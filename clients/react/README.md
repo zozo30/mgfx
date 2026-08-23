@@ -105,6 +105,7 @@ instead of intrinsic host elements:
 - `Mesh` for explicit application-owned indexed geometry and `Path` for SVG
   path data lowered to persistent canonical server resources
 - `Svg` for bounded multi-layer vector documents, including 2–8 stop linear gradients
+  and local gradient-definition inheritance
 
 `src/navigation.tsx` provides an in-memory history `Router`, `useRouter()` with
 push/replace/back operations, and a depth-aware `Dialog`. Dialogs use absolute

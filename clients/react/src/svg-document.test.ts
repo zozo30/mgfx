@@ -60,6 +60,25 @@ test("SVG object-bounding-box gradients map onto transformed path bounds", () =>
   assert.deepEqual(document.layers[0]?.fillGradient?.end, { x: 53, y: 7 });
 });
 
+test("SVG linear gradients inherit stops and geometry through local references", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 80 20">
+    <defs>
+      <linearGradient id="palette"><stop offset="0" stop-color="#ff4000"/>
+        <stop offset=".5" stop-color="#8050ff"/><stop offset="1" stop-color="#20d890"/>
+      </linearGradient>
+      <linearGradient id="positioned" href="#palette" gradientUnits="userSpaceOnUse"
+        x1="10" y1="0" x2="70" y2="0"/>
+    </defs>
+    <rect width="80" height="20" fill="url(#positioned)"/>
+  </svg>`);
+  assert.equal(document.layers[0]?.fillGradient?.stops?.length, 3);
+  assert.deepEqual(document.layers[0]?.fillGradient?.start, { x: 10, y: 0 });
+  assert.deepEqual(document.layers[0]?.fillGradient?.end, { x: 70, y: 0 });
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 10 10"><defs>
+    <linearGradient id="a" href="#b"/><linearGradient id="b" href="#a"/>
+    </defs><rect width="10" height="10" fill="url(#a)"/></svg>`), /reference cycle/);
+});
+
 test("SVG vector lowering reports unresolved gradient paint", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z" fill="url(#missing)"/></svg>`),

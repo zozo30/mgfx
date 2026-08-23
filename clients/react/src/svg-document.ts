@@ -62,6 +62,11 @@ interface GradientDefinition {
   readonly stops: readonly { readonly offset: number; readonly color: Color }[];
 }
 
+interface RawGradientDefinition {
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly stops: readonly { readonly offset: number; readonly color: Color }[];
+}
+
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 const white: Color = { red: 1, green: 1, blue: 1, alpha: 1 };
 const primitiveTags = new Set(["path", "line", "polyline", "polygon", "rect", "circle", "ellipse"]);
@@ -206,26 +211,48 @@ function scaleDash(dash: DashStyle, scale: number): DashStyle {
 }
 
 function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<string, GradientDefinition> {
-  const definitions = new Map<string, GradientDefinition>();
-  for (const match of source.matchAll(/<linearGradient\b([^>]*)>([\s\S]*?)<\/linearGradient\s*>/gi)) {
+  const raw = new Map<string, RawGradientDefinition>();
+  for (const match of source.matchAll(/<linearGradient\b([^>]*?)(?:\/\s*>|>([\s\S]*?)<\/linearGradient\s*>)/gi)) {
     const attributes = withInlineStyle(svgAttributes(match[1]!));
     const id = attributes.id?.trim();
     if (!id) continue;
-    const stops = [...match[2]!.matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
+    const stops = [...(match[2] ?? "").matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
       const values = withInlineStyle(svgAttributes(stop[1]!));
       const color = parseColor(values["stop-color"] ?? "black", currentColor)!;
       return { offset: unitInterval(values.offset ?? "0"),
         color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
     }).sort((left, right) => left.offset - right.offset);
-    if (stops.length < 2 || stops.length > 8) continue;
-    definitions.set(id, {
-      units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
-      x1: attributes.x1 ?? "0%", y1: attributes.y1 ?? "0%",
-      x2: attributes.x2 ?? "100%", y2: attributes.y2 ?? "0%",
-      transform: parseTransform(attributes.gradientTransform),
-      stops,
-    });
+    raw.set(id, { attributes, stops });
   }
+  const definitions = new Map<string, GradientDefinition>();
+  const resolve = (id: string, visiting: ReadonlySet<string>): GradientDefinition | undefined => {
+    const cached = definitions.get(id);
+    if (cached) return cached;
+    const item = raw.get(id);
+    if (!item) return undefined;
+    if (visiting.has(id)) throw new Error(`SVG linear gradient reference cycle at #${id}`);
+    const href = item.attributes.href ?? item.attributes["xlink:href"];
+    if (href !== undefined && !/^#[^\s]+$/.test(href))
+      throw new Error(`SVG linear gradient #${id} has an external reference`);
+    const nextVisiting = new Set(visiting); nextVisiting.add(id);
+    const base = href ? resolve(href.slice(1), nextVisiting) : undefined;
+    if (href && !base) throw new Error(`SVG linear gradient #${id} references missing ${href}`);
+    const stops = item.stops.length > 0 ? item.stops : base?.stops ?? [];
+    if (stops.length < 2 || stops.length > 8) return undefined;
+    const definition: GradientDefinition = {
+      units: item.attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" :
+        item.attributes.gradientUnits === "objectBoundingBox" ? "objectBoundingBox" :
+        base?.units ?? "objectBoundingBox",
+      x1: item.attributes.x1 ?? base?.x1 ?? "0%", y1: item.attributes.y1 ?? base?.y1 ?? "0%",
+      x2: item.attributes.x2 ?? base?.x2 ?? "100%", y2: item.attributes.y2 ?? base?.y2 ?? "0%",
+      transform: item.attributes.gradientTransform !== undefined
+        ? parseTransform(item.attributes.gradientTransform) : base?.transform ?? identity,
+      stops,
+    };
+    definitions.set(id, definition);
+    return definition;
+  };
+  for (const id of raw.keys()) resolve(id, new Set());
   return definitions;
 }
 

@@ -54,11 +54,13 @@ root view box, inherited fill/stroke/opacity state, nested groups, primitive
 shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
 becomes a stable path resource with its own compact paint command. Linear gradients
 gradients resolve from `<defs>` in either SVG user space or object-bounding-box
-space, including stop opacity and gradient transforms, then use native `DrawPath`
+space, including stop opacity, gradient transforms, and fragment-only `href` or
+`xlink:href` inheritance, then use native `DrawPath`
 gradient paint. `stroke-dasharray` sequences of up to 32 values plus
 `stroke-dashoffset` lower to native dashed path paint. Odd sequences are repeated
 to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
 masks, text, and embedded images deliberately continue through the high-quality raster fallback.
+Missing, cyclic, or external gradient references are rejected rather than partially rendered.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the

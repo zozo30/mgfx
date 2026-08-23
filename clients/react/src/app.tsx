@@ -150,10 +150,12 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       <stop offset="48%" stop-color="#4b28d7"/>
       <stop offset="100%" stop-color="#183b69"/>
     </linearGradient>
-    <linearGradient id="signal" gradientUnits="userSpaceOnUse" x1="78" y1="24" x2="131" y2="42">
+    <linearGradient id="signalPalette">
       <stop offset="0%" stop-color="#ff8a1e"/>
       <stop offset="100%" stop-color="#ffe75a"/>
     </linearGradient>
+    <linearGradient id="signal" href="#signalPalette" gradientUnits="userSpaceOnUse"
+      x1="78" y1="24" x2="131" y2="42"/>
   </defs>
   <g transform="translate(4 4)">
     <rect x="1" y="1" width="150" height="62" rx="12" fill="url(#panel)"
