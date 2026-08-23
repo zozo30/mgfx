@@ -38,6 +38,7 @@ export interface RadialGradientPaint {
   readonly outerColor: Color;
   readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   readonly spread?: "pad" | "repeat" | "reflect";
+  readonly focal?: { readonly x: number; readonly y: number };
 }
 
 export interface SvgVectorDocument {
@@ -83,6 +84,7 @@ interface RawGradientDefinition {
 interface RadialGradientDefinition {
   readonly units: "objectBoundingBox" | "userSpaceOnUse";
   readonly cx: string; readonly cy: string; readonly radius: string;
+  readonly fx: string; readonly fy: string;
   readonly transform: Matrix;
   readonly stops: readonly { readonly offset: number; readonly color: Color }[];
   readonly spread: "pad" | "repeat" | "reflect";
@@ -291,8 +293,7 @@ function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<
     const id = attributes.id?.trim();
     if (!id) continue;
     const cx = attributes.cx ?? "50%", cy = attributes.cy ?? "50%";
-    if ((attributes.fx !== undefined && attributes.fx !== cx) ||
-        (attributes.fy !== undefined && attributes.fy !== cy)) continue;
+    if (attributes.fr !== undefined && unitCoordinate(attributes.fr) !== 0) continue;
     const stops = [...match[2]!.matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
       const values = withInlineStyle(svgAttributes(stop[1]!));
       const color = parseColor(values["stop-color"] ?? "black", currentColor)!;
@@ -302,7 +303,8 @@ function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<
     if (stops.length < 2 || stops.length > 8) continue;
     definitions.set(id, {
       units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
-      cx, cy, radius: attributes.r ?? "50%", transform: parseTransform(attributes.gradientTransform),
+      cx, cy, fx: attributes.fx ?? cx, fy: attributes.fy ?? cy,
+      radius: attributes.r ?? "50%", transform: parseTransform(attributes.gradientTransform),
       stops, spread: attributes.spreadMethod === "repeat" ? "repeat" :
         attributes.spreadMethod === "reflect" ? "reflect" : "pad",
     });
@@ -314,7 +316,8 @@ function resolveRadialGradient(definitions: ReadonlyMap<string, RadialGradientDe
   path: string, state: PaintState, viewBox: Rect, paintOpacity: number): RadialGradientPaint {
   const definition = definitions.get(id);
   if (!definition) throw new Error(`SVG radial gradient #${id} is unsupported`);
-  let center: { x: number; y: number }, edgeX: { x: number; y: number }, edgeY: { x: number; y: number };
+  let center: { x: number; y: number }, edgeX: { x: number; y: number },
+    edgeY: { x: number; y: number }, focal: { x: number; y: number };
   if (definition.units === "userSpaceOnUse") {
     const cx = coordinate(definition.cx, viewBox.x, viewBox.width);
     const cy = coordinate(definition.cy, viewBox.y, viewBox.height);
@@ -322,6 +325,10 @@ function resolveRadialGradient(definitions: ReadonlyMap<string, RadialGradientDe
     center = transformPoint(state.transform, transformPoint(definition.transform, { x: cx, y: cy }));
     edgeX = transformPoint(state.transform, transformPoint(definition.transform, { x: cx + radius, y: cy }));
     edgeY = transformPoint(state.transform, transformPoint(definition.transform, { x: cx, y: cy + radius }));
+    focal = transformPoint(state.transform, transformPoint(definition.transform, {
+      x: coordinate(definition.fx, viewBox.x, viewBox.width),
+      y: coordinate(definition.fy, viewBox.y, viewBox.height),
+    }));
   } else {
     const bounds = new SVGPathData(path).getBounds();
     const cx = unitCoordinate(definition.cx), cy = unitCoordinate(definition.cy);
@@ -333,15 +340,28 @@ function resolveRadialGradient(definitions: ReadonlyMap<string, RadialGradientDe
     };
     center = map({ x: cx, y: cy }); edgeX = map({ x: cx + radius, y: cy });
     edgeY = map({ x: cx, y: cy + radius });
+    focal = map({ x: unitCoordinate(definition.fx), y: unitCoordinate(definition.fy) });
+  }
+  const axisX = { x: edgeX.x - center.x, y: edgeX.y - center.y };
+  const axisY = { x: edgeY.x - center.x, y: edgeY.y - center.y };
+  const determinant = axisX.x * axisY.y - axisX.y * axisY.x;
+  let focalX = ((focal.x - center.x) * axisY.y - (focal.y - center.y) * axisY.x) / determinant;
+  let focalY = (axisX.x * (focal.y - center.y) - axisX.y * (focal.x - center.x)) / determinant;
+  const focalLength = Math.hypot(focalX, focalY);
+  if (focalLength >= 1) {
+    const scale = 0.999999 / focalLength;
+    focalX *= scale; focalY *= scale;
+    focal = { x: center.x + axisX.x * focalX + axisY.x * focalY,
+      y: center.y + axisX.y * focalX + axisY.y * focalY };
   }
   const stops = definition.stops.map((stop) => ({ offset: stop.offset,
     color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
   const needsExplicitStops = stops.length > 2 || stops[0]!.offset !== 0 ||
     stops[stops.length - 1]!.offset !== 1;
-  return { center, axisX: { x: edgeX.x - center.x, y: edgeX.y - center.y },
-    axisY: { x: edgeY.x - center.x, y: edgeY.y - center.y },
+  return { center, axisX, axisY,
     innerColor: stops[0]!.color, outerColor: stops[stops.length - 1]!.color,
-    ...(needsExplicitStops ? { stops } : {}), spread: definition.spread };
+    ...(needsExplicitStops ? { stops } : {}), spread: definition.spread,
+    ...(Math.hypot(focal.x - center.x, focal.y - center.y) > 0.000001 ? { focal } : {}) };
 }
 
 function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,

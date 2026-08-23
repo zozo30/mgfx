@@ -59,7 +59,8 @@ space, including stop opacity, gradient transforms, and fragment-only `href` or
 gradient paint. Centered two- through eight-stop radial fills with `pad`, `repeat`,
 or `reflect` spread resolve into a center and two radius vectors, preserving elliptical
 and transformed fields without client tessellation. Offset focal points deliberately
-remain on the raster fallback. `stroke-dasharray`
+use the native focal-ray solver when focal radius is zero; nonzero `fr` deliberately
+remains on the raster fallback. `stroke-dasharray`
 sequences of up to 32 values plus
 `stroke-dashoffset` lower to native dashed path paint. Odd sequences are repeated
 to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
@@ -220,6 +221,10 @@ ordered stops. The stop table changes paint only and is advertised independently
 by `multiStopRadialPathGradients`.
 Repeat and reflect wrap radial distance in the same fragment shader before stop
 selection and are advertised by `radialPathGradientSpreadModes`.
+`DrawFocalRadialPath` adds an offset source-space focal point. Metal transforms it
+into the elliptical basis and solves the ray intersection with the outer unit circle
+per fragment, preserving multi-stop and spread behavior without shifted-circle
+approximations. Support is advertised by `focalRadialPathGradients`.
 
 ## Linear gradients
 

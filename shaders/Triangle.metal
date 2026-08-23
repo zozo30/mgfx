@@ -37,6 +37,7 @@ struct RadialPathUniforms {
     packed_float2 center;
     packed_float2 axisX;
     packed_float2 axisY;
+    packed_float2 focal;
     uint stopCount;
     uint spread;
     packed_float4 offsets[2];
@@ -58,7 +59,14 @@ fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]],
         ? float2((delta.x * gradient.axisY.y - delta.y * gradient.axisY.x) / determinant,
                  (gradient.axisX.x * delta.y - gradient.axisX.y * delta.x) / determinant)
         : float2(1.0);
-    const float rawAmount = length(radial);
+    const float2 focalDelta = radial - gradient.focal;
+    const float distanceSquared = dot(focalDelta, focalDelta);
+    const float focalProjection = dot(gradient.focal, focalDelta);
+    const float discriminant = max(focalProjection * focalProjection -
+        distanceSquared * (dot(gradient.focal, gradient.focal) - 1.0), 0.0);
+    const float denominator = -focalProjection + sqrt(discriminant);
+    const float rawAmount = distanceSquared <= 0.0000001 ? 0.0 :
+        denominator > 0.000001 ? distanceSquared / denominator : 1.0;
     const float repeated = rawAmount - floor(rawAmount);
     const float reflectedCycle = fmod(rawAmount, 2.0);
     const float amount = gradient.spread == 1 ? repeated : gradient.spread == 2 ?

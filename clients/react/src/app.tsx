@@ -157,7 +157,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     </linearGradient>
     <linearGradient id="signal" href="#signalPalette" gradientUnits="userSpaceOnUse"
       x1="78" y1="24" x2="131" y2="42"/>
-          <radialGradient id="orb" r="25%" spreadMethod="reflect">
+          <radialGradient id="orb" r="25%" fx="38%" fy="35%" spreadMethod="reflect">
             <stop offset="0" stop-color="#d8fff0"/>
             <stop offset="0.48" stop-color="#58e6b5"/>
             <stop offset="1" stop-color="#16c784"/></radialGradient>

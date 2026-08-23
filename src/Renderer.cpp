@@ -1212,7 +1212,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                    command.opcode == gfx::Opcode::drawDashArrayPath ||
                    command.opcode == gfx::Opcode::drawMultiGradientPath ||
                    command.opcode == gfx::Opcode::drawRadialPath ||
-                   command.opcode == gfx::Opcode::drawMultiRadialPath) {
+                   command.opcode == gfx::Opcode::drawMultiRadialPath ||
+                   command.opcode == gfx::Opcode::drawFocalRadialPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1255,6 +1256,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     !std::isfinite(path.radialGradient.outerColor.green) ||
                     !std::isfinite(path.radialGradient.outerColor.blue) ||
                     !std::isfinite(path.radialGradient.outerColor.alpha) ||
+                    (path.radialGradient.hasFocalPoint &&
+                     (!std::isfinite(path.radialGradient.focalX) ||
+                      !std::isfinite(path.radialGradient.focalY))) ||
                     (!path.radialGradient.stops.empty() &&
                      (path.radialGradient.stops.size() < 2U ||
                       path.radialGradient.stops.size() > 8U ||
@@ -1316,7 +1320,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                         std::array<float, 2> position, source;
                     };
                     struct RadialPathUniforms {
-                        std::array<float, 2> center, axisX, axisY;
+                        std::array<float, 2> center, axisX, axisY, focal;
                         std::uint32_t stopCount = 0;
                         std::uint32_t spread = 0;
                         std::array<std::array<float, 4>, 2> offsets{};
@@ -1324,7 +1328,20 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     };
                     RadialPathUniforms uniforms{{radial->centerX, radial->centerY},
                         {radial->axisXX, radial->axisXY},
-                        {radial->axisYX, radial->axisYY}};
+                        {radial->axisYX, radial->axisYY}, {0.0F, 0.0F}};
+                    if (radial->hasFocalPoint) {
+                        const float determinant = radial->axisXX * radial->axisYY -
+                                                  radial->axisXY * radial->axisYX;
+                        const float dx = radial->focalX - radial->centerX;
+                        const float dy = radial->focalY - radial->centerY;
+                        uniforms.focal = {
+                            (dx * radial->axisYY - dy * radial->axisYX) / determinant,
+                            (radial->axisXX * dy - radial->axisXY * dx) / determinant,
+                        };
+                        if (uniforms.focal[0] * uniforms.focal[0] +
+                            uniforms.focal[1] * uniforms.focal[1] >= 1.0F)
+                            throw std::runtime_error("Radial focal point lies outside its field");
+                    }
                     uniforms.stopCount = static_cast<std::uint32_t>(
                         radial->stops.empty() ? 2U : radial->stops.size());
                     uniforms.spread = static_cast<std::uint32_t>(radial->spread);

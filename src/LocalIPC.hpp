@@ -104,6 +104,7 @@ enum ServerCapability : std::uint64_t {
     radialPathGradients = 1ULL << 43U,
     multiStopRadialPathGradients = 1ULL << 44U,
     radialPathGradientSpreadModes = 1ULL << 45U,
+    focalRadialPathGradients = 1ULL << 46U,
 };
 
 enum class ResourceKind : std::uint8_t {

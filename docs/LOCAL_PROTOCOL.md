@@ -115,6 +115,7 @@ Path-gradient repeat and reflect spread modes are advertised by `1 << 42`.
 Two-stop radial path gradients are advertised by `1 << 43`.
 Multi-stop radial path gradients are advertised by `1 << 44`.
 Radial path repeat and reflect spread modes are advertised by `1 << 45`.
+Offset focal points for radial path gradients are advertised by `1 << 46`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -280,3 +281,9 @@ base, followed by six `f32` values for center and radius vectors, `u8 stopCount`
 Spread is pad (`0`), repeat (`1`), or reflect (`2`). Payload size
 is `160 + stopCount * 20`, with 2 through 8 ordered stops in `[0,1]`. Capability
 bit 44 is required for the stop table and bit 45 for repeat or reflect.
+
+MGFX opcode `34` (`DrawFocalRadialPath`) extends opcode 33 by inserting two
+source-space `f32` focal coordinates before its stop header. The header therefore
+starts at byte 160, stops at byte 168, and payload size is
+`168 + stopCount * 20`. The focal point must lie strictly inside the ellipse;
+capability bit 46 is required. This represents SVG `fx`/`fy` with zero `fr`.

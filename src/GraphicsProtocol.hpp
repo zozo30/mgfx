@@ -44,6 +44,7 @@ enum class Opcode : std::uint16_t {
     drawMultiGradientPath = 31,
     drawRadialPath = 32,
     drawMultiRadialPath = 33,
+    drawFocalRadialPath = 34,
 };
 
 enum class Primitive : std::uint8_t {
@@ -278,6 +279,8 @@ struct PathCommand {
         Color innerColor, outerColor;
         std::vector<PathGradient::Stop> stops;
         PathGradient::Spread spread = PathGradient::Spread::pad;
+        bool hasFocalPoint = false;
+        float focalX = 0.0F, focalY = 0.0F;
     };
     bool fillRadialGradient = false;
     RadialGradient radialGradient{};

@@ -43,7 +43,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.PathGradientSpreadModes |
     ExtendedServerCapability.RadialPathGradients |
     ExtendedServerCapability.MultiStopRadialPathGradients |
-    ExtendedServerCapability.RadialPathGradientSpreadModes;
+    ExtendedServerCapability.RadialPathGradientSpreadModes |
+    ExtendedServerCapability.FocalRadialPathGradients;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -496,6 +497,24 @@ test("multi-stop radial path paint remains one bounded native command", () => {
   assert.equal(bytes.readUInt8(24 + 152), 3);
   assert.equal(bytes.readUInt8(24 + 153), 2);
   assert.ok(Math.abs(bytes.readFloatLE(24 + 160 + 20) - 0.4) < 0.00001);
+});
+
+test("focal radial path paint carries an offset highlight without client geometry", () => {
+  const frame = new FrameEncoder();
+  frame.path(9, { left: 0, top: 1, right: 1, bottom: 0 },
+    { x: 0, y: 0, width: 40, height: 20 }, { fillRadialGradient: {
+      center: { x: 20, y: 10 }, axisX: { x: 20, y: 0 }, axisY: { x: 0, y: 10 },
+      focal: { x: 14, y: 7 },
+      innerColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+      outerColor: { red: 0.1, green: 0.8, blue: 0.5, alpha: 1 },
+    } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 34);
+  assert.equal(bytes.readUInt32LE(20), 208);
+  assert.equal(bytes.readFloatLE(24 + 152), 14);
+  assert.equal(bytes.readFloatLE(24 + 156), 7);
+  assert.equal(bytes.readUInt8(24 + 160), 2);
 });
 
 test("indexed meshes upload once and frames reference their resource", () => {
