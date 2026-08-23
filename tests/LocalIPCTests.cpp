@@ -74,6 +74,21 @@ int main() {
         return 1;
     }
 
+    mgfx::ipc::TextMeasure textMeasure{};
+    if (!mgfx::ipc::decodeTextMeasure(mgfx::ipc::encodeTextMeasure(
+            {mgfx::ipc::TextFamily::systemSans, "Árvíztűrő — Ω"}), textMeasure) ||
+        textMeasure.family != mgfx::ipc::TextFamily::systemSans ||
+        textMeasure.text != "Árvíztűrő — Ω") {
+        std::cerr << "Native text measurement request round trip failed\n";
+        return 1;
+    }
+    float textAdvance = 0.0F;
+    if (!mgfx::ipc::decodeTextMetrics(mgfx::ipc::encodeTextMetrics(6.25F), textAdvance) ||
+        textAdvance != 6.25F) {
+        std::cerr << "Native text metrics response round trip failed\n";
+        return 1;
+    }
+
     mgfx::ipc::TextureUpload texture{};
     const mgfx::ipc::TextureUpload sourceTexture{9, 2, 1,
         {255, 0, 0, 255, 0, 255, 0, 255}};

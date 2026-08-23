@@ -1,9 +1,10 @@
 import { createContext, createElement, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
 import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants.js";
-import { FrameEncoder, type Key, type KeyEvent, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
+import { FrameEncoder, type FontFamily, type Key, type KeyEvent, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
-  box, circle, clickable, column, Component, ComponentHost, focusable, row, scrollView, stack, text,
+  box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
+  nativeTextAdvance, row, scrollView, stack, text,
   type Element, type Point, type Size, type Style, type TextStyle,
   mesh, path as vectorPath, type MeshData, type PathData,
 } from "@mgfx/demo-client/ui";
@@ -165,11 +166,13 @@ export class ReactSurface {
   private readonly snapshot: SnapshotComponent;
   private viewport: Size = { width: 0, height: 0 };
   private readonly uploadedPaths = new Set<number>();
+  private readonly requestedTextMetrics = new Set<string>();
 
   constructor(private readonly onFrame: (frame: Buffer) => void,
               private readonly windowCommands?: NativeWindowCommands,
               private readonly resourceCommands?: {
                 readonly createPath: (id: number, segments: readonly PathSegment[]) => void;
+                readonly measureText?: (family: FontFamily, text: string) => Promise<number>;
               }) {
     this.container = { children: [], surface: this };
     this.snapshot = new SnapshotComponent(this.container);
@@ -202,6 +205,7 @@ export class ReactSurface {
   private submit(): void {
     if (this.viewport.width <= 0 || this.viewport.height <= 0 || this.container.children.length === 0) return;
     this.uploadPaths(this.container.children);
+    this.requestMetrics(this.container.children);
     this.host.rebuild(this.snapshot);
     this.host.layout(this.viewport);
     const encoder = new FrameEncoder();
@@ -219,6 +223,28 @@ export class ReactSurface {
         this.uploadedPaths.add(path.resourceId);
       }
       this.uploadPaths(child.children);
+    }
+  }
+  private requestMetrics(children: readonly HostChild[]): void {
+    for (const child of children) {
+      if (child.kind !== "host") continue;
+      if (child.type === "mgfx-text") {
+        const family = child.props.textStyle?.fontFamily;
+        const value = child.props.value ?? child.children
+          .filter((item): item is TextNode => item.kind === "text").map((item) => item.value).join("");
+        if ((family === "system" || family === "monospace") && value &&
+            nativeTextAdvance(family, value) === undefined) {
+          const key = `${family}\0${value}`;
+          if (!this.requestedTextMetrics.has(key) && this.resourceCommands?.measureText) {
+            this.requestedTextMetrics.add(key);
+            void this.resourceCommands.measureText(family, value).then((advance) => {
+              cacheNativeTextAdvance(family, value, advance);
+              this.submit();
+            }).catch(() => {});
+          }
+        }
+      }
+      this.requestMetrics(child.children);
     }
   }
 }

@@ -6,9 +6,10 @@ import { ReactSurface } from "./renderer.js";
 import { decodeImageFile, type DecodedImage } from "./image-codec.js";
 import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
-  decodeServerHello, decodeSize, decodeText, decodeWindowChromeMetrics, encodeCursor, encodePathCreate, encodeText,
+  decodeServerHello, decodeSize, decodeText, decodeTextMetrics, decodeWindowChromeMetrics,
+  encodeCursor, encodePathCreate, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
-  MessageType, sendMessage } from "@mgfx/demo-client/protocol";
+  MessageType, sendMessage, TextMetricsClient } from "@mgfx/demo-client/protocol";
 
 const userId = process.geteuid?.() ?? process.getuid?.();
 if (userId === undefined) throw new Error("MGFX React requires a POSIX Node.js platform");
@@ -35,6 +36,8 @@ const clipboard = new ClipboardClient(
 );
 const framePacer = new FramePacer((frame, sequence) =>
   sendMessage(socket, MessageType.Frame, frame, sequence));
+const textMetrics = new TextMetricsClient((payload, sequence) =>
+  sendMessage(socket, MessageType.TextMeasure, payload, sequence));
 const surface = new ReactSurface(
   (frame) => framePacer.submit(frame),
   {
@@ -50,6 +53,7 @@ const surface = new ReactSurface(
   {
     createPath: (id, segments) => sendMessage(socket, MessageType.PathCreate,
       encodePathCreate(id, segments)),
+    measureText: (family, text) => textMetrics.measure(family, text),
   },
 );
 let chromeMetrics = { leadingInset: 132, titleBarHeight: 56 };
@@ -86,6 +90,9 @@ socket.on("data", (chunk) => {
         chromeMetrics = decodeWindowChromeMetrics(message.payload);
         renderApplication();
         break;
+      case MessageType.TextMetrics:
+        textMetrics.receive(message.sequence, decodeTextMetrics(message.payload));
+        break;
       case MessageType.Close: socket.end(); break;
       }
     }
@@ -94,7 +101,7 @@ socket.on("data", (chunk) => {
     socket.destroy();
   }
 });
-socket.on("close", () => { clipboard.close(); process.exit(0); });
+socket.on("close", () => { clipboard.close(); textMetrics.close(); process.exit(0); });
 socket.on("error", (error) => {
   if (!shuttingDown) console.error("MGFX React socket error:", error.message);
 });

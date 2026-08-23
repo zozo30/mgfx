@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeWindowChromeMetrics, encodeCursor, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -170,6 +170,17 @@ test("system Unicode text is a compact skippable display-list command", () => {
   assert.equal(bytes.readUInt16LE(16), 8);
   assert.equal(bytes.readUInt8(24), 1);
   assert.equal(bytes.subarray(56, 56 + Buffer.byteLength("Hello — Ω")).toString(), "Hello — Ω");
+});
+
+test("native text metrics correlate asynchronous measurement replies", async () => {
+  const sent: Array<{ payload: Buffer; sequence: number }> = [];
+  const metrics = new TextMetricsClient((payload, sequence) => sent.push({ payload, sequence }));
+  const pending = metrics.measure("system", "Árvíztűrő — Ω");
+  assert.deepEqual(sent[0]?.payload, encodeTextMeasure("system", "Árvíztűrő — Ω"));
+  const payload = Buffer.alloc(4); payload.writeFloatLE(6.25);
+  metrics.receive(sent[0]!.sequence + 1, 99);
+  metrics.receive(sent[0]!.sequence, decodeTextMetrics(payload));
+  assert.equal(await pending, 6.25);
 });
 
 test("clipboard replies resolve only their correlated request", async () => {

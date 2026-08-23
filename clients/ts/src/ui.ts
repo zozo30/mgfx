@@ -43,6 +43,16 @@ export interface TextStyle {
   color?: Color;
   fontFamily?: "pixel" | "system" | "monospace";
 }
+
+const nativeTextAdvances = new Map<string, number>();
+const nativeTextKey = (family: "system" | "monospace", value: string) => `${family}\0${value}`;
+export function cacheNativeTextAdvance(family: "system" | "monospace", value: string,
+  advance: number): void {
+  if (Number.isFinite(advance) && advance >= 0) nativeTextAdvances.set(nativeTextKey(family, value), advance);
+}
+export function nativeTextAdvance(family: "system" | "monospace", value: string): number | undefined {
+  return nativeTextAdvances.get(nativeTextKey(family, value));
+}
 export interface MeshData {
   readonly positions: readonly Point[];
   readonly indices: readonly number[];
@@ -278,8 +288,10 @@ class Node {
     if (this.type === "text" && this.value) {
       const fontSize = this.textStyle.fontSize ?? 16;
       if (this.textStyle.fontFamily && this.textStyle.fontFamily !== "pixel") {
+        const exactAdvance = nativeTextAdvance(this.textStyle.fontFamily, this.value);
         const averageAdvance = this.textStyle.fontFamily === "monospace" ? 0.60 : 0.56;
-        width = [...this.value].length * fontSize * averageAdvance;
+        width = exactAdvance !== undefined ? exactAdvance * fontSize
+          : [...this.value].length * fontSize * averageAdvance;
       } else {
         const cell = fontSize / 7;
         width = this.value.length * cell * 6 - cell;

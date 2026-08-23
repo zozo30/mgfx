@@ -41,6 +41,8 @@ enum class MessageType : std::uint16_t {
     textureDestroy = 25,
     pathCreate = 26,
     pathDestroy = 27,
+    textMeasure = 28,
+    textMetrics = 29,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -62,6 +64,14 @@ enum ServerCapability : std::uint32_t {
     clientWindowChrome = 1U << 9U,
     textureResources = 1U << 10U,
     pathResources = 1U << 11U,
+    nativeTextMetrics = 1U << 12U,
+};
+
+enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
+
+struct TextMeasure {
+    TextFamily family;
+    std::string text;
 };
 
 enum class WindowChromeMode : std::uint8_t {
@@ -247,5 +257,9 @@ std::vector<std::uint8_t> encodePathUpload(const PathUpload& path);
 bool decodePathUpload(const std::vector<std::uint8_t>& payload, PathUpload& path);
 std::vector<std::uint8_t> encodeResourceId(std::uint32_t id);
 bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& id);
+std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure);
+bool decodeTextMeasure(const std::vector<std::uint8_t>& payload, TextMeasure& measure);
+std::vector<std::uint8_t> encodeTextMetrics(float advance);
+bool decodeTextMetrics(const std::vector<std::uint8_t>& payload, float& advance);
 
 } // namespace mgfx::ipc

@@ -41,6 +41,28 @@ test("React Path uploads canonical curves once and emits DrawPath instead of tri
   assert.equal(frame.readUInt16LE(40), 7);
 });
 
+test("React relayouts once when exact native text metrics arrive", async () => {
+  let frames = 0, requests = 0;
+  const surface = new ReactSurface(() => { frames += 1; }, undefined, {
+    createPath: () => {},
+    measureText: async (family, value) => {
+      requests += 1;
+      assert.equal(family, "system");
+      assert.equal(value, "ASYNC METRIC 937");
+      return 8.75;
+    },
+  });
+  surface.render(<mgfx-text value="ASYNC METRIC 937"
+    textStyle={{ fontSize: 20, fontFamily: "system" }} />);
+  surface.resize({ width: 400, height: 60 });
+  const approximateFrames = frames;
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(requests, 1);
+  assert.ok(frames > approximateFrames);
+  surface.resize({ width: 420, height: 60 });
+  assert.equal(requests, 1);
+});
+
 test("native router pushes and pops React route history", () => {
   let observed = "";
   function Home() {

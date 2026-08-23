@@ -33,6 +33,8 @@ export enum MessageType {
   TextureDestroy = 25,
   PathCreate = 26,
   PathDestroy = 27,
+  TextMeasure = 28,
+  TextMetrics = 29,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -49,6 +51,7 @@ export enum ServerCapability {
   ClientWindowChrome = 1 << 9,
   TextureResources = 1 << 10,
   PathResources = 1 << 11,
+  NativeTextMetrics = 1 << 12,
 }
 export interface ServerHello {
   readonly version: number;
@@ -137,6 +140,54 @@ export interface PathPaint {
 }
 
 export type FontFamily = "system" | "monospace";
+
+export function encodeTextMeasure(family: FontFamily, text: string): Buffer {
+  const utf8 = Buffer.from(text, "utf8");
+  if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
+    throw new RangeError("Text measurement requires 1 through 65536 non-NUL UTF-8 bytes");
+  const payload = Buffer.alloc(4 + utf8.length);
+  payload.writeUInt8(family === "monospace" ? 1 : 0, 0);
+  utf8.copy(payload, 4);
+  return payload;
+}
+
+export function decodeTextMetrics(payload: Buffer): number {
+  if (payload.length !== 4) throw new Error("TextMetrics payload must be 4 bytes");
+  const advance = payload.readFloatLE(0);
+  if (!Number.isFinite(advance) || advance < 0) throw new Error("Invalid text advance");
+  return advance;
+}
+
+export class TextMetricsClient {
+  private nextSequence = 1;
+  private readonly pending = new Map<number, {
+    resolve: (advance: number) => void; reject: (error: Error) => void;
+  }>();
+
+  constructor(private readonly sendRequest: (payload: Buffer, sequence: number) => void) {}
+
+  measure(family: FontFamily, text: string): Promise<number> {
+    const payload = encodeTextMeasure(family, text);
+    const sequence = this.nextSequence;
+    this.nextSequence = sequence === 0xffff_ffff ? 1 : sequence + 1;
+    this.sendRequest(payload, sequence);
+    return new Promise<number>((resolve, reject) => {
+      this.pending.set(sequence, { resolve, reject });
+    });
+  }
+
+  receive(sequence: number, advance: number): void {
+    const request = this.pending.get(sequence);
+    if (!request) return;
+    this.pending.delete(sequence);
+    request.resolve(advance);
+  }
+
+  close(error = new Error("MGFX text-metrics connection closed")): void {
+    for (const request of this.pending.values()) request.reject(error);
+    this.pending.clear();
+  }
+}
 
 export function encodeTextureCreate(id: number, width: number, height: number,
   rgba: Uint8Array): Buffer {

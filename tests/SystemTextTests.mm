@@ -9,6 +9,11 @@ int main() {
         std::cerr << "System Unicode shaping produced no drawable glyph geometry\n";
         return 1;
     }
+    if (std::fabs(gfx::measureSystemText("Hello, MGFX — Ω", gfx::FontFamily::systemSans) -
+                  sans.advance) > 0.0001F) {
+        std::cerr << "Fast text measurement disagrees with shaped geometry metrics\n";
+        return 1;
+    }
     const gfx::ShapedText mono = gfx::shapeSystemText("iiiiWWWW", gfx::FontFamily::systemMonospace);
     if (mono.triangles.empty() || mono.advance <= 4.0F || mono.advance >= 6.0F) {
         std::cerr << "Monospaced system font metrics are implausible\n";

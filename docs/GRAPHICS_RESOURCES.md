@@ -62,6 +62,11 @@ string. Metal therefore receives compact cached vector text instead of one
 rectangle pair per lit pixel. Other native hosts can execute the same command
 through DirectWrite or a HarfBuzz/FreeType service.
 
+Clients request the exact native advance once per unique family/string through
+correlated `TextMeasure`/`TextMetrics` MGIP messages. React first lays out with a
+nonblocking estimate, caches the em-unit reply, and performs one corrected
+layout; animation frames do not repeat measurement traffic.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility
@@ -84,8 +89,8 @@ color glyph atlases remain available for small text and emoji.
    Next add persistent mesh resources and selective lowering of complete
    `<Svg>` documents.
 4. **Partially implemented:** compact Unicode `DrawText`, native shaping, and
-   cached glyph-outline geometry. Next add font uploads, exact asynchronous
-   metrics, rich-text runs, and atlas caching.
+   cached glyph-outline geometry, plus exact asynchronous advance metrics. Next
+   add font uploads, multiline/rich-text runs, and atlas caching.
 5. Add cache budgets, device-loss recreation, and resource tracing tools.
 
 None of these stages changes window, layout, event, or component ownership: the

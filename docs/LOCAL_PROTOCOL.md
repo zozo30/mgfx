@@ -69,6 +69,10 @@ created or shown a drawable surface.
 | 23 | `WindowChromeMetrics` | server → client | `f32 leadingInset`, `f32 titleBarHeight` in drawable units |
 | 24 | `TextureCreate` | client → server | `u32 id`, `u32 width`, `u32 height`, reserved `u32`, tightly packed RGBA8 pixels |
 | 25 | `TextureDestroy` | client → server | Nonzero `u32` resource ID |
+| 26 | `PathCreate` | client → server | Nonzero `u32` ID, segment count, reserved fields, canonical path segments |
+| 27 | `PathDestroy` | client → server | Nonzero `u32` resource ID |
+| 28 | `TextMeasure` | client → server | `u8 family`, three reserved zero bytes, UTF-8 text; nonzero sequence |
+| 29 | `TextMetrics` | server → client | `f32 advance` in em units; echoes request sequence |
 
 Backend is `1` Metal, `2` Vulkan, or `3` DirectX. Capability bits are client
 window lifecycle (`1 << 0`), pointer input (`1 << 1`), keyboard input (`1 << 2`),
@@ -81,6 +85,8 @@ Native text clipboard access is advertised by `1 << 8`.
 Client-controlled window chrome is advertised by `1 << 9`.
 Persistent RGBA8 texture resources and MGFX `DrawImage` are advertised by
 `1 << 10`.
+Persistent canonical path resources are advertised by `1 << 11`.
+Correlated native text measurement is advertised by `1 << 12`.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.

@@ -129,4 +129,22 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family) {
     return shaped;
 }
 
+float measureSystemText(const std::string& utf8, FontFamily family) {
+    NSString* string = [[NSString alloc] initWithBytes:utf8.data()
+                                              length:utf8.size()
+                                            encoding:NSUTF8StringEncoding];
+    if (string == nil || string.length == 0) return 0.0F;
+    CTFontRef font = createFont(family);
+    if (font == nullptr) return 0.0F;
+    NSDictionary* attributes = @{(__bridge id)kCTFontAttributeName: (__bridge id)font};
+    NSAttributedString* attributed = [[NSAttributedString alloc] initWithString:string
+                                                                     attributes:attributes];
+    CTLineRef line = CTLineCreateWithAttributedString((__bridge CFAttributedStringRef)attributed);
+    const float advance = line == nullptr ? 0.0F : static_cast<float>(
+        CTLineGetTypographicBounds(line, nullptr, nullptr, nullptr) / designSize);
+    if (line != nullptr) CFRelease(line);
+    CFRelease(font);
+    return advance;
+}
+
 } // namespace gfx

@@ -557,4 +557,32 @@ bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& i
     return true;
 }
 
+std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure) {
+    std::vector<std::uint8_t> payload(4 + measure.text.size());
+    payload[0] = static_cast<std::uint8_t>(measure.family);
+    std::copy(measure.text.begin(), measure.text.end(), payload.begin() + 4);
+    return payload;
+}
+
+bool decodeTextMeasure(const std::vector<std::uint8_t>& payload, TextMeasure& measure) {
+    if (payload.size() <= 4 || payload.size() > 65'540 ||
+        payload[0] > static_cast<std::uint8_t>(TextFamily::systemMonospace) ||
+        payload[1] != 0 || payload[2] != 0 || payload[3] != 0) return false;
+    measure.family = static_cast<TextFamily>(payload[0]);
+    measure.text.assign(payload.begin() + 4, payload.end());
+    return measure.text.find('\0') == std::string::npos;
+}
+
+std::vector<std::uint8_t> encodeTextMetrics(float advance) {
+    std::vector<std::uint8_t> payload(4);
+    writeFloat(payload.data(), advance);
+    return payload;
+}
+
+bool decodeTextMetrics(const std::vector<std::uint8_t>& payload, float& advance) {
+    if (payload.size() != 4 || !std::isfinite(advance = readFloat(payload.data())) ||
+        advance < 0.0F) return false;
+    return true;
+}
+
 } // namespace mgfx::ipc

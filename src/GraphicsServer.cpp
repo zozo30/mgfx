@@ -1,4 +1,5 @@
 #include "GraphicsServer.hpp"
+#include "SystemText.hpp"
 
 #include "GraphicsProtocol.hpp"
 
@@ -309,7 +310,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::clipboard |
             mgfx::ipc::ServerCapability::clientWindowChrome |
             mgfx::ipc::ServerCapability::textureResources |
-            mgfx::ipc::ServerCapability::pathResources;
+            mgfx::ipc::ServerCapability::pathResources |
+            mgfx::ipc::ServerCapability::nativeTextMetrics;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -423,6 +425,17 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
             if (mgfx::ipc::decodeResourceId(message.payload, id)) {
                 const std::lock_guard<std::mutex> lock(resourceMutex_);
                 pendingPathDestroys_.push_back(id);
+            }
+        } else if (message.type == mgfx::ipc::MessageType::textMeasure &&
+                   message.sequence != 0) {
+            mgfx::ipc::TextMeasure measure{};
+            if (mgfx::ipc::decodeTextMeasure(message.payload, measure)) {
+                const gfx::FontFamily family = measure.family ==
+                    mgfx::ipc::TextFamily::systemMonospace
+                    ? gfx::FontFamily::systemMonospace : gfx::FontFamily::systemSans;
+                const float advance = gfx::measureSystemText(measure.text, family);
+                active->send(mgfx::ipc::MessageType::textMetrics,
+                             mgfx::ipc::encodeTextMetrics(advance), message.sequence);
             }
         }
     }

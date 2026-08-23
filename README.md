@@ -199,8 +199,10 @@ hit testing is in progress.
 or `monospace` text. Those modes emit one compact UTF-8 `DrawText` command. The
 macOS server shapes Unicode with CoreText and caches vector glyph outlines;
 future Vulkan and DirectX hosts can execute the same display-list command using
-their platform text service. Font uploads and exact rich-text measurement are
-the next text layer.
+their platform text service. The component runtime asynchronously requests and
+caches exact native advances, then performs one corrected layout without
+blocking frames on the Unix socket. Font uploads and multiline rich text are the
+next text layer.
 
 ## Requirements
 
