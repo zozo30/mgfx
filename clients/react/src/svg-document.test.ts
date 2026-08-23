@@ -68,12 +68,12 @@ test("SVG documents lower linear-gradient dashed strokes without client geometry
     <defs><linearGradient id="edge"><stop offset="0" stop-color="#ff8000"/>
       <stop offset="1" stop-color="#ffe050"/></linearGradient></defs>
     <path d="M2 10H38" stroke="url(#edge)" stroke-width="2"
-      stroke-dasharray="5 3" stroke-dashoffset="-1"
+      stroke-dasharray="5 3 1 3" stroke-dashoffset="-1"
       stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="6"/>
   </svg>`);
   assert.deepEqual(document.layers[0]?.strokeGradient?.start, { x: 2, y: 10 });
   assert.deepEqual(document.layers[0]?.strokeGradient?.end, { x: 38, y: 10 });
-  assert.deepEqual(document.layers[0]?.dash, { length: 5, gap: 3, offset: -1 });
+  assert.deepEqual(document.layers[0]?.dash, { values: [5, 3, 1, 3], offset: -1 });
   assert.equal(document.layers[0]?.lineCap, "square");
   assert.equal(document.layers[0]?.lineJoin, "miter");
   assert.equal(document.layers[0]?.miterLimit, 6);

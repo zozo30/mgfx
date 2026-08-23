@@ -102,6 +102,13 @@ int main() {
         std::cerr << "Server dash splitting did not preserve exact painted length\n";
         return 1;
     }
+    const gfx::PathTriangles patternedStroke = gfx::tessellatePath(strokePath, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::bevel,
+        2, 0.25F, 0, 0, 1, 4, {4, 2, 1, 2});
+    if (std::fabs(triangleArea(patternedStroke.stroke) - 24.0) > 0.001) {
+        std::cerr << "Arbitrary dash splitting did not preserve its painted lengths\n";
+        return 1;
+    }
     const double roundArea = triangleArea(stroke.stroke);
     if (roundArea <= 43.0 || roundArea >= 43.2) {
         std::cerr << "Round caps do not form a non-overlapping semicircle pair\n";

@@ -40,6 +40,7 @@ enum class Opcode : std::uint16_t {
     drawDashedPath = 27,
     drawExtendedPath = 28,
     drawStyledPath = 29,
+    drawDashArrayPath = 30,
 };
 
 enum class Primitive : std::uint8_t {
@@ -263,6 +264,7 @@ struct PathCommand {
     float gapLength = 0.0F;
     float dashOffset = 0.0F;
     float miterLimit = 4.0F;
+    std::vector<float> dashPattern;
 };
 
 enum class FontFamily : std::uint8_t {

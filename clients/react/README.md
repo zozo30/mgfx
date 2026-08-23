@@ -121,8 +121,9 @@ endpoints and colors travel in each lightweight `DrawPath`, while geometry
 remains cached by the server.
 Fill and stroke gradients are independent, so an SVG primitive may combine a
 gradient interior with a differently oriented gradient outline.
-`Path` also accepts a `{ length, gap, offset }` dash style. Inline SVG maps
-one- or two-value `stroke-dasharray` and signed `stroke-dashoffset` onto it;
+`Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
+styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
+signed `stroke-dashoffset` onto them;
 the Metal server splits and tessellates the stroke rather than receiving segments
 or triangles from React.
 SVG and `Path` strokes support butt, round, and square caps plus bevel, round,

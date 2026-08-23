@@ -87,6 +87,7 @@ export const ExtendedServerCapability = {
   GradientPathStrokes: 1n << 37n,
   ExtendedPathStrokeStyles: 1n << 38n,
   CustomPathMiterLimits: 1n << 39n,
+  ArbitraryPathDashArrays: 1n << 40n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -251,7 +252,8 @@ export interface PathPaint {
   readonly lineCap?: "butt" | "round" | "square";
   readonly lineJoin?: "bevel" | "round" | "miter";
   readonly miterLimit?: number;
-  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number } |
+    { readonly values: readonly number[]; readonly offset?: number };
 }
 
 export type FontFamily = "system" | "monospace" | "serif" | "rounded";
@@ -747,12 +749,18 @@ export class FrameEncoder {
     if (!Number.isSafeInteger(pathId) || pathId <= 0 || pathId > 0xffff_ffff ||
         (!paint.fill && !paint.fillGradient && !paint.stroke && !paint.strokeGradient))
       throw new RangeError("Path draw requires an ID and paint");
-    const dashed = paint.dash !== undefined;
+    const dashArray = paint.dash !== undefined && "values" in paint.dash;
+    const dashed = paint.dash !== undefined && !dashArray;
     const extended = paint.strokeGradient !== undefined;
     const styled = paint.miterLimit !== undefined;
     if (styled && (!Number.isFinite(paint.miterLimit) || paint.miterLimit < 1 || paint.miterLimit > 1000))
       throw new RangeError("Path miter limit must be between 1 and 1000");
-    const payload = Buffer.alloc(styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
+    if (dashArray && (paint.dash.values.length < 2 || paint.dash.values.length > 32 ||
+        paint.dash.values.length % 2 !== 0 ||
+        paint.dash.values.some((value) => !Number.isFinite(value) || value <= 0)))
+      throw new RangeError("Path dash arrays require 2 through 32 positive values in pairs");
+    const payload = Buffer.alloc(dashArray ? 192 + paint.dash.values.length * 4 :
+      styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     payload.writeUInt32LE(pathId, 0);
     payload.writeUInt8((paint.fill || paint.fillGradient ? 1 : 0) |
       (paint.stroke || paint.strokeGradient ? 2 : 0) | (paint.fillGradient ? 4 : 0) |
@@ -792,7 +800,12 @@ export class FrameEncoder {
         });
     }
     // Styled paths reserve the gradient block even when stroke paint is solid.
-    if (paint.dash) {
+    if (dashArray) {
+      payload.writeFloatLE(paint.miterLimit ?? 4, 176);
+      payload.writeFloatLE(paint.dash.offset ?? 0, 180);
+      payload.writeUInt32LE(paint.dash.values.length, 184);
+      paint.dash.values.forEach((value, index) => payload.writeFloatLE(value, 192 + index * 4));
+    } else if (paint.dash) {
       const values = [paint.dash.length, paint.dash.gap, paint.dash.offset ?? 0];
       if ((!paint.stroke && !paint.strokeGradient) || values.some((value) => !Number.isFinite(value)) ||
           paint.dash.length <= 0 || paint.dash.gap <= 0)
@@ -800,8 +813,8 @@ export class FrameEncoder {
       const dashOffset = (extended || styled) ? 176 : 128;
       values.forEach((value, index) => payload.writeFloatLE(value, dashOffset + index * 4));
     }
-    if (styled) payload.writeFloatLE(paint.miterLimit!, 192);
-    this.command(styled ? 29 : extended ? 28 : dashed ? 27 : 7, payload);
+    if (styled && !dashArray) payload.writeFloatLE(paint.miterLimit!, 192);
+    this.command(dashArray ? 30 : styled ? 29 : extended ? 28 : dashed ? 27 : 7, payload);
   }
 
   richText(runs: readonly RichTextRun[], left: number, top: number, fontSize: number): void {

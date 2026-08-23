@@ -55,8 +55,9 @@ shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
 becomes a stable path resource with its own compact paint command. Two-stop linear
 gradients resolve from `<defs>` in either SVG user space or object-bounding-box
 space, including stop opacity and gradient transforms, then use native `DrawPath`
-gradient paint. One- and two-value `stroke-dasharray` plus `stroke-dashoffset`
-lower to native dashed path paint. Executable or external content is rejected, while complex gradients,
+gradient paint. `stroke-dasharray` sequences of up to 32 values plus
+`stroke-dashoffset` lower to native dashed path paint. Odd sequences are repeated
+to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
 masks, text, and embedded images deliberately continue through the high-quality raster fallback.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
@@ -77,6 +78,11 @@ combined with dashing, while preserving that paint-independent geometry cache.
 The server splits flattened contours at exact arc-length boundaries before using
 the ordinary cap/join stroke tessellator. Dash style participates in the bounded
 geometry cache; clients still upload only the original canonical path.
+
+`DrawDashArrayPath` carries 2 through 32 alternating paint/gap lengths. The
+server performs the same exact arc-length splitting and includes the complete
+sequence in its geometry cache key; clients never expand the pattern into line
+segments.
 
 Stroke caps are encoded as butt (`0`), round (`1`), or square (`2`), and joins
 as bevel (`0`), round (`1`), or miter (`2`). Square-cap extension and miter

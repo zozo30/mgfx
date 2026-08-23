@@ -98,6 +98,7 @@ enum ServerCapability : std::uint64_t {
     gradientPathStrokes = 1ULL << 37U,
     extendedPathStrokeStyles = 1ULL << 38U,
     customPathMiterLimits = 1ULL << 39U,
+    arbitraryPathDashArrays = 1ULL << 40U,
 };
 
 enum class ResourceKind : std::uint8_t {

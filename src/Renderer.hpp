@@ -63,6 +63,7 @@ private:
         float gapLength;
         float dashOffset;
         float miterLimit;
+        std::vector<float> dashPattern;
         gfx::PathTriangles triangles;
     };
     struct PathResource {

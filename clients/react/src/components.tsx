@@ -52,7 +52,8 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round" | "square";
   readonly lineJoin?: "bevel" | "round" | "miter"; readonly style?: Style;
   readonly miterLimit?: number;
-  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number } |
+    { readonly values: readonly number[]; readonly offset?: number };
 }) {
   const resource = useMemo(() => canonicalPath(data), [data]);
   const path: PathData = { resourceId: resource.resourceId, segments: resource.segments,

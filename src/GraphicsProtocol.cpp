@@ -338,8 +338,10 @@ void CommandEncoder::drawPath(const PathCommand& path) {
     const bool dashed = path.dashLength > 0.0F && path.gapLength > 0.0F;
     const bool extended = path.strokeGradient;
     const bool styled = path.miterLimit != 4.0F;
-    beginCommand(styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
+    const bool dashArray = !path.dashPattern.empty();
+    beginCommand(dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
                          : dashed ? Opcode::drawDashedPath : Opcode::drawPath,
+                 dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
                  styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     appendU32(bytes_, path.pathId);
     bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
@@ -369,7 +371,7 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                         path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
         appendFloat(bytes_, value);
     }
-    if (extended || styled) {
+    if (extended || styled || dashArray) {
         for (float value : {path.strokeGradientPaint.startX, path.strokeGradientPaint.startY,
                             path.strokeGradientPaint.endX, path.strokeGradientPaint.endY,
                             path.strokeGradientPaint.startColor.red,
@@ -381,13 +383,19 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                             path.strokeGradientPaint.endColor.blue,
                             path.strokeGradientPaint.endColor.alpha}) appendFloat(bytes_, value);
     }
-    if (dashed || styled) {
+    if (dashArray) {
+        appendFloat(bytes_, path.miterLimit);
+        appendFloat(bytes_, path.dashOffset);
+        appendU32(bytes_, static_cast<std::uint32_t>(path.dashPattern.size()));
+        appendU32(bytes_, 0);
+        for (float length : path.dashPattern) appendFloat(bytes_, length);
+    } else if (dashed || styled) {
         appendFloat(bytes_, path.dashLength);
         appendFloat(bytes_, path.gapLength);
         appendFloat(bytes_, path.dashOffset);
         appendFloat(bytes_, 0.0F);
     }
-    if (styled) {
+    if (styled && !dashArray) {
         appendFloat(bytes_, path.miterLimit);
         appendFloat(bytes_, 0.0F);
         appendFloat(bytes_, 0.0F);
@@ -794,10 +802,16 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const bool dashed = command.opcode == Opcode::drawDashedPath;
     const bool extended = command.opcode == Opcode::drawExtendedPath;
     const bool styled = command.opcode == Opcode::drawStyledPath;
+    const bool dashArray = command.opcode == Opcode::drawDashArrayPath;
     const bool extendedDashed = extended && command.payloadSize == 192U;
-    if ((!dashed && !extended && !styled && command.opcode != Opcode::drawPath) ||
-        command.payloadSize != (styled ? 208U : extended ? (extendedDashed ? 192U : 176U)
-                                                        : dashed ? 144U : 128U) ||
+    const bool validDashArraySize = dashArray && command.payloadSize >= 200U &&
+        command.payloadSize <= 320U && readU32(command.payload + 184) >= 2U &&
+        readU32(command.payload + 184) <= 32U && readU32(command.payload + 184) % 2U == 0U &&
+        command.payloadSize == 192U + readU32(command.payload + 184) * 4U;
+    if ((!dashed && !extended && !styled && !dashArray && command.opcode != Opcode::drawPath) ||
+        (!dashArray && command.payloadSize != (styled ? 208U : extended ? (extendedDashed ? 192U : 176U)
+                                                        : dashed ? 144U : 128U)) ||
+        (dashArray && !validDashArraySize) ||
         command.payload[4] > 15 ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::square) ||
@@ -826,7 +840,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
                       readFloat(command.payload + 104), readFloat(command.payload + 108)},
                      {readFloat(command.payload + 112), readFloat(command.payload + 116),
                       readFloat(command.payload + 120), readFloat(command.payload + 124)}};
-    if (extended || styled) {
+    if (extended || styled || dashArray) {
         path.strokeGradientPaint = {readFloat(command.payload + 128), readFloat(command.payload + 132),
             readFloat(command.payload + 136), readFloat(command.payload + 140),
             {readFloat(command.payload + 144), readFloat(command.payload + 148),
@@ -848,10 +862,25 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         path.miterLimit > 1000.0F ||
         readU32(command.payload + 196) != 0U || readU32(command.payload + 200) != 0U ||
         readU32(command.payload + 204) != 0U)) return false;
+    if (dashArray) {
+        path.miterLimit = readFloat(command.payload + 176);
+        path.dashOffset = readFloat(command.payload + 180);
+        if (!std::isfinite(path.miterLimit) || path.miterLimit < 1.0F ||
+            path.miterLimit > 1000.0F || !std::isfinite(path.dashOffset) ||
+            readU32(command.payload + 188) != 0U) return false;
+        const std::uint32_t count = readU32(command.payload + 184);
+        path.dashPattern.reserve(count);
+        for (std::uint32_t index = 0; index < count; ++index) {
+            const float length = readFloat(command.payload + 192 + index * 4U);
+            if (!std::isfinite(length) || length <= 0.0F) return false;
+            path.dashPattern.push_back(length);
+        }
+    }
     return path.pathId != 0 && (path.fill || path.stroke) &&
            (!path.fillGradient || path.fill) &&
            (!extended || path.strokeGradient) &&
-           (!path.strokeGradient || ((extended || styled) && path.stroke)) &&
+           (!path.strokeGradient || ((extended || styled || dashArray) && path.stroke)) &&
+           (!dashArray || path.stroke) &&
            (!hasDash || (path.stroke && path.dashLength > 0.0F && path.gapLength > 0.0F));
 }
 

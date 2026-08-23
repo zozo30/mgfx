@@ -258,7 +258,8 @@ export interface PathData {
   readonly lineCap?: "butt" | "round" | "square";
   readonly lineJoin?: "bevel" | "round" | "miter";
   readonly miterLimit?: number;
-  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number } |
+    { readonly values: readonly number[]; readonly offset?: number };
 }
 export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richText" | "scroll" | "circle" | "mesh" | "path";
 export interface Element {

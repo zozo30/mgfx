@@ -385,16 +385,22 @@ PathPoint interpolate(const PathPoint& start, const PathPoint& end, float amount
 }
 
 std::vector<Contour> dashContours(const std::vector<Contour>& contours,
-                                  float dashLength, float gapLength, float offset) {
+                                  const std::vector<float>& pattern, float offset) {
     std::vector<Contour> result;
-    const float period = dashLength + gapLength;
-    if (dashLength <= 0.0F || gapLength <= 0.0F || period <= 0.0F) return contours;
+    if (pattern.empty()) return contours;
+    float period = 0.0F;
+    for (float length : pattern) period += length;
+    if (period <= 0.0F) return contours;
     for (const Contour& contour : contours) {
         if (contour.points.size() < 2) continue;
         float phase = std::fmod(offset, period);
         if (phase < 0.0F) phase += period;
-        bool drawing = phase < dashLength;
-        float remaining = drawing ? dashLength - phase : period - phase;
+        std::size_t patternIndex = 0;
+        while (patternIndex + 1 < pattern.size() && phase >= pattern[patternIndex]) {
+            phase -= pattern[patternIndex++];
+        }
+        bool drawing = patternIndex % 2 == 0;
+        float remaining = pattern[patternIndex] - phase;
         std::vector<Contour> pieces;
         std::vector<PathPoint> active;
         const std::size_t segmentCount = contour.closed
@@ -418,8 +424,9 @@ std::vector<Contour> dashContours(const std::vector<Contour>& contours,
                 if (remaining <= 0.00001F) {
                     if (drawing && active.size() > 1) pieces.push_back({std::move(active), false});
                     active.clear();
-                    drawing = !drawing;
-                    remaining = drawing ? dashLength : gapLength;
+                    patternIndex = (patternIndex + 1) % pattern.size();
+                    drawing = patternIndex % 2 == 0;
+                    remaining = pattern[patternIndex];
                 }
             }
         }
@@ -446,13 +453,14 @@ PathTriangles tessellatePath(const std::vector<mgfx::ipc::PathSegment>& segments
                              LineCap lineCap, LineJoin lineJoin,
                              float strokeWidth, float tolerance,
                              float dashLength, float gapLength, float dashOffset,
-                             float miterLimit) {
+                             float miterLimit, const std::vector<float>& dashPattern) {
     PathTriangles result;
     const std::vector<Contour> contours = flatten(segments, std::max(0.01F, tolerance));
     if (fillEnabled) appendFill(contours, fillRule, result.fill);
     if (strokeEnabled) appendStroke(
+        !dashPattern.empty() ? dashContours(contours, dashPattern, dashOffset) :
         dashLength > 0.0F && gapLength > 0.0F
-            ? dashContours(contours, dashLength, gapLength, dashOffset) : contours,
+            ? dashContours(contours, {dashLength, gapLength}, dashOffset) : contours,
         strokeWidth, lineCap, lineJoin, miterLimit, result.stroke);
     return result;
 }

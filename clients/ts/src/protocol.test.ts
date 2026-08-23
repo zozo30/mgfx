@@ -37,7 +37,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.GridPatterns | ExtendedServerCapability.DashedPathStrokes;
   const allCapabilities = capabilities | ExtendedServerCapability.GradientPathStrokes;
   const completeCapabilities = allCapabilities | ExtendedServerCapability.ExtendedPathStrokeStyles |
-    ExtendedServerCapability.CustomPathMiterLimits;
+    ExtendedServerCapability.CustomPathMiterLimits |
+    ExtendedServerCapability.ArbitraryPathDashArrays;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -424,11 +425,11 @@ test("canonical paths upload once and frames reference server-side vector geomet
       strokeGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 24 },
         startColor: { red: 1, green: 0.2, blue: 0.1, alpha: 1 },
         endColor: { red: 1, green: 0.9, blue: 0.2, alpha: 1 } },
-      dash: { length: 7, gap: 4, offset: -2 },
+      dash: { values: [7, 4, 2, 4], offset: -2 },
     });
   frame.endFrame();
   const bytes = frame.finish();
-  assert.equal(bytes.readUInt16LE(16), 29);
+  assert.equal(bytes.readUInt16LE(16), 30);
   assert.equal(bytes.readUInt32LE(20), 208);
   assert.equal(bytes.readUInt32LE(24), 12);
   assert.equal(bytes.readUInt8(28), 15);
@@ -436,10 +437,11 @@ test("canonical paths upload once and frames reference server-side vector geomet
   assert.equal(bytes.readUInt8(31), 2);
   assert.equal(bytes.readFloatLE(24 + 124), 1);
   assert.equal(bytes.readFloatLE(24 + 128 + 8), 24);
-  assert.equal(bytes.readFloatLE(24 + 176), 7);
-  assert.equal(bytes.readFloatLE(24 + 180), 4);
-  assert.equal(bytes.readFloatLE(24 + 184), -2);
-  assert.equal(bytes.readFloatLE(24 + 192), 6);
+  assert.equal(bytes.readFloatLE(24 + 176), 6);
+  assert.equal(bytes.readFloatLE(24 + 180), -2);
+  assert.equal(bytes.readUInt32LE(24 + 184), 4);
+  assert.deepEqual([0, 1, 2, 3].map((index) => bytes.readFloatLE(24 + 192 + index * 4)),
+    [7, 4, 2, 4]);
 });
 
 test("indexed meshes upload once and frames reference their resource", () => {

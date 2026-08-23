@@ -369,7 +369,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::dashedPathStrokes |
             mgfx::ipc::ServerCapability::gradientPathStrokes |
             mgfx::ipc::ServerCapability::extendedPathStrokeStyles |
-            mgfx::ipc::ServerCapability::customPathMiterLimits;
+            mgfx::ipc::ServerCapability::customPathMiterLimits |
+            mgfx::ipc::ServerCapability::arbitraryPathDashArrays;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

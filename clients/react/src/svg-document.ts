@@ -3,6 +3,9 @@ import type { Color } from "@mgfx/demo-client/protocol";
 import type { Rect } from "@mgfx/demo-client/ui";
 import { svgAttributes, svgPrimitivePath } from "./icon-pack.js";
 
+type DashStyle = { readonly length: number; readonly gap: number; readonly offset?: number } |
+  { readonly values: readonly number[]; readonly offset?: number };
+
 export interface SvgVectorLayer {
   readonly path: string;
   readonly fill?: Color;
@@ -14,7 +17,7 @@ export interface SvgVectorLayer {
   readonly lineCap: "butt" | "round" | "square";
   readonly lineJoin: "bevel" | "round" | "miter";
   readonly miterLimit?: number;
-  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
+  readonly dash?: DashStyle;
 }
 
 export interface LinearGradientPaint {
@@ -45,7 +48,7 @@ interface PaintState {
   readonly miterLimit?: number;
   readonly currentColor: Color;
   readonly transform: Matrix;
-  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
+  readonly dash?: DashStyle;
 }
 
 interface GradientDefinition {
@@ -184,17 +187,22 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
 function parseDash(value: string, offset: string | undefined) {
   if (value.trim().toLowerCase() === "none") return undefined;
   const values = value.trim().split(/[\s,]+/).filter(Boolean).map(Number);
-  if ((values.length !== 1 && values.length !== 2) ||
+  if (values.length < 1 || values.length > 32 ||
       values.some((item) => !Number.isFinite(item) || item <= 0))
-    throw new Error(`SVG vector strokes support one or two positive dash lengths, got ${value}`);
-  return { length: values[0]!, gap: values[1] ?? values[0]!,
-    ...(offset !== undefined ? { offset: finiteNumber(offset, 0) } : {}) };
+    throw new Error(`SVG vector strokes support 1 through 32 positive dash lengths, got ${value}`);
+  const normalized = values.length % 2 === 0 ? values : [...values, ...values];
+  if (normalized.length > 32)
+    throw new Error(`SVG dash sequence expands beyond 32 alternating lengths: ${value}`);
+  const phase = offset !== undefined ? { offset: finiteNumber(offset, 0) } : {};
+  return normalized.length === 2
+    ? { length: normalized[0]!, gap: normalized[1]!, ...phase }
+    : { values: normalized, ...phase };
 }
 
-function scaleDash(dash: { readonly length: number; readonly gap: number; readonly offset?: number },
-  scale: number) {
-  return { length: dash.length * scale, gap: dash.gap * scale,
-    ...(dash.offset !== undefined ? { offset: dash.offset * scale } : {}) };
+function scaleDash(dash: DashStyle, scale: number): DashStyle {
+  const phase = dash.offset !== undefined ? { offset: dash.offset * scale } : {};
+  return "values" in dash ? { values: dash.values.map((value) => value * scale), ...phase }
+    : { length: dash.length * scale, gap: dash.gap * scale, ...phase };
 }
 
 function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<string, GradientDefinition> {

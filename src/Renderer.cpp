@@ -1186,7 +1186,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
         } else if (command.opcode == gfx::Opcode::drawPath ||
                    command.opcode == gfx::Opcode::drawDashedPath ||
                    command.opcode == gfx::Opcode::drawExtendedPath ||
-                   command.opcode == gfx::Opcode::drawStyledPath) {
+                   command.opcode == gfx::Opcode::drawStyledPath ||
+                   command.opcode == gfx::Opcode::drawDashArrayPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1205,6 +1206,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 !std::isfinite(path.dashLength) || !std::isfinite(path.gapLength) ||
                 !std::isfinite(path.dashOffset) || path.dashLength < 0.0F ||
                 path.gapLength < 0.0F ||
+                std::any_of(path.dashPattern.begin(), path.dashPattern.end(),
+                    [](float length) { return !std::isfinite(length) || length <= 0.0F; }) ||
                 (path.fillGradient && !finiteGradient(path.gradient)) ||
                 (path.strokeGradient && !finiteGradient(path.strokeGradientPaint)) ||
                 path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
@@ -1222,7 +1225,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                        cached.dashLength == path.dashLength &&
                        cached.gapLength == path.gapLength &&
                        cached.dashOffset == path.dashOffset &&
-                       cached.miterLimit == path.miterLimit;
+                       cached.miterLimit == path.miterLimit &&
+                       cached.dashPattern == path.dashPattern;
             };
             auto cached = std::find_if(resource.cache.begin(), resource.cache.end(), sameStyle);
             if (cached == resource.cache.end()) {
@@ -1230,11 +1234,12 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 resource.cache.push_back({path.fill, path.stroke, path.fillRule, path.lineCap,
                     path.lineJoin, path.strokeWidth, path.tolerance,
                     path.dashLength, path.gapLength, path.dashOffset, path.miterLimit,
+                    path.dashPattern,
                     gfx::tessellatePath(resource.segments, path.fill, path.stroke,
                         path.fillRule, path.lineCap, path.lineJoin,
                         path.strokeWidth, path.tolerance,
                         path.dashLength, path.gapLength, path.dashOffset,
-                        path.miterLimit)});
+                        path.miterLimit, path.dashPattern)});
                 cached = std::prev(resource.cache.end());
             }
             const auto drawPathTriangles = [&](const std::vector<gfx::PathPoint>& points,
