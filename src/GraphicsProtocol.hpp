@@ -19,6 +19,8 @@ enum class Opcode : std::uint16_t {
     drawImage = 6,
     drawPath = 7,
     drawText = 8,
+    pushTransform = 9,
+    popTransform = 10,
 };
 
 enum class Primitive : std::uint8_t {
@@ -53,6 +55,15 @@ struct ClipRect {
     float top;
     float right;
     float bottom;
+};
+
+struct AffineTransform {
+    float m11;
+    float m12;
+    float m21;
+    float m22;
+    float translateX;
+    float translateY;
 };
 
 struct ImageCommand {
@@ -124,6 +135,8 @@ public:
     void drawImage(const ImageCommand& image);
     void drawPath(const PathCommand& path);
     void drawText(const TextCommand& text);
+    void pushTransform(AffineTransform transform);
+    void popTransform();
 
     std::vector<std::uint8_t> finish();
 
@@ -157,5 +170,6 @@ bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);
+bool decodePushTransform(const CommandView& command, AffineTransform& transform);
 
 } // namespace gfx

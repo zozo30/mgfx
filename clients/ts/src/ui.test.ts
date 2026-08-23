@@ -57,6 +57,27 @@ test("pointer capture reports element-local drag coordinates", () => {
   assert.deepEqual(points, ["down:5,5", "move:40,15", "up:40,15"]);
 });
 
+test("transformed components paint transform commands and hit their visual position", () => {
+  let clicks = 0;
+  class TransformComponent extends Component {
+    build(): Element {
+      return row([{ ...box({ preferredSize: { width: 20, height: 20 }, transform: {
+        translateX: 40, rotation: 8, scaleX: 1.1, scaleY: 1.1,
+      } }, "moving"), onClick: () => { clicks += 1; } }]);
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new TransformComponent()); host.layout({ width: 100, height: 40 });
+  assert.equal(host.pointerDown({ x: 10, y: 10 }), false);
+  assert.equal(host.pointerDown({ x: 50, y: 10 }), true);
+  host.pointerUp({ x: 50, y: 10 });
+  assert.equal(clicks, 1);
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 40 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 9);
+});
+
 test("keyboard focus traverses and activates controls", () => {
   let first = 0, second = 0;
   class KeyboardComponent extends Component {

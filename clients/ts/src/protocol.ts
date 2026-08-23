@@ -52,6 +52,7 @@ export enum ServerCapability {
   TextureResources = 1 << 10,
   PathResources = 1 << 11,
   NativeTextMetrics = 1 << 12,
+  TransformStack = 1 << 13,
 }
 export interface ServerHello {
   readonly version: number;
@@ -116,6 +117,10 @@ export interface Vertex {
 
 export interface ClipRect {
   readonly left: number; readonly top: number; readonly right: number; readonly bottom: number;
+}
+export interface AffineTransform {
+  readonly m11: number; readonly m12: number; readonly m21: number; readonly m22: number;
+  readonly translateX: number; readonly translateY: number;
 }
 
 export type PathSegment =
@@ -594,6 +599,18 @@ export class FrameEncoder {
   }
 
   popClip(): void { this.command(5, Buffer.alloc(0)); }
+
+  pushTransform(transform: AffineTransform): void {
+    const values = [transform.m11, transform.m12, transform.m21, transform.m22,
+      transform.translateX, transform.translateY];
+    if (values.some((value) => !Number.isFinite(value)))
+      throw new RangeError("Affine transform values must be finite");
+    const payload = Buffer.alloc(24);
+    values.forEach((value, index) => payload.writeFloatLE(value, index * 4));
+    this.command(9, payload);
+  }
+
+  popTransform(): void { this.command(10, Buffer.alloc(0)); }
 
   finish(): Buffer {
     const byteCount = MGFX_HEADER_BYTES + this.commands.reduce((sum, item) => sum + item.length, 0);

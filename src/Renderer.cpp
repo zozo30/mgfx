@@ -18,6 +18,30 @@ std::string errorMessage(const char* prefix, NS::Error* error) {
     return std::string(prefix) + ": " + error->localizedDescription()->utf8String();
 }
 
+gfx::AffineTransform concatenate(const gfx::AffineTransform& parent,
+                                 const gfx::AffineTransform& child) {
+    return {
+        parent.m11 * child.m11 + parent.m21 * child.m12,
+        parent.m12 * child.m11 + parent.m22 * child.m12,
+        parent.m11 * child.m21 + parent.m21 * child.m22,
+        parent.m12 * child.m21 + parent.m22 * child.m22,
+        parent.m11 * child.translateX + parent.m21 * child.translateY + parent.translateX,
+        parent.m12 * child.translateX + parent.m22 * child.translateY + parent.translateY,
+    };
+}
+
+std::array<float, 2> transformPoint(const gfx::AffineTransform& transform,
+                                    std::array<float, 2> point) {
+    return {transform.m11 * point[0] + transform.m21 * point[1] + transform.translateX,
+            transform.m12 * point[0] + transform.m22 * point[1] + transform.translateY};
+}
+
+bool finiteTransform(const gfx::AffineTransform& transform) {
+    return std::isfinite(transform.m11) && std::isfinite(transform.m12) &&
+           std::isfinite(transform.m21) && std::isfinite(transform.m22) &&
+           std::isfinite(transform.translateX) && std::isfinite(transform.translateY);
+}
+
 } // namespace
 
 Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
@@ -134,6 +158,10 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
     MTL::CommandBuffer* commandBuffer = commandQueue_->commandBuffer();
     MTL::RenderCommandEncoder* encoder = nullptr;
     std::vector<gfx::ClipRect> clipStack;
+    std::vector<gfx::AffineTransform> transformStack{{1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F}};
+    const auto currentTransform = [&]() -> const gfx::AffineTransform& {
+        return transformStack.back();
+    };
     const auto currentClip = [&]() {
         return clipStack.empty() ? gfx::ClipRect{0.0F, 0.0F, 1.0F, 1.0F} : clipStack.back();
     };
@@ -167,6 +195,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 draw.primitive != gfx::Primitive::triangleList) {
                 throw std::runtime_error("Malformed or unsupported draw command");
             }
+            for (gfx::Vertex& vertex : draw.vertices) {
+                vertex.position = transformPoint(currentTransform(), vertex.position);
+            }
             if (encoder == nullptr) {
                 encoder = commandBuffer->renderCommandEncoder(renderPass);
                 applyClip();
@@ -195,6 +226,21 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             if (!gfx::decodePushClip(command, clip)) {
                 throw std::runtime_error("Malformed push-clip command");
             }
+            const std::array<std::array<float, 2>, 4> corners = {{
+                {clip.left * 2.0F - 1.0F, 1.0F - clip.top * 2.0F},
+                {clip.right * 2.0F - 1.0F, 1.0F - clip.top * 2.0F},
+                {clip.right * 2.0F - 1.0F, 1.0F - clip.bottom * 2.0F},
+                {clip.left * 2.0F - 1.0F, 1.0F - clip.bottom * 2.0F},
+            }};
+            float left = 1.0F, top = 1.0F, right = 0.0F, bottom = 0.0F;
+            for (const auto& corner : corners) {
+                const auto point = transformPoint(currentTransform(), corner);
+                const float x = (point[0] + 1.0F) * 0.5F;
+                const float y = (1.0F - point[1]) * 0.5F;
+                left = std::min(left, x); top = std::min(top, y);
+                right = std::max(right, x); bottom = std::max(bottom, y);
+            }
+            clip = {left, top, right, bottom};
             if (!clipStack.empty()) {
                 const gfx::ClipRect parent = clipStack.back();
                 clip.left = std::max(clip.left, parent.left);
@@ -218,7 +264,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             const std::array<float, 4> tint = {image.tint.red, image.tint.green,
                                                image.tint.blue, image.tint.alpha};
-            const ImageVertex vertices[] = {
+            ImageVertex vertices[] = {
                 {{image.destination.left, image.destination.top}, {image.uv.left, image.uv.top}, tint},
                 {{image.destination.left, image.destination.bottom}, {image.uv.left, image.uv.bottom}, tint},
                 {{image.destination.right, image.destination.bottom}, {image.uv.right, image.uv.bottom}, tint},
@@ -226,6 +272,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 {{image.destination.right, image.destination.bottom}, {image.uv.right, image.uv.bottom}, tint},
                 {{image.destination.right, image.destination.top}, {image.uv.right, image.uv.top}, tint},
             };
+            for (ImageVertex& vertex : vertices) {
+                vertex.position = transformPoint(currentTransform(), vertex.position);
+            }
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(imagePipelineState_.get());
             applyClip();
@@ -304,7 +353,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                         const float y = path.destination.top +
                             (point[1] - path.viewBox.y) / path.viewBox.height *
                             (path.destination.bottom - path.destination.top);
-                        vertices.push_back({{x, y}, vertexColor});
+                        vertices.push_back({transformPoint(currentTransform(), {x, y}), vertexColor});
                     }
                     encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
                     encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
@@ -347,8 +396,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 vertices.reserve(count);
                 for (std::size_t index = 0; index < count; ++index) {
                     const gfx::PathPoint& point = points[first + index];
-                    vertices.push_back({{text.left + point[0] * text.fontSize * aspect,
-                                         text.top - point[1] * text.fontSize}, color});
+                    vertices.push_back({transformPoint(currentTransform(),
+                        {text.left + point[0] * text.fontSize * aspect,
+                         text.top - point[1] * text.fontSize}), color});
                 }
                 encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
                 encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
@@ -362,6 +412,17 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
             clipStack.pop_back();
             applyClip();
+        } else if (command.opcode == gfx::Opcode::pushTransform) {
+            gfx::AffineTransform transform{};
+            if (!gfx::decodePushTransform(command, transform) || !finiteTransform(transform)) {
+                throw std::runtime_error("Malformed push-transform command");
+            }
+            transformStack.push_back(concatenate(currentTransform(), transform));
+        } else if (command.opcode == gfx::Opcode::popTransform) {
+            if (command.payloadSize != 0 || transformStack.size() <= 1) {
+                throw std::runtime_error("Malformed or unbalanced pop-transform command");
+            }
+            transformStack.pop_back();
         }
         // End-frame and unknown opcodes need no Metal work. Unknown commands are
         // safely skippable because every protocol record carries its byte size.
@@ -371,6 +432,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
     }
     if (!clipStack.empty()) {
         throw std::runtime_error("Unbalanced graphics clip stack");
+    }
+    if (transformStack.size() != 1) {
+        throw std::runtime_error("Unbalanced graphics transform stack");
     }
     if (encoder == nullptr) {
         encoder = commandBuffer->renderCommandEncoder(renderPass);

@@ -29,6 +29,8 @@ int main() {
     encoder.draw(gfx::Primitive::triangleList, vertices, 3);
     encoder.pushClip({0.1F, 0.2F, 0.8F, 0.9F});
     encoder.popClip();
+    encoder.pushTransform({0.8F, 0.2F, -0.2F, 0.8F, 0.1F, -0.1F});
+    encoder.popTransform();
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -64,6 +66,13 @@ int main() {
         !decoder.next(command) || command.opcode != gfx::Opcode::popClip || command.payloadSize != 0 ||
         !decoder.next(command)) {
         return fail("Clip decoding failed");
+    }
+    gfx::AffineTransform transform{};
+    if (!gfx::decodePushTransform(command, transform) || !nearlyEqual(transform.m11, 0.8F) ||
+        !nearlyEqual(transform.translateY, -0.1F) || !decoder.next(command) ||
+        command.opcode != gfx::Opcode::popTransform || command.payloadSize != 0 ||
+        !decoder.next(command)) {
+        return fail("Transform decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

@@ -138,7 +138,10 @@ function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
           viewBox={{ x: 0, y: 0, width: 24, height: 24 }} tolerance={0.12}
           strokeWidth={2} lineCap="round" lineJoin="round"
           strokeColor={rgba(0.24 + index * 0.14, 0.72 + pulse * 0.18, 1 - index * 0.12)}
-          style={{ preferredSize: { width: 76, height: 76 } }} />)}
+          style={{ preferredSize: { width: 76, height: 76 }, transform: {
+            rotation: Math.sin(time / 520 + index * 0.8) * 7,
+            scaleX: 0.94 + pulse * 0.08, scaleY: 0.94 + pulse * 0.08,
+          } }} />)}
       </Row>
     </Row>
   );

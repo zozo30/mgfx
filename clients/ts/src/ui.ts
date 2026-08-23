@@ -23,6 +23,12 @@ export interface ImagePaint {
   readonly sourceSize?: Size;
   readonly fit?: "fill" | "contain" | "cover";
 }
+export interface Transform {
+  readonly translateX?: number; readonly translateY?: number;
+  readonly scaleX?: number; readonly scaleY?: number;
+  readonly rotation?: number;
+  readonly originX?: number; readonly originY?: number;
+}
 export interface Style {
   preferredSize?: Partial<Size>; padding?: Partial<Insets>; gap?: number;
   background?: Color; backgroundGradient?: LinearGradient;
@@ -37,6 +43,7 @@ export interface Style {
   inset?: Partial<Insets>;
   zIndex?: number;
   modal?: boolean;
+  transform?: Transform;
 }
 export interface TextStyle {
   fontSize?: number;
@@ -329,7 +336,10 @@ class Node {
   path: PathData | undefined = undefined;
   measured: Size = { width: 0, height: 0 };
   bounds: Rect = { x: 0, y: 0, width: 0, height: 0 };
-  constructor(element: Element) { this.type = element.type; this.key = element.key; this.update(element); }
+  private parent: Node | undefined;
+  constructor(element: Element, parent?: Node) {
+    this.type = element.type; this.key = element.key; this.parent = parent; this.update(element);
+  }
   matches(element: Element): boolean { return this.type === element.type && this.key === element.key; }
   update(element: Element): void {
     this.type = element.type; this.key = element.key; this.style = element.style;
@@ -348,8 +358,8 @@ class Node {
       let found = child.key === "" && old[index]?.matches(child) ? index : -1;
       if (child.key !== "") found = old.findIndex((candidate, candidateIndex) =>
         !used[candidateIndex] && candidate.matches(child));
-      if (found < 0) return new Node(child);
-      used[found] = true; old[found]!.update(child); return old[found]!;
+      if (found < 0) return new Node(child, this);
+      used[found] = true; old[found]!.parent = this; old[found]!.update(child); return old[found]!;
     });
   }
   measure(constraints: Constraints): Size {
@@ -444,6 +454,7 @@ class Node {
     }
   }
   paint(encoder: FrameEncoder, viewport: Size): void {
+    if (this.style.transform) encoder.pushTransform(this.affineTransform(viewport));
     if (this.style.clip) encoder.pushClip({ left: this.bounds.x / viewport.width,
       top: this.bounds.y / viewport.height, right: (this.bounds.x + this.bounds.width) / viewport.width,
       bottom: (this.bounds.y + this.bounds.height) / viewport.height });
@@ -476,14 +487,16 @@ class Node {
     if (this.type === "text") paintText(encoder, this.bounds, this.value, this.textStyle, viewport);
     for (const child of this.paintOrder()) child.paint(encoder, viewport);
     if (this.style.clip) encoder.popClip();
+    if (this.style.transform) encoder.popTransform();
   }
   hitTarget(point: Point): Node | undefined {
-    if (!contains(this.bounds, point)) return undefined;
+    const transformedPoint = this.inverseTransform(point);
+    if (!contains(this.bounds, transformedPoint)) return undefined;
     const modal = this.modalChild();
-    if (modal) return modal.hitTarget(point);
+    if (modal) return modal.hitTarget(transformedPoint);
     const ordered = this.paintOrder();
     for (let i = ordered.length - 1; i >= 0; i--) {
-      const target = ordered[i]!.hitTarget(point);
+      const target = ordered[i]!.hitTarget(transformedPoint);
       if (target) return target;
     }
     return this.isFocusable() ? this : undefined;
@@ -495,15 +508,17 @@ class Node {
     else for (const child of this.paintOrder()) child.collectTargets(targets);
   }
   localPoint(point: Point): Point {
-    return { x: point.x - this.bounds.x, y: point.y - this.bounds.y };
+    const layoutPoint = this.pointFromRoot(point);
+    return { x: layoutPoint.x - this.bounds.x, y: layoutPoint.y - this.bounds.y };
   }
   scrollTarget(point: Point): Node | undefined {
-    if (!contains(this.bounds, point)) return undefined;
+    const transformedPoint = this.inverseTransform(point);
+    if (!contains(this.bounds, transformedPoint)) return undefined;
     const modal = this.modalChild();
-    if (modal) return modal.scrollTarget(point);
+    if (modal) return modal.scrollTarget(transformedPoint);
     const ordered = this.paintOrder();
     for (let i = ordered.length - 1; i >= 0; i--) {
-      const target = ordered[i]!.scrollTarget(point);
+      const target = ordered[i]!.scrollTarget(transformedPoint);
       if (target) return target;
     }
     return this.onScroll ? this : undefined;
@@ -520,6 +535,43 @@ class Node {
   private modalChild(): Node | undefined {
     return [...this.children].filter((child) => child.style.modal)
       .sort((left, right) => (right.style.zIndex ?? 0) - (left.style.zIndex ?? 0))[0];
+  }
+  private affineTransform(viewport: Size) {
+    const transform = this.style.transform ?? {};
+    const scaleX = transform.scaleX ?? 1, scaleY = transform.scaleY ?? 1;
+    const radians = (transform.rotation ?? 0) * Math.PI / 180;
+    const cosine = Math.cos(radians), sine = Math.sin(radians);
+    const originX = (this.bounds.x + this.bounds.width * (transform.originX ?? 0.5)) /
+      viewport.width * 2 - 1;
+    const originY = 1 - (this.bounds.y + this.bounds.height * (transform.originY ?? 0.5)) /
+      viewport.height * 2;
+    const m11 = cosine * scaleX, m12 = -sine * scaleX;
+    const m21 = sine * scaleY, m22 = cosine * scaleY;
+    return { m11, m12, m21, m22,
+      translateX: originX - m11 * originX - m21 * originY +
+        (transform.translateX ?? 0) / viewport.width * 2,
+      translateY: originY - m12 * originX - m22 * originY -
+        (transform.translateY ?? 0) / viewport.height * 2 };
+  }
+  private inverseTransform(point: Point): Point {
+    const transform = this.style.transform;
+    if (!transform) return point;
+    const origin = { x: this.bounds.x + this.bounds.width * (transform.originX ?? 0.5),
+      y: this.bounds.y + this.bounds.height * (transform.originY ?? 0.5) };
+    const translated = { x: point.x - (transform.translateX ?? 0) - origin.x,
+      y: point.y - (transform.translateY ?? 0) - origin.y };
+    const radians = -(transform.rotation ?? 0) * Math.PI / 180;
+    const cosine = Math.cos(radians), sine = Math.sin(radians);
+    const rotated = { x: translated.x * cosine - translated.y * sine,
+      y: translated.x * sine + translated.y * cosine };
+    const scaleX = transform.scaleX ?? 1, scaleY = transform.scaleY ?? 1;
+    if (Math.abs(scaleX) < 0.000001 || Math.abs(scaleY) < 0.000001)
+      return { x: Number.POSITIVE_INFINITY, y: Number.POSITIVE_INFINITY };
+    return { x: rotated.x / scaleX + origin.x, y: rotated.y / scaleY + origin.y };
+  }
+  private pointFromRoot(point: Point): Point {
+    const parentPoint = this.parent ? this.parent.pointFromRoot(point) : point;
+    return this.inverseTransform(parentPoint);
   }
 }
 

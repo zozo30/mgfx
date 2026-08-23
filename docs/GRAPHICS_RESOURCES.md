@@ -99,6 +99,17 @@ React exposes the correlated native animation clock through context. A focused
 text field subscribes for caret blinking and cancels immediately on blur, so
 reusable components share display cadence without owning timers.
 
+## Transform stack
+
+`PushTransform` carries a six-float affine matrix in normalized device space;
+`PopTransform` restores the parent matrix. The Metal backend composes nested
+records and transforms every drawable category after decoding, so clients send
+stable resources and animate only a compact matrix. Component styles calculate
+matrices from pixel translation, scale, degree rotation, and fractional origin.
+The retained input tree walks the inverse transforms for pointer hit testing.
+Servers advertise this optional display-list extension with the negotiated
+`transformStack` capability bit.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

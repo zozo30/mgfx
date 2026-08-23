@@ -18,12 +18,14 @@ test("server hello identifies backend and portable capabilities", () => {
   payload.writeUInt16LE(1, 0);
   payload.writeUInt16LE(GraphicsBackend.Metal, 2);
   payload.writeUInt32LE(ServerCapability.ClientWindowLifecycle |
-    ServerCapability.PointerInput | ServerCapability.TextInput, 4);
+    ServerCapability.PointerInput | ServerCapability.TextInput |
+    ServerCapability.TransformStack, 4);
   assert.deepEqual(decodeServerHello(payload), {
     version: 1,
     backend: GraphicsBackend.Metal,
     capabilities: ServerCapability.ClientWindowLifecycle |
-      ServerCapability.PointerInput | ServerCapability.TextInput,
+      ServerCapability.PointerInput | ServerCapability.TextInput |
+      ServerCapability.TransformStack,
   });
   assert.throws(() => decodeServerHello(Buffer.alloc(7)));
 });
@@ -82,6 +84,20 @@ test("MGFX clip stack uses skippable protocol commands", () => {
   assert.equal(bytes.readUInt32LE(20), 16);
   assert.equal(bytes.readUInt16LE(40), 5);
   assert.equal(bytes.readUInt32LE(44), 0);
+});
+
+test("MGFX affine transforms use balanced skippable commands", () => {
+  const frame = new FrameEncoder();
+  frame.pushTransform({ m11: 0.8, m12: 0.2, m21: -0.2, m22: 0.8,
+    translateX: 0.1, translateY: -0.1 });
+  frame.popTransform(); frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 9);
+  assert.equal(bytes.readUInt32LE(20), 24);
+  assert.ok(Math.abs(bytes.readFloatLE(24) - 0.8) < 0.00001);
+  assert.equal(bytes.readUInt16LE(48), 10);
+  assert.throws(() => frame.pushTransform({ m11: Number.NaN, m12: 0, m21: 0, m22: 1,
+    translateX: 0, translateY: 0 }));
 });
 
 test("text input decodes validated UTF-8", () => {

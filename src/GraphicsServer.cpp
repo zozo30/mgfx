@@ -311,7 +311,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::clientWindowChrome |
             mgfx::ipc::ServerCapability::textureResources |
             mgfx::ipc::ServerCapability::pathResources |
-            mgfx::ipc::ServerCapability::nativeTextMetrics;
+            mgfx::ipc::ServerCapability::nativeTextMetrics |
+            mgfx::ipc::ServerCapability::transformStack;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

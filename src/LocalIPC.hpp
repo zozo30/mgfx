@@ -65,6 +65,7 @@ enum ServerCapability : std::uint32_t {
     textureResources = 1U << 10U,
     pathResources = 1U << 11U,
     nativeTextMetrics = 1U << 12U,
+    transformStack = 1U << 13U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };

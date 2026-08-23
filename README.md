@@ -151,6 +151,13 @@ placeholder, focus styling, Unicode-safe Backspace, and a bounded value length.
 
 ## Components and layout
 
+Component styles support nested affine translation, scale, rotation, and
+fractional transform origins. The retained tree emits balanced transform-stack
+records; the graphics server applies them uniformly to triangles, textures,
+cached paths, native text, and clip bounds. Hit testing applies the matching
+inverse transform, so animated controls remain interactive at their drawn
+position.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,

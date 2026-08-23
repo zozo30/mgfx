@@ -122,6 +122,18 @@ void CommandEncoder::popClip() {
     beginCommand(Opcode::popClip, 0);
 }
 
+void CommandEncoder::pushTransform(AffineTransform transform) {
+    beginCommand(Opcode::pushTransform, 6 * sizeof(float));
+    for (float value : {transform.m11, transform.m12, transform.m21, transform.m22,
+                        transform.translateX, transform.translateY}) {
+        appendFloat(bytes_, value);
+    }
+}
+
+void CommandEncoder::popTransform() {
+    beginCommand(Opcode::popTransform, 0);
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -280,6 +292,14 @@ bool decodePushClip(const CommandView& command, ClipRect& clip) {
     if (command.opcode != Opcode::pushClip || command.payloadSize != 16) return false;
     clip = {readFloat(command.payload), readFloat(command.payload + 4),
             readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    return true;
+}
+
+bool decodePushTransform(const CommandView& command, AffineTransform& transform) {
+    if (command.opcode != Opcode::pushTransform || command.payloadSize != 24) return false;
+    transform = {readFloat(command.payload), readFloat(command.payload + 4),
+                 readFloat(command.payload + 8), readFloat(command.payload + 12),
+                 readFloat(command.payload + 16), readFloat(command.payload + 20)};
     return true;
 }
 
