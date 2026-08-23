@@ -295,6 +295,12 @@ maps them to the current macOS system designs, while future backends can choose
 their native equivalents. Servers advertise the expanded family set with
 `portableFontFamilies`.
 
+Custom fonts are persistent connection-scoped resources. `FontCreate` uploads
+at most 16 MiB once, and subsequent draw and metric requests carry only its
+nonzero ID. CoreText validates and shapes the font server-side; the client never
+converts glyphs to geometry. Resource versions prevent stale cached outlines
+after replacement, and fonts are released on destroy or disconnect.
+
 ## Requirements
 
 - macOS

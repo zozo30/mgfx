@@ -45,6 +45,8 @@ enum class MessageType : std::uint16_t {
     textMetrics = 29,
     meshCreate = 30,
     meshDestroy = 31,
+    fontCreate = 32,
+    fontDestroy = 33,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -84,6 +86,7 @@ enum ServerCapability : std::uint32_t {
     textLetterSpacing = 1U << 27U,
     textDecorations = 1U << 28U,
     portableFontFamilies = 1U << 29U,
+    fontResources = 1U << 30U,
 };
 
 enum class TextFamily : std::uint8_t {
@@ -100,7 +103,13 @@ struct TextMeasure {
     TextWeight weight;
     TextStyle style;
     float letterSpacing;
+    std::uint32_t fontResourceId;
     std::string text;
+};
+
+struct FontUpload {
+    std::uint32_t id;
+    std::vector<std::uint8_t> bytes;
 };
 
 enum class WindowChromeMode : std::uint8_t {
@@ -298,6 +307,8 @@ std::vector<std::uint8_t> encodePathUpload(const PathUpload& path);
 bool decodePathUpload(const std::vector<std::uint8_t>& payload, PathUpload& path);
 std::vector<std::uint8_t> encodeMeshUpload(const MeshUpload& mesh);
 bool decodeMeshUpload(const std::vector<std::uint8_t>& payload, MeshUpload& mesh);
+std::vector<std::uint8_t> encodeFontUpload(const FontUpload& font);
+bool decodeFontUpload(const std::vector<std::uint8_t>& payload, FontUpload& font);
 std::vector<std::uint8_t> encodeResourceId(std::uint32_t id);
 bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& id);
 std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure);

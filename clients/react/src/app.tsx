@@ -139,6 +139,7 @@ interface AppProps {
   readonly chromeMetrics: WindowChromeMetrics;
   readonly headerImageSize: { readonly width: number; readonly height: number };
   readonly vectorIcons: readonly VectorIcon[];
+  readonly customFontResourceId: number | undefined;
 }
 
 export function App(props: AppProps) {
@@ -148,7 +149,7 @@ export function App(props: AppProps) {
   }} /></AnimationProvider>;
 }
 
-function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
+function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontResourceId }: AppProps) {
   const [selected, setSelected] = useState(0);
   const [value, setValue] = useState("");
   const [mode, setMode] = useState<WindowMode>("normal");
@@ -181,6 +182,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
         crossAxisAlignment: "center" }}>
         <Text value="MGFX React" style={{ fontSize: 32, fontFamily: "system", fontWeight: "semibold",
           letterSpacing: 0.5,
+          ...(customFontResourceId === undefined ? {} : { fontResourceId: customFontResourceId }),
           color: rgba(0.9, 0.96, 1) }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
           <ConicBadge time={animationTime} />

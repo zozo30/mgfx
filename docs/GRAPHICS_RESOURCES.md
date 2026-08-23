@@ -75,6 +75,12 @@ Family codes select semantic system sans, fixed-pitch, serif, or rounded
 designs. They deliberately do not expose platform font names, so identical
 client commands remain meaningful on every backend.
 
+Clients may also upload a bounded font file once with `FontCreate` and refer to
+its connection-scoped ID from both `DrawText` and `TextMeasure`. The macOS host
+constructs a Core Graphics font, then CoreText owns shaping and outlines exactly
+as it does for system families. Replacement increments a resource version used
+by the geometry cache, while disconnect and `FontDestroy` release native data.
+
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is
 part of shaping, measurement, and geometry cache identity.
@@ -216,9 +222,9 @@ color glyph atlases remain available for small text and emoji.
    Direct `<Mesh>` remains available.
    Persistent colored mesh resources are also implemented. Next add selective
    lowering of complete `<Svg>` documents.
-4. **Partially implemented:** compact Unicode `DrawText`, native shaping, and
-   cached glyph-outline geometry, plus exact asynchronous advance metrics. Next
-   add font uploads, multiline/rich-text runs, and atlas caching.
+4. **Partially implemented:** compact Unicode `DrawText`, native shaping,
+   persistent font uploads, cached glyph-outline geometry, and exact asynchronous
+   advance metrics. Next add multiline rich-text runs and atlas caching.
 5. Add cache budgets, device-loss recreation, and resource tracing tools.
 
 None of these stages changes window, layout, event, or component ownership: the

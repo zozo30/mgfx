@@ -338,9 +338,11 @@ void CommandEncoder::drawPath(const PathCommand& path) {
 }
 
 void CommandEncoder::drawText(const TextCommand& text) {
-    const std::uint8_t extension = text.decoration != noTextDecoration ? 2
+    const std::uint8_t extension = text.fontResourceId != 0 ? 3
+        : text.decoration != noTextDecoration ? 2
         : text.letterSpacing != 0.0F ? 1 : 0;
-    const std::size_t headerSize = extension == 2 ? 40 : extension == 1 ? 36 : 32;
+    const std::size_t headerSize = extension == 3 ? 44
+        : extension == 2 ? 40 : extension == 1 ? 36 : 32;
     if (text.text.size() > std::numeric_limits<std::uint32_t>::max() - headerSize) {
         throw std::length_error("Text command exceeds 4 GiB");
     }
@@ -356,10 +358,11 @@ void CommandEncoder::drawText(const TextCommand& text) {
         appendFloat(bytes_, value);
     }
     if (extension >= 1) appendFloat(bytes_, text.letterSpacing);
-    if (extension == 2) {
+    if (extension >= 2) {
         bytes_.push_back(text.decoration);
         bytes_.insert(bytes_.end(), 3, 0);
     }
+    if (extension == 3) appendU32(bytes_, text.fontResourceId);
     bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
 }
 
@@ -699,13 +702,14 @@ bool decodeText(const CommandView& command, TextCommand& text) {
     constexpr std::size_t baseHeaderSize = 32;
     if (command.opcode != Opcode::drawText || command.payloadSize <= baseHeaderSize) return false;
     const std::uint8_t extension = command.payload[3];
-    const std::size_t headerSize = extension == 2 ? 40 : extension == 1 ? 36 : baseHeaderSize;
+    const std::size_t headerSize = extension == 3 ? 44
+        : extension == 2 ? 40 : extension == 1 ? 36 : baseHeaderSize;
     if (command.opcode != Opcode::drawText || command.payloadSize <= headerSize ||
         command.payloadSize > headerSize + 65536 ||
         command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemRounded) ||
         command.payload[1] > static_cast<std::uint8_t>(FontWeight::semibold) ||
         command.payload[2] > static_cast<std::uint8_t>(FontStyle::italic) ||
-        extension > 2 || (extension == 2 &&
+        extension > 3 || (extension >= 2 &&
             (command.payload[36] > (underlineText | strikeThroughText) ||
              command.payload[37] != 0 || command.payload[38] != 0 || command.payload[39] != 0))) {
         return false;
@@ -714,7 +718,8 @@ bool decodeText(const CommandView& command, TextCommand& text) {
     text.weight = static_cast<FontWeight>(command.payload[1]);
     text.style = static_cast<FontStyle>(command.payload[2]);
     text.letterSpacing = extension >= 1 ? readFloat(command.payload + 32) : 0.0F;
-    text.decoration = extension == 2 ? command.payload[36] : noTextDecoration;
+    text.decoration = extension >= 2 ? command.payload[36] : noTextDecoration;
+    text.fontResourceId = extension == 3 ? readU32(command.payload + 40) : 0;
     text.left = readFloat(command.payload + 4);
     text.top = readFloat(command.payload + 8);
     text.fontSize = readFloat(command.payload + 12);
@@ -722,7 +727,8 @@ bool decodeText(const CommandView& command, TextCommand& text) {
                   readFloat(command.payload + 24), readFloat(command.payload + 28)};
     text.text.assign(reinterpret_cast<const char*>(command.payload + headerSize),
                      command.payloadSize - headerSize);
-    return std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10.0F &&
+    return (extension != 3 || text.fontResourceId != 0) &&
+           std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10.0F &&
            text.text.find('\0') == std::string::npos;
 }
 

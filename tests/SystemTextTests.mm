@@ -1,7 +1,9 @@
 #include "SystemText.hpp"
 
 #include <cmath>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 
 int main() {
     const gfx::ShapedText sans = gfx::shapeSystemText("Hello, MGFX — Ω", gfx::FontFamily::systemSans);
@@ -26,6 +28,27 @@ int main() {
     if (serif.triangles.empty() || rounded.triangles.empty() ||
         serif.advance <= 0.0F || rounded.advance <= 0.0F) {
         std::cerr << "Portable native font families produced no shaped geometry\n";
+        return 1;
+    }
+    std::ifstream fontFile("/System/Library/Fonts/Monaco.ttf", std::ios::binary);
+    const std::vector<std::uint8_t> fontBytes{
+        std::istreambuf_iterator<char>(fontFile), std::istreambuf_iterator<char>()};
+    if (!gfx::createFontResource(77, fontBytes) || gfx::fontResourceVersion(77) == 0) {
+        std::cerr << "Could not create a persistent custom font resource\n";
+        return 1;
+    }
+    const gfx::ShapedText custom = gfx::shapeSystemText(
+        "Custom font resource", gfx::FontFamily::systemSans, gfx::FontWeight::regular,
+        gfx::FontStyle::regular, 0.0F, 77);
+    if (custom.triangles.empty() || custom.advance <= 0.0F ||
+        gfx::measureSystemText("Custom font resource", gfx::FontFamily::systemSans,
+            gfx::FontWeight::regular, gfx::FontStyle::regular, 0.0F, 77) <= 0.0F) {
+        std::cerr << "Custom font resource produced no shaped geometry\n";
+        return 1;
+    }
+    gfx::destroyFontResource(77);
+    if (gfx::fontResourceVersion(77) != 0) {
+        std::cerr << "Custom font resource was not destroyed\n";
         return 1;
     }
     const gfx::ShapedText bold = gfx::shapeSystemText(

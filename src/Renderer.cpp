@@ -1175,12 +1175,17 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             cacheKey.append(reinterpret_cast<const char*>(&text.letterSpacing),
                             sizeof(text.letterSpacing));
             cacheKey.push_back(static_cast<char>(text.decoration));
+            cacheKey.append(reinterpret_cast<const char*>(&text.fontResourceId),
+                            sizeof(text.fontResourceId));
+            const std::uint64_t fontVersion = gfx::fontResourceVersion(text.fontResourceId);
+            cacheKey.append(reinterpret_cast<const char*>(&fontVersion), sizeof(fontVersion));
             cacheKey += text.text;
             auto [found, inserted] = textCache_.try_emplace(cacheKey);
             gfx::ShapedText& shaped = found->second;
             if (inserted) {
                 shaped = gfx::shapeSystemText(
-                    text.text, text.family, text.weight, text.style, text.letterSpacing);
+                    text.text, text.family, text.weight, text.style, text.letterSpacing,
+                    text.fontResourceId);
                 const auto appendDecoration = [&](float position, float thickness) {
                     const float half = std::max(thickness, 0.04F) * 0.5F;
                     const float left = 0.0F, right = shaped.advance;

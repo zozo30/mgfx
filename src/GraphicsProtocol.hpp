@@ -253,6 +253,7 @@ struct TextCommand {
     FontStyle style;
     float letterSpacing;
     std::uint8_t decoration;
+    std::uint32_t fontResourceId;
     float left;
     float top;
     float fontSize;

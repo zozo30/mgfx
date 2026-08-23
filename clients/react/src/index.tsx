@@ -1,4 +1,5 @@
 import { createConnection, type Socket } from "node:net";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { App } from "./app.js";
@@ -7,7 +8,7 @@ import { decodeImageFile, type DecodedImage } from "./image-codec.js";
 import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
   decodeServerHello, decodeSize, decodeText, decodeTextMetrics, decodeWindowChromeMetrics,
-  encodeCursor, encodeMeshCreate, encodePathCreate, encodeText,
+  encodeCursor, encodeFontCreate, encodeMeshCreate, encodePathCreate, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
   MessageType, sendMessage, TextMetricsClient } from "@mgfx/demo-client/protocol";
 
@@ -25,6 +26,15 @@ try {
 }
 const socket = await connectWithRetry(socketPath);
 let shuttingDown = false;
+let customFontResourceId: number | undefined;
+try {
+  const fontBytes = await readFile("/System/Library/Fonts/Monaco.ttf");
+  customFontResourceId = 1;
+  sendMessage(socket, MessageType.FontCreate, encodeFontCreate(customFontResourceId, fontBytes));
+  console.log(`Uploaded Monaco.ttf as font resource ${customFontResourceId}`);
+} catch (error) {
+  console.warn("Could not load the optional custom-font demo resource:", error);
+}
 sendMessage(socket, MessageType.TextureCreate, encodeTextureCreate(1,
   headerImage.width, headerImage.height, headerImage.rgba));
 const animationClock = new AnimationClock((requestSequence) =>
@@ -55,13 +65,14 @@ const surface = new ReactSurface(
       encodePathCreate(id, segments)),
     createMesh: (id, vertices, indices) => sendMessage(socket, MessageType.MeshCreate,
       encodeMeshCreate(id, vertices, indices)),
-    measureText: (family, text, weight, style, letterSpacing) =>
-      textMetrics.measure(family, text, weight, style, letterSpacing),
+    measureText: (family, text, weight, style, letterSpacing, fontResourceId) =>
+      textMetrics.measure(family, text, weight, style, letterSpacing, fontResourceId),
   },
 );
 let chromeMetrics = { leadingInset: 132, titleBarHeight: 56 };
 const renderApplication = () => surface.render(
   <App animationClock={animationClock} chromeMetrics={chromeMetrics}
+    customFontResourceId={customFontResourceId}
     headerImageSize={{ width: headerImage.width, height: headerImage.height }}
     vectorIcons={vectorIcons} />);
 renderApplication();

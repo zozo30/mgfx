@@ -79,6 +79,7 @@ int main() {
                       gfx::FontStyle::italic,
                       0.08F,
                       gfx::underlineText | gfx::strikeThroughText,
+                      77,
                       -0.8F, 0.7F, 0.08F,
                       {0.7F, 0.9F, 1.0F, 1.0F}, "Hello — Ω"});
     encoder.endFrame();
@@ -211,6 +212,7 @@ int main() {
         text.weight != gfx::FontWeight::semibold || text.style != gfx::FontStyle::italic ||
         !nearlyEqual(text.letterSpacing, 0.08F) ||
         text.decoration != (gfx::underlineText | gfx::strikeThroughText) ||
+        text.fontResourceId != 77 ||
         text.text != "Hello — Ω" || !nearlyEqual(text.fontSize, 0.08F) ||
         !decoder.next(command) || command.opcode != gfx::Opcode::endFrame ||
         decoder.next(command) || !decoder.valid()) {

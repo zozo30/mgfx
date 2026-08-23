@@ -82,6 +82,7 @@ export interface TextStyle {
   fontSize?: number;
   color?: Color;
   fontFamily?: "pixel" | "system" | "monospace" | "serif" | "rounded";
+  fontResourceId?: number;
   fontWeight?: "regular" | "medium" | "semibold" | "bold";
   fontStyle?: "regular" | "italic";
   letterSpacing?: number;
@@ -94,20 +95,23 @@ export interface TextStyle {
 const nativeTextAdvances = new Map<string, number>();
 const nativeTextKey = (family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">, value: string,
   weight: "regular" | "medium" | "semibold" | "bold" = "regular",
-  style: "regular" | "italic" = "regular", letterSpacing = 0) =>
-  `${family}\0${weight}\0${style}\0${letterSpacing}\0${value}`;
+  style: "regular" | "italic" = "regular", letterSpacing = 0, fontResourceId = 0) =>
+  `${family}\0${fontResourceId}\0${weight}\0${style}\0${letterSpacing}\0${value}`;
 export function cacheNativeTextAdvance(
   family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">, value: string,
   advance: number, weight: "regular" | "medium" | "semibold" | "bold" = "regular",
-  style: "regular" | "italic" = "regular", letterSpacing = 0): void {
+  style: "regular" | "italic" = "regular", letterSpacing = 0, fontResourceId = 0): void {
   if (Number.isFinite(advance) && advance >= 0)
-    nativeTextAdvances.set(nativeTextKey(family, value, weight, style, letterSpacing), advance);
+    nativeTextAdvances.set(
+      nativeTextKey(family, value, weight, style, letterSpacing, fontResourceId), advance);
 }
 export function nativeTextAdvance(
   family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">, value: string,
   weight: "regular" | "medium" | "semibold" | "bold" = "regular",
-  style: "regular" | "italic" = "regular", letterSpacing = 0): number | undefined {
-  return nativeTextAdvances.get(nativeTextKey(family, value, weight, style, letterSpacing));
+  style: "regular" | "italic" = "regular", letterSpacing = 0,
+  fontResourceId = 0): number | undefined {
+  return nativeTextAdvances.get(
+    nativeTextKey(family, value, weight, style, letterSpacing, fontResourceId));
 }
 
 export function nativeTextMetricRuns(value: string, style: TextStyle): readonly string[] {
@@ -129,7 +133,8 @@ function textRunWidth(value: string, style: TextStyle, fontSize: number): number
   if (style.fontFamily && style.fontFamily !== "pixel") {
     const tracking = (style.letterSpacing ?? 0) / fontSize;
     const exact = nativeTextAdvance(
-      style.fontFamily, value, style.fontWeight, style.fontStyle, tracking);
+      style.fontFamily, value, style.fontWeight, style.fontStyle, tracking,
+      style.fontResourceId);
     const average = style.fontFamily === "monospace" ? 0.60 : 0.56;
     return (exact ?? [...value].length * (average + tracking)) * fontSize;
   }
@@ -921,7 +926,7 @@ function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: Te
       encoder.systemText(line.value, lineX(line.width) / viewport.width * 2 - 1,
         1 - (bounds.y + index * lineHeight) / viewport.height * 2,
         fontSize / viewport.height * 2, color, family, style.fontWeight, style.fontStyle,
-        tracking, decoration);
+        tracking, decoration, style.fontResourceId);
     });
     return;
   }

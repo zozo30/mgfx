@@ -4,6 +4,7 @@
 #include "VectorPath.hpp"
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 namespace gfx {
@@ -22,10 +23,16 @@ struct ShapedText {
 ShapedText shapeSystemText(const std::string& utf8, FontFamily family,
                             FontWeight weight = FontWeight::regular,
                             FontStyle style = FontStyle::regular,
-                            float letterSpacing = 0.0F);
+                            float letterSpacing = 0.0F,
+                            std::uint32_t fontResourceId = 0);
 float measureSystemText(const std::string& utf8, FontFamily family,
                         FontWeight weight = FontWeight::regular,
                         FontStyle style = FontStyle::regular,
-                        float letterSpacing = 0.0F);
+                        float letterSpacing = 0.0F,
+                        std::uint32_t fontResourceId = 0);
+bool createFontResource(std::uint32_t id, const std::vector<std::uint8_t>& bytes);
+void destroyFontResource(std::uint32_t id);
+void clearFontResources();
+std::uint64_t fontResourceVersion(std::uint32_t id);
 
 } // namespace gfx

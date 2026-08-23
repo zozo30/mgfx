@@ -313,6 +313,7 @@ void GraphicsServer::run() {
             pendingMeshUploads_.clear();
             pendingMeshDestroys_.clear();
         }
+        gfx::clearFontResources();
         clientDisconnected_ = false;
         constexpr std::uint32_t capabilities =
             mgfx::ipc::ServerCapability::clientWindowLifecycle |
@@ -344,7 +345,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::typographyStyles |
             mgfx::ipc::ServerCapability::textLetterSpacing |
             mgfx::ipc::ServerCapability::textDecorations |
-            mgfx::ipc::ServerCapability::portableFontFamilies;
+            mgfx::ipc::ServerCapability::portableFontFamilies |
+            mgfx::ipc::ServerCapability::fontResources;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -471,6 +473,16 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
                 const std::lock_guard<std::mutex> lock(resourceMutex_);
                 pendingMeshDestroys_.push_back(id);
             }
+        } else if (message.type == mgfx::ipc::MessageType::fontCreate) {
+            mgfx::ipc::FontUpload font{};
+            if (mgfx::ipc::decodeFontUpload(message.payload, font)) {
+                gfx::createFontResource(font.id, font.bytes);
+            }
+        } else if (message.type == mgfx::ipc::MessageType::fontDestroy) {
+            std::uint32_t id = 0;
+            if (mgfx::ipc::decodeResourceId(message.payload, id)) {
+                gfx::destroyFontResource(id);
+            }
         } else if (message.type == mgfx::ipc::MessageType::textMeasure &&
                    message.sequence != 0) {
             mgfx::ipc::TextMeasure measure{};
@@ -488,7 +500,8 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
                 const gfx::FontStyle style = measure.style == mgfx::ipc::TextStyle::italic
                     ? gfx::FontStyle::italic : gfx::FontStyle::regular;
                 const float advance = gfx::measureSystemText(
-                    measure.text, family, weight, style, measure.letterSpacing);
+                    measure.text, family, weight, style, measure.letterSpacing,
+                    measure.fontResourceId);
                 active->send(mgfx::ipc::MessageType::textMetrics,
                              mgfx::ipc::encodeTextMetrics(advance), message.sequence);
             }
@@ -503,6 +516,7 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
         }
     }
     if (disconnected && !stopping_) {
+        gfx::clearFontResources();
         {
             const std::lock_guard<std::mutex> lock(frameMutex_);
             latestFrame_.reset();

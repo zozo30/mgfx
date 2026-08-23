@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -393,28 +393,36 @@ test("system Unicode text is a compact skippable display-list command", () => {
   const frame = new FrameEncoder();
   frame.systemText("Hello — Ω", -0.8, 0.6, 0.08,
     { red: 0.7, green: 0.9, blue: 1, alpha: 1 }, "monospace", "semibold", "italic", 0.075,
-    TextDecoration.Underline | TextDecoration.LineThrough);
+    TextDecoration.Underline | TextDecoration.LineThrough, 42);
   frame.endFrame();
   const bytes = frame.finish();
   assert.equal(bytes.readUInt16LE(16), 8);
   assert.equal(bytes.readUInt8(24), 1);
   assert.equal(bytes.readUInt8(25), 3);
   assert.equal(bytes.readUInt8(26), 1);
-  assert.equal(bytes.readUInt8(27), 2);
+  assert.equal(bytes.readUInt8(27), 3);
   assert.ok(Math.abs(bytes.readFloatLE(56) - 0.075) < 0.00001);
   assert.equal(bytes.readUInt8(60), 3);
-  assert.equal(bytes.subarray(64, 64 + Buffer.byteLength("Hello — Ω")).toString(), "Hello — Ω");
+  assert.equal(bytes.readUInt32LE(64), 42);
+  assert.equal(bytes.subarray(68, 68 + Buffer.byteLength("Hello — Ω")).toString(), "Hello — Ω");
+});
+
+test("font files upload once as bounded persistent resources", () => {
+  const font = encodeFontCreate(42, Buffer.from([0, 1, 0, 0, 4, 8, 15, 16, 23, 42]));
+  assert.equal(font.readUInt32LE(0), 42);
+  assert.deepEqual(font.subarray(4), Buffer.from([0, 1, 0, 0, 4, 8, 15, 16, 23, 42]));
 });
 
 test("native text metrics correlate asynchronous measurement replies", async () => {
   const sent: Array<{ payload: Buffer; sequence: number }> = [];
   const metrics = new TextMetricsClient((payload, sequence) => sent.push({ payload, sequence }));
-  const pending = metrics.measure("serif", "Árvíztűrő — Ω", "medium", "italic", 0.075);
+  const pending = metrics.measure("serif", "Árvíztűrő — Ω", "medium", "italic", 0.075, 42);
   assert.deepEqual(sent[0]?.payload,
-    encodeTextMeasure("serif", "Árvíztűrő — Ω", "medium", "italic", 0.075));
+    encodeTextMeasure("serif", "Árvíztűrő — Ω", "medium", "italic", 0.075, 42));
   assert.equal(sent[0]?.payload.readUInt8(0), 2);
-  assert.equal(sent[0]?.payload.readUInt8(3), 1);
+  assert.equal(sent[0]?.payload.readUInt8(3), 2);
   assert.ok(Math.abs(sent[0]!.payload.readFloatLE(4) - 0.075) < 0.00001);
+  assert.equal(sent[0]?.payload.readUInt32LE(8), 42);
   const payload = Buffer.alloc(4); payload.writeFloatLE(6.25);
   metrics.receive(sent[0]!.sequence + 1, 99);
   metrics.receive(sent[0]!.sequence, decodeTextMetrics(payload));

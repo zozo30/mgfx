@@ -5,6 +5,8 @@
 #import <Foundation/Foundation.h>
 
 #include <vector>
+#include <mutex>
+#include <unordered_map>
 
 namespace gfx {
 namespace {
@@ -16,6 +18,14 @@ constexpr float designSize = 1000.0F;
 constexpr CGFloat mediumWeight = 0.23;
 constexpr CGFloat semiboldWeight = 0.30;
 constexpr CGFloat boldWeight = 0.40;
+
+struct FontResource {
+    CGFontRef font = nullptr;
+    std::uint64_t version = 0;
+};
+std::mutex fontResourceMutex;
+std::unordered_map<std::uint32_t, FontResource> fontResources;
+std::uint64_t nextFontVersion = 1;
 
 struct PathBuilder {
     std::vector<mgfx::ipc::PathSegment> segments;
@@ -72,9 +82,17 @@ void appendPathElement(void* context, const CGPathElement* element) {
     }
 }
 
-CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style) {
+CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style,
+                     std::uint32_t fontResourceId) {
     CTFontRef font = nullptr;
-    if (family == FontFamily::systemSerif || family == FontFamily::systemRounded) {
+    if (fontResourceId != 0) {
+        const std::lock_guard<std::mutex> lock(fontResourceMutex);
+        const auto found = fontResources.find(fontResourceId);
+        if (found == fontResources.end()) return nullptr;
+        font = CTFontCreateWithGraphicsFont(found->second.font, designSize, nullptr, nullptr);
+    }
+    if (font == nullptr &&
+        (family == FontFamily::systemSerif || family == FontFamily::systemRounded)) {
         NSFontDescriptor* base = [NSFont systemFontOfSize:designSize].fontDescriptor;
         const NSFontDescriptorSystemDesign design = family == FontFamily::systemSerif
             ? NSFontDescriptorSystemDesignSerif : NSFontDescriptorSystemDesignRounded;
@@ -112,13 +130,14 @@ CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style) {
 } // namespace
 
 ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
-                            FontStyle style, float letterSpacing) {
+                            FontStyle style, float letterSpacing,
+                            std::uint32_t fontResourceId) {
     ShapedText shaped;
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
                                             encoding:NSUTF8StringEncoding];
     if (string == nil || string.length == 0) return shaped;
-    CTFontRef baseFont = createFont(family, weight, style);
+    CTFontRef baseFont = createFont(family, weight, style, fontResourceId);
     if (baseFont == nullptr) return shaped;
     NSMutableDictionary* attributes = [@{
         (__bridge id)kCTFontAttributeName: (__bridge id)baseFont} mutableCopy];
@@ -180,12 +199,13 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
 }
 
 float measureSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
-                        FontStyle style, float letterSpacing) {
+                        FontStyle style, float letterSpacing,
+                        std::uint32_t fontResourceId) {
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
                                             encoding:NSUTF8StringEncoding];
     if (string == nil || string.length == 0) return 0.0F;
-    CTFontRef font = createFont(family, weight, style);
+    CTFontRef font = createFont(family, weight, style, fontResourceId);
     if (font == nullptr) return 0.0F;
     NSMutableDictionary* attributes = [@{
         (__bridge id)kCTFontAttributeName: (__bridge id)font} mutableCopy];
@@ -200,6 +220,49 @@ float measureSystemText(const std::string& utf8, FontFamily family, FontWeight w
     if (line != nullptr) CFRelease(line);
     CFRelease(font);
     return advance;
+}
+
+bool createFontResource(std::uint32_t id, const std::vector<std::uint8_t>& bytes) {
+    if (id == 0 || bytes.empty()) return false;
+    CFDataRef data = CFDataCreate(nullptr, bytes.data(), static_cast<CFIndex>(bytes.size()));
+    if (data == nullptr) return false;
+    CGDataProviderRef provider = CGDataProviderCreateWithCFData(data);
+    CFRelease(data);
+    if (provider == nullptr) return false;
+    CGFontRef font = CGFontCreateWithDataProvider(provider);
+    CGDataProviderRelease(provider);
+    if (font == nullptr) return false;
+    const std::lock_guard<std::mutex> lock(fontResourceMutex);
+    auto found = fontResources.find(id);
+    if (found != fontResources.end()) CGFontRelease(found->second.font);
+    fontResources[id] = {font, nextFontVersion++};
+    return true;
+}
+
+void destroyFontResource(std::uint32_t id) {
+    const std::lock_guard<std::mutex> lock(fontResourceMutex);
+    const auto found = fontResources.find(id);
+    if (found == fontResources.end()) return;
+    CGFontRelease(found->second.font);
+    fontResources.erase(found);
+    ++nextFontVersion;
+}
+
+void clearFontResources() {
+    const std::lock_guard<std::mutex> lock(fontResourceMutex);
+    for (const auto& [id, resource] : fontResources) {
+        static_cast<void>(id);
+        CGFontRelease(resource.font);
+    }
+    fontResources.clear();
+    ++nextFontVersion;
+}
+
+std::uint64_t fontResourceVersion(std::uint32_t id) {
+    if (id == 0) return 0;
+    const std::lock_guard<std::mutex> lock(fontResourceMutex);
+    const auto found = fontResources.find(id);
+    return found == fontResources.end() ? 0 : found->second.version;
 }
 
 } // namespace gfx

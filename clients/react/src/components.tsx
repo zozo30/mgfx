@@ -137,10 +137,12 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const fontWeight = textStyle?.fontWeight ?? "regular";
   const fontStyle = textStyle?.fontStyle ?? "regular";
   const letterSpacing = (textStyle?.letterSpacing ?? 0) / fontSize;
+  const fontResourceId = textStyle?.fontResourceId ?? 0;
   const paddingLeft = style.padding?.left ?? 12;
   const characterWidth = (character: string) => {
     if (fontFamily !== "pixel") {
-      return (nativeTextAdvance(fontFamily, character, fontWeight, fontStyle, letterSpacing) ??
+      return (nativeTextAdvance(
+        fontFamily, character, fontWeight, fontStyle, letterSpacing, fontResourceId) ??
         (fontFamily === "monospace" ? 0.60 : 0.56) + letterSpacing) * fontSize;
     }
     return fontSize * 6 / 7;

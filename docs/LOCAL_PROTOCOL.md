@@ -71,10 +71,12 @@ created or shown a drawable surface.
 | 25 | `TextureDestroy` | client → server | Nonzero `u32` resource ID |
 | 26 | `PathCreate` | client → server | Nonzero `u32` ID, segment count, reserved fields, canonical path segments |
 | 27 | `PathDestroy` | client → server | Nonzero `u32` resource ID |
-| 28 | `TextMeasure` | client → server | `u8 family`, `u8 weight`, `u8 style`, `u8 extension`; optional `f32 letterSpacing` in em when extension is 1, then UTF-8 text; nonzero sequence |
+| 28 | `TextMeasure` | client → server | `u8 family`, `u8 weight`, `u8 style`, `u8 extension`; optional `f32 letterSpacing` in em for extension 1, plus `u32 fontId` for extension 2, then UTF-8 text; nonzero sequence |
 | 29 | `TextMetrics` | server → client | `f32 advance` in em units; echoes request sequence |
 | 30 | `MeshCreate` | client → server | Nonzero `u32` ID, vertex/index counts, colored vertices, triangle indices |
 | 31 | `MeshDestroy` | client → server | Nonzero `u32` resource ID |
+| 32 | `FontCreate` | client → server | Nonzero `u32` ID followed by at most 16 MiB of native font bytes |
+| 33 | `FontDestroy` | client → server | Nonzero `u32` resource ID |
 
 Backend is `1` Metal, `2` Vulkan, or `3` DirectX. Capability bits are client
 window lifecycle (`1 << 0`), pointer input (`1 << 1`), keyboard input (`1 << 2`),
@@ -93,6 +95,7 @@ Native medium/semibold/italic typography is advertised by `1 << 26`, and
 native letter spacing by `1 << 27`.
 Native font-metric underline and line-through are advertised by `1 << 28`.
 Portable serif and rounded system families are advertised by `1 << 29`.
+Persistent client font resources are advertised by `1 << 30`.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.
@@ -182,6 +185,7 @@ and apply them before draw commands.
 
 MGFX opcode `8` (`DrawText`) carries a portable system-font family, weight,
 style, optional em letter spacing, underline/line-through flags, normalized
-top-left position and font height, straight RGBA color, and validated UTF-8.
+top-left position and font height, optional persistent font ID, straight RGBA
+color, and validated UTF-8.
 The backend shapes Unicode and caches tessellated glyph outlines; strings no
 longer expand into a triangle command for every pixel-font cell.

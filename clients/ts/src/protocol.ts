@@ -37,6 +37,8 @@ export enum MessageType {
   TextMetrics = 29,
   MeshCreate = 30,
   MeshDestroy = 31,
+  FontCreate = 32,
+  FontDestroy = 33,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -71,6 +73,7 @@ export enum ServerCapability {
   TextLetterSpacing = 1 << 27,
   TextDecorations = 1 << 28,
   PortableFontFamilies = 1 << 29,
+  FontResources = 1 << 30,
 }
 export interface ServerHello {
   readonly version: number;
@@ -222,20 +225,23 @@ const fontFamilyCode = (family: FontFamily): number =>
 
 export function encodeTextMeasure(family: FontFamily, text: string,
   weight: FontWeight = "regular", style: FontStyle = "regular",
-  letterSpacing = 0): Buffer {
+  letterSpacing = 0, fontResourceId = 0): Buffer {
   const utf8 = Buffer.from(text, "utf8");
   if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
     throw new RangeError("Text measurement requires 1 through 65536 non-NUL UTF-8 bytes");
   if (!Number.isFinite(letterSpacing) || Math.abs(letterSpacing) > 10)
     throw new RangeError("Text letter spacing must be finite and within -10 through 10 em");
-  const hasLetterSpacing = letterSpacing !== 0;
-  const headerSize = hasLetterSpacing ? 8 : 4;
+  if (!Number.isInteger(fontResourceId) || fontResourceId < 0 || fontResourceId > 0xffff_ffff)
+    throw new RangeError("Font resource ID must be an unsigned 32-bit integer");
+  const extension = fontResourceId !== 0 ? 2 : letterSpacing !== 0 ? 1 : 0;
+  const headerSize = extension === 2 ? 12 : extension === 1 ? 8 : 4;
   const payload = Buffer.alloc(headerSize + utf8.length);
   payload.writeUInt8(fontFamilyCode(family), 0);
   payload.writeUInt8(fontWeightCode(weight), 1);
   payload.writeUInt8(style === "italic" ? 1 : 0, 2);
-  payload.writeUInt8(hasLetterSpacing ? 1 : 0, 3);
-  if (hasLetterSpacing) payload.writeFloatLE(letterSpacing, 4);
+  payload.writeUInt8(extension, 3);
+  if (extension >= 1) payload.writeFloatLE(letterSpacing, 4);
+  if (extension === 2) payload.writeUInt32LE(fontResourceId, 8);
   utf8.copy(payload, headerSize);
   return payload;
 }
@@ -256,8 +262,9 @@ export class TextMetricsClient {
   constructor(private readonly sendRequest: (payload: Buffer, sequence: number) => void) {}
 
   measure(family: FontFamily, text: string, weight: FontWeight = "regular",
-    style: FontStyle = "regular", letterSpacing = 0): Promise<number> {
-    const payload = encodeTextMeasure(family, text, weight, style, letterSpacing);
+    style: FontStyle = "regular", letterSpacing = 0, fontResourceId = 0): Promise<number> {
+    const payload = encodeTextMeasure(
+      family, text, weight, style, letterSpacing, fontResourceId);
     const sequence = this.nextSequence;
     this.nextSequence = sequence === 0xffff_ffff ? 1 : sequence + 1;
     this.sendRequest(payload, sequence);
@@ -344,6 +351,17 @@ export function encodeResourceId(id: number): Buffer {
   if (!Number.isSafeInteger(id) || id <= 0 || id > 0xffff_ffff)
     throw new RangeError("Resource ID must be a nonzero u32");
   const payload = Buffer.alloc(4); payload.writeUInt32LE(id); return payload;
+}
+
+export function encodeFontCreate(id: number, bytes: Buffer): Buffer {
+  if (!Number.isInteger(id) || id <= 0 || id > 0xffff_ffff)
+    throw new RangeError("Font resource ID must be a nonzero unsigned 32-bit integer");
+  if (bytes.length === 0 || bytes.length > 16 * 1024 * 1024)
+    throw new RangeError("Font resource must contain 1 through 16777216 bytes");
+  const payload = Buffer.allocUnsafe(4 + bytes.length);
+  payload.writeUInt32LE(id, 0);
+  bytes.copy(payload, 4);
+  return payload;
 }
 
 export class MessageParser {
@@ -696,7 +714,7 @@ export class FrameEncoder {
   systemText(text: string, left: number, top: number, fontSize: number,
     color: Color, family: FontFamily = "system", weight: FontWeight = "regular",
     style: FontStyle = "regular", letterSpacing = 0,
-    decoration: TextDecoration = TextDecoration.None): void {
+    decoration: TextDecoration = TextDecoration.None, fontResourceId = 0): void {
     const utf8 = Buffer.from(text, "utf8");
     if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
       throw new RangeError("System text must contain 1 through 65536 non-NUL UTF-8 bytes");
@@ -704,8 +722,12 @@ export class FrameEncoder {
       throw new RangeError("Text letter spacing must be finite and within -10 through 10 em");
     if (!Number.isInteger(decoration) || decoration < 0 || decoration > 3)
       throw new RangeError("Text decoration must contain only underline and line-through flags");
-    const extension = decoration !== TextDecoration.None ? 2 : letterSpacing !== 0 ? 1 : 0;
-    const headerSize = extension === 2 ? 40 : extension === 1 ? 36 : 32;
+    if (!Number.isInteger(fontResourceId) || fontResourceId < 0 || fontResourceId > 0xffff_ffff)
+      throw new RangeError("Font resource ID must be an unsigned 32-bit integer");
+    const extension = fontResourceId !== 0 ? 3
+      : decoration !== TextDecoration.None ? 2 : letterSpacing !== 0 ? 1 : 0;
+    const headerSize = extension === 3 ? 44
+      : extension === 2 ? 40 : extension === 1 ? 36 : 32;
     const payload = Buffer.alloc(headerSize + utf8.length);
     payload.writeUInt8(fontFamilyCode(family), 0);
     payload.writeUInt8(fontWeightCode(weight), 1);
@@ -717,7 +739,8 @@ export class FrameEncoder {
         payload.writeFloatLE(value, 4 + index * 4);
       });
     if (extension >= 1) payload.writeFloatLE(letterSpacing, 32);
-    if (extension === 2) payload.writeUInt8(decoration, 36);
+    if (extension >= 2) payload.writeUInt8(decoration, 36);
+    if (extension === 3) payload.writeUInt32LE(fontResourceId, 40);
     utf8.copy(payload, headerSize);
     this.command(8, payload);
   }

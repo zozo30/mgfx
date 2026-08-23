@@ -78,13 +78,21 @@ int main() {
     mgfx::ipc::TextMeasure textMeasure{};
     if (!mgfx::ipc::decodeTextMeasure(mgfx::ipc::encodeTextMeasure(
             {mgfx::ipc::TextFamily::systemSerif, mgfx::ipc::TextWeight::bold,
-             mgfx::ipc::TextStyle::italic, 0.08F, "Árvíztűrő — Ω"}), textMeasure) ||
+             mgfx::ipc::TextStyle::italic, 0.08F, 77, "Árvíztűrő — Ω"}), textMeasure) ||
         textMeasure.family != mgfx::ipc::TextFamily::systemSerif ||
         textMeasure.weight != mgfx::ipc::TextWeight::bold ||
         textMeasure.style != mgfx::ipc::TextStyle::italic ||
         std::fabs(textMeasure.letterSpacing - 0.08F) > 0.00001F ||
+        textMeasure.fontResourceId != 77 ||
         textMeasure.text != "Árvíztűrő — Ω") {
         std::cerr << "Native text measurement request round trip failed\n";
+        return 1;
+    }
+    const mgfx::ipc::FontUpload fontUpload{91, {0, 1, 0, 0, 2, 3, 4, 5}};
+    mgfx::ipc::FontUpload decodedFont{};
+    if (!mgfx::ipc::decodeFontUpload(mgfx::ipc::encodeFontUpload(fontUpload), decodedFont) ||
+        decodedFont.id != fontUpload.id || decodedFont.bytes != fontUpload.bytes) {
+        std::cerr << "Font resource upload round trip failed\n";
         return 1;
     }
     float textAdvance = 0.0F;

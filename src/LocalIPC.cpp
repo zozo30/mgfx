@@ -610,14 +610,16 @@ bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& i
 }
 
 std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure) {
-    const bool hasLetterSpacing = measure.letterSpacing != 0.0F;
-    const std::size_t headerSize = hasLetterSpacing ? 8 : 4;
+    const std::uint8_t extension = measure.fontResourceId != 0 ? 2
+        : measure.letterSpacing != 0.0F ? 1 : 0;
+    const std::size_t headerSize = extension == 2 ? 12 : extension == 1 ? 8 : 4;
     std::vector<std::uint8_t> payload(headerSize + measure.text.size());
     payload[0] = static_cast<std::uint8_t>(measure.family);
     payload[1] = static_cast<std::uint8_t>(measure.weight);
     payload[2] = static_cast<std::uint8_t>(measure.style);
-    payload[3] = hasLetterSpacing ? 1 : 0;
-    if (hasLetterSpacing) writeFloat(payload.data() + 4, measure.letterSpacing);
+    payload[3] = extension;
+    if (extension >= 1) writeFloat(payload.data() + 4, measure.letterSpacing);
+    if (extension == 2) writeU32(payload.data() + 8, measure.fontResourceId);
     std::copy(measure.text.begin(), measure.text.end(), payload.begin() + headerSize);
     return payload;
 }
@@ -626,17 +628,34 @@ bool decodeTextMeasure(const std::vector<std::uint8_t>& payload, TextMeasure& me
     if (payload.size() <= 4 ||
         payload[0] > static_cast<std::uint8_t>(TextFamily::systemRounded) ||
         payload[1] > static_cast<std::uint8_t>(TextWeight::semibold) ||
-        payload[2] > static_cast<std::uint8_t>(TextStyle::italic) || payload[3] > 1) return false;
-    const bool hasLetterSpacing = payload[3] == 1;
-    const std::size_t headerSize = hasLetterSpacing ? 8 : 4;
+        payload[2] > static_cast<std::uint8_t>(TextStyle::italic) || payload[3] > 2) return false;
+    const std::uint8_t extension = payload[3];
+    const std::size_t headerSize = extension == 2 ? 12 : extension == 1 ? 8 : 4;
     if (payload.size() <= headerSize || payload.size() > headerSize + 65'536) return false;
     measure.family = static_cast<TextFamily>(payload[0]);
     measure.weight = static_cast<TextWeight>(payload[1]);
     measure.style = static_cast<TextStyle>(payload[2]);
-    measure.letterSpacing = hasLetterSpacing ? readFloat(payload.data() + 4) : 0.0F;
+    measure.letterSpacing = extension >= 1 ? readFloat(payload.data() + 4) : 0.0F;
+    measure.fontResourceId = extension == 2 ? readU32(payload.data() + 8) : 0;
     measure.text.assign(payload.begin() + static_cast<std::ptrdiff_t>(headerSize), payload.end());
-    return std::isfinite(measure.letterSpacing) && std::fabs(measure.letterSpacing) <= 10.0F &&
+    return (extension != 2 || measure.fontResourceId != 0) &&
+           std::isfinite(measure.letterSpacing) && std::fabs(measure.letterSpacing) <= 10.0F &&
            measure.text.find('\0') == std::string::npos;
+}
+
+std::vector<std::uint8_t> encodeFontUpload(const FontUpload& font) {
+    std::vector<std::uint8_t> payload(4 + font.bytes.size());
+    writeU32(payload.data(), font.id);
+    std::copy(font.bytes.begin(), font.bytes.end(), payload.begin() + 4);
+    return payload;
+}
+
+bool decodeFontUpload(const std::vector<std::uint8_t>& payload, FontUpload& font) {
+    constexpr std::size_t maxFontBytes = 16U * 1024U * 1024U;
+    if (payload.size() <= 4 || payload.size() > 4 + maxFontBytes ||
+        (font.id = readU32(payload.data())) == 0) return false;
+    font.bytes.assign(payload.begin() + 4, payload.end());
+    return true;
 }
 
 std::vector<std::uint8_t> encodeTextMetrics(float advance) {
