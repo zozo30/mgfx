@@ -51,10 +51,15 @@ export interface RadialGradient {
   readonly inner: Color; readonly outer: Color;
   readonly centerX?: number; readonly centerY?: number; readonly radius?: number;
 }
+export interface ConicGradient {
+  readonly start: Color; readonly middle: Color; readonly end: Color;
+  readonly centerX?: number; readonly centerY?: number; readonly rotation?: number;
+}
 export interface Style {
   preferredSize?: Partial<Size>; padding?: Partial<Insets>; gap?: number;
   background?: Color; backgroundGradient?: LinearGradient;
   backgroundRadialGradient?: RadialGradient;
+  backgroundConicGradient?: ConicGradient;
   backgroundPattern?: DiagonalStripePattern; flexGrow?: number;
   backgroundDotGrid?: DotGridPattern;
   backgroundWaveDots?: WaveDotPattern;
@@ -499,6 +504,7 @@ class Node {
     const background = this.style.background;
     const gradient = this.style.backgroundGradient;
     const radial = this.style.backgroundRadialGradient;
+    const conic = this.style.backgroundConicGradient;
     if (this.type === "mesh") {
       paintMesh(encoder, this.bounds, this.mesh, viewport);
     } else if (this.type === "path") {
@@ -509,12 +515,19 @@ class Node {
           Math.min(this.bounds.width, this.bounds.height) / 2, viewport);
         paintCircle(encoder, this.bounds, undefined, undefined, this.style.borderWidth ?? 0,
           this.style.borderColor, viewport);
+      } else if (conic) {
+        paintConicGradient(encoder, this.bounds, conic,
+          Math.min(this.bounds.width, this.bounds.height) / 2, viewport);
+        paintCircle(encoder, this.bounds, undefined, undefined, this.style.borderWidth ?? 0,
+          this.style.borderColor, viewport);
       } else paintCircle(encoder, this.bounds, background, gradient, this.style.borderWidth ?? 0,
         this.style.borderColor, viewport);
     } else if ((this.style.cornerRadius ?? 0) > 0) {
       let combinedBorder = false;
       if (radial) {
         paintRadialGradient(encoder, this.bounds, radial, this.style.cornerRadius ?? 0, viewport);
+      } else if (conic) {
+        paintConicGradient(encoder, this.bounds, conic, this.style.cornerRadius ?? 0, viewport);
       } else if (gradient) {
         paintLinearGradient(encoder, this.bounds, gradient, this.style.cornerRadius ?? 0, viewport);
       } else if (this.style.backgroundImage) {
@@ -536,6 +549,7 @@ class Node {
       let combinedBorder = false;
       if (this.bounds.width > 0 && this.bounds.height > 0) {
         if (radial) paintRadialGradient(encoder, this.bounds, radial, 0, viewport);
+        else if (conic) paintConicGradient(encoder, this.bounds, conic, 0, viewport);
         else if (gradient) paintLinearGradient(encoder, this.bounds, gradient, 0, viewport);
         else if (!this.style.backgroundImage && !this.style.backgroundPattern &&
           !this.style.backgroundDotGrid && !this.style.backgroundWaveDots) {
@@ -658,6 +672,15 @@ function paintLinearGradient(encoder: FrameEncoder, bounds: Rect, gradient: Line
   encoder.linearGradient({ destination: normalizedRect(bounds, viewport), cornerRadius,
     direction: gradient.direction ?? "horizontal",
     startColor: gradient.start, endColor: gradient.end });
+}
+
+function paintConicGradient(encoder: FrameEncoder, bounds: Rect, gradient: ConicGradient,
+  cornerRadius: number, viewport: Size): void {
+  if (bounds.width <= 0 || bounds.height <= 0) return;
+  encoder.conicGradient({ destination: normalizedRect(bounds, viewport),
+    centerX: gradient.centerX ?? 0.5, centerY: gradient.centerY ?? 0.5,
+    rotation: (gradient.rotation ?? 0) * Math.PI / 180, cornerRadius,
+    startColor: gradient.start, middleColor: gradient.middle, endColor: gradient.end });
 }
 
 function paintServerRoundedRect(encoder: FrameEncoder, bounds: Rect, cornerRadius: number,

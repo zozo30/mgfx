@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
 import { Button, Mesh, Path, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
-import { DiagonalPattern, DotGrid, WavePattern } from "./app.js";
+import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
 import { AnimationProvider } from "./animation.js";
 
@@ -332,4 +332,21 @@ test("wave animation emits one server pattern instead of circle nodes", () => {
     offset += 8 + payloadSize;
   }
   assert.equal(waveCommands, 1);
+});
+
+test("conic badge animation changes only server gradient parameters", () => {
+  let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<ConicBadge time={0} />); surface.resize({ width: 52, height: 52 });
+  const first = Buffer.from(frame);
+  surface.render(<ConicBadge time={400} />);
+  assert.notDeepEqual(frame, first);
+  let offset = 16, conicCommands = 0;
+  while (offset < frame.length) {
+    const opcode = frame.readUInt16LE(offset);
+    const payloadSize = frame.readUInt32LE(offset + 4);
+    if (opcode === 23) conicCommands += 1;
+    offset += 8 + payloadSize;
+  }
+  assert.equal(conicCommands, 1);
 });

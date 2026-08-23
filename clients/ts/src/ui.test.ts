@@ -340,6 +340,27 @@ test("linear gradients lower to one constant-size server command", () => {
   assert.equal(frame.readFloatLE(44), 0); // Horizontal direction.
 });
 
+test("conic gradients lower rotation and rounded masking to one command", () => {
+  class ConicComponent extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 60, height: 60 }, cornerRadius: 30,
+        backgroundConicGradient: {
+          start: { red: 0, green: 0.8, blue: 1, alpha: 1 },
+          middle: { red: 0.8, green: 0.2, blue: 1, alpha: 1 },
+          end: { red: 0, green: 0.8, blue: 1, alpha: 1 }, rotation: 90 } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new ConicComponent()); host.layout({ width: 60, height: 60 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 60, height: 60 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 23);
+  assert.ok(Math.abs(frame.readFloatLE(48) - Math.PI / 2) < 0.00001);
+  assert.equal(frame.readFloatLE(52), 30);
+});
+
 test("rounded images lower to the server image-surface shader", () => {
   class RoundedImage extends Component {
     build(): Element {

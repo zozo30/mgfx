@@ -163,6 +163,21 @@ test("MGFX linear gradient is one fixed server command", () => {
     endColor: { red: 1, green: 1, blue: 1, alpha: 1 } }));
 });
 
+test("MGFX conic gradient is one fixed server command", () => {
+  const frame = new FrameEncoder();
+  frame.conicGradient({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
+    centerX: 0.5, centerY: 0.5, rotation: 1.25, cornerRadius: 30,
+    startColor: { red: 0.1, green: 0.8, blue: 1, alpha: 1 },
+    middleColor: { red: 0.7, green: 0.2, blue: 1, alpha: 1 },
+    endColor: { red: 0.1, green: 0.8, blue: 1, alpha: 1 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 23);
+  assert.equal(bytes.readUInt32LE(20), 80);
+  assert.ok(Math.abs(bytes.readFloatLE(48) - 1.25) < 0.00001);
+  assert.equal(bytes.readFloatLE(52), 30);
+});
+
 test("MGFX rounded rectangle combines fill and border in one command", () => {
   const frame = new FrameEncoder();
   frame.roundedRect({ destination: { left: -0.7, top: 0.5, right: 0.7, bottom: -0.5 },

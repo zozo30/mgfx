@@ -339,7 +339,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::imageSurfaces |
             mgfx::ipc::ServerCapability::dotGrids |
             mgfx::ipc::ServerCapability::waveDots |
-            mgfx::ipc::ServerCapability::meshResources;
+            mgfx::ipc::ServerCapability::meshResources |
+            mgfx::ipc::ServerCapability::conicGradients;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

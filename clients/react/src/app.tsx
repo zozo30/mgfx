@@ -23,6 +23,14 @@ export function DotGrid({ time }: { readonly time: number }) {
   );
 }
 
+export function ConicBadge({ time }: { readonly time: number }) {
+  return <Box style={{ preferredSize: { width: 52, height: 52 }, cornerRadius: 26,
+    backgroundConicGradient: { start: rgba(0.15, 0.85, 1),
+      middle: rgba(0.74, 0.2, 1), end: rgba(0.15, 0.85, 1), rotation: time / 20 },
+    borderWidth: 2, borderColor: rgba(0.78, 0.95, 1, 0.9),
+    shadow: { color: rgba(0.1, 0.65, 1, 0.35), blur: 10, spread: 1 } }} />;
+}
+
 export function WavePattern({ time }: { readonly time: number }) {
   return (
     <Box style={{ preferredSize: { height: 70 }, cornerRadius: 14,
@@ -174,6 +182,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
         <Text value="MGFX React" style={{ fontSize: 32, fontFamily: "system", fontWeight: "bold",
           color: rgba(0.9, 0.96, 1) }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
+          <ConicBadge time={animationTime} />
           <Image textureId={1} sourceWidth={headerImageSize.width}
             sourceHeight={headerImageSize.height} fit="cover"
             style={{ preferredSize: { width: 52, height: 52 },

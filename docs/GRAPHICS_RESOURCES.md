@@ -147,6 +147,14 @@ straight-alpha colors and applies an antialiased rounded mask per fragment. The
 command inherits clipping, transforms, and opacity and is advertised by
 `linearGradients`.
 
+## Conic gradients
+
+`DrawConicGradient` carries a destination, normalized center, radian rotation,
+rounded-corner radius, and three colors. Metal derives the polar angle and blends
+start-to-middle-to-end while applying an antialiased rounded mask. Using the same
+start and end color closes the angular seam for continuously rotating badges and
+dials. Support is advertised by `conicGradients`.
+
 ## Rounded rectangles
 
 `DrawRoundedRect` combines destination, pixel corner radius and border width,

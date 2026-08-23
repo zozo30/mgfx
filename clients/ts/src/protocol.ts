@@ -66,6 +66,7 @@ export enum ServerCapability {
   DotGrids = 1 << 22,
   WaveDots = 1 << 23,
   MeshResources = 1 << 24,
+  ConicGradients = 1 << 25,
 }
 export interface ServerHello {
   readonly version: number;
@@ -164,6 +165,11 @@ export interface LinearGradientPaint {
   readonly destination: ClipRect; readonly cornerRadius: number;
   readonly direction: "horizontal" | "vertical" | "diagonal";
   readonly startColor: Color; readonly endColor: Color;
+}
+export interface ConicGradientPaint {
+  readonly destination: ClipRect; readonly centerX: number; readonly centerY: number;
+  readonly rotation: number; readonly cornerRadius: number;
+  readonly startColor: Color; readonly middleColor: Color; readonly endColor: Color;
 }
 export interface DotGridPaint {
   readonly destination: ClipRect; readonly rows: number; readonly columns: number;
@@ -795,6 +801,22 @@ export class FrameEncoder {
     const payload = Buffer.alloc(56);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(18, payload);
+  }
+
+  conicGradient(value: ConicGradientPaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.centerX, value.centerY, value.rotation, value.cornerRadius,
+      value.startColor.red, value.startColor.green, value.startColor.blue, value.startColor.alpha,
+      value.middleColor.red, value.middleColor.green,
+      value.middleColor.blue, value.middleColor.alpha,
+      value.endColor.red, value.endColor.green, value.endColor.blue, value.endColor.alpha];
+    if (values.some((item) => !Number.isFinite(item)) || value.centerX < 0 || value.centerX > 1 ||
+        value.centerY < 0 || value.centerY > 1 || value.cornerRadius < 0 ||
+        value.cornerRadius > 8192)
+      throw new RangeError("Conic gradient values are outside supported bounds");
+    const payload = Buffer.alloc(80);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(23, payload);
   }
 
   dotGrid(value: DotGridPaint): void {

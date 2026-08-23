@@ -208,6 +208,54 @@ fragment float4 linearGradientFragmentMain(LinearGradientVertexOut in [[stage_in
     return float4(color.rgb * alpha, alpha);
 }
 
+struct ConicGradientVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    packed_float2 center;
+    float rotation;
+    float cornerRadius;
+    packed_float4 startColor;
+    packed_float4 middleColor;
+    packed_float4 endColor;
+};
+
+struct ConicGradientVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float2 center;
+    float rotation;
+    float cornerRadius;
+    float4 startColor;
+    float4 middleColor;
+    float4 endColor;
+};
+
+vertex ConicGradientVertexOut conicGradientVertexMain(
+    const device ConicGradientVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const ConicGradientVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size, value.center,
+            value.rotation, value.cornerRadius, value.startColor,
+            value.middleColor, value.endColor};
+}
+
+fragment float4 conicGradientFragmentMain(ConicGradientVertexOut in [[stage_in]]) {
+    constexpr float tau = 6.28318530718;
+    const float angle = atan2(in.local.y - in.center.y, in.local.x - in.center.x);
+    const float amount = fract((angle + in.rotation) / tau + 1.0);
+    const float4 color = amount < 0.5
+        ? mix(in.startColor, in.middleColor, amount * 2.0)
+        : mix(in.middleColor, in.endColor, (amount - 0.5) * 2.0);
+    const float2 halfSize = in.size * 0.5;
+    const float radius = min(in.cornerRadius, min(halfSize.x, halfSize.y));
+    const float2 q = abs(in.local - halfSize) - halfSize + radius;
+    const float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    const float coverage = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
+    const float alpha = color.a * coverage;
+    return float4(color.rgb * alpha, alpha);
+}
+
 struct RoundedRectVertex {
     packed_float2 position;
     packed_float2 local;

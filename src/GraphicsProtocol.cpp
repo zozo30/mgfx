@@ -220,6 +220,20 @@ void CommandEncoder::drawLinearGradient(const LinearGradientCommand& gradient) {
     }
 }
 
+void CommandEncoder::drawConicGradient(const ConicGradientCommand& gradient) {
+    beginCommand(Opcode::drawConicGradient, 20 * sizeof(float));
+    for (float value : {gradient.destination.left, gradient.destination.top,
+                        gradient.destination.right, gradient.destination.bottom,
+                        gradient.centerX, gradient.centerY, gradient.rotation,
+                        gradient.cornerRadius,
+                        gradient.startColor.red, gradient.startColor.green,
+                        gradient.startColor.blue, gradient.startColor.alpha,
+                        gradient.middleColor.red, gradient.middleColor.green,
+                        gradient.middleColor.blue, gradient.middleColor.alpha,
+                        gradient.endColor.red, gradient.endColor.green,
+                        gradient.endColor.blue, gradient.endColor.alpha}) appendFloat(bytes_, value);
+}
+
 void CommandEncoder::drawDotGrid(const DotGridCommand& grid) {
     beginCommand(Opcode::drawDotGrid, 96);
     for (float value : {grid.destination.left, grid.destination.top,
@@ -534,6 +548,23 @@ bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gra
                            readFloat(command.payload + 32), readFloat(command.payload + 36)};
     gradient.endColor = {readFloat(command.payload + 40), readFloat(command.payload + 44),
                          readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    return true;
+}
+
+bool decodeConicGradient(const CommandView& command, ConicGradientCommand& gradient) {
+    if (command.opcode != Opcode::drawConicGradient || command.payloadSize != 80) return false;
+    gradient.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                            readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    gradient.centerX = readFloat(command.payload + 16);
+    gradient.centerY = readFloat(command.payload + 20);
+    gradient.rotation = readFloat(command.payload + 24);
+    gradient.cornerRadius = readFloat(command.payload + 28);
+    gradient.startColor = {readFloat(command.payload + 32), readFloat(command.payload + 36),
+                           readFloat(command.payload + 40), readFloat(command.payload + 44)};
+    gradient.middleColor = {readFloat(command.payload + 48), readFloat(command.payload + 52),
+                            readFloat(command.payload + 56), readFloat(command.payload + 60)};
+    gradient.endColor = {readFloat(command.payload + 64), readFloat(command.payload + 68),
+                         readFloat(command.payload + 72), readFloat(command.payload + 76)};
     return true;
 }
 

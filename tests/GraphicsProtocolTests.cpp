@@ -50,6 +50,9 @@ int main() {
                                 gfx::GradientDirection::diagonal,
                                 {0.2F, 0.8F, 1.0F, 1.0F},
                                 {0.7F, 0.2F, 1.0F, 0.75F}});
+    encoder.drawConicGradient({{-0.3F, 0.3F, 0.3F, -0.3F}, 0.5F, 0.5F, 1.25F, 30.0F,
+                               {0.1F, 0.8F, 1.0F, 1.0F}, {0.7F, 0.2F, 1.0F, 1.0F},
+                               {0.1F, 0.8F, 1.0F, 1.0F}});
     encoder.drawImageSurface({9, gfx::ImageSampling::nearest,
                               {-0.6F, 0.6F, 0.6F, -0.6F},
                               {0.1F, 0.2F, 0.9F, 0.8F},
@@ -152,6 +155,12 @@ int main() {
         !nearlyEqual(linear.startColor.green, 0.8F) ||
         !nearlyEqual(linear.endColor.alpha, 0.75F) || !decoder.next(command)) {
         return fail("Linear-gradient decoding failed");
+    }
+    gfx::ConicGradientCommand conic{};
+    if (!gfx::decodeConicGradient(command, conic) ||
+        !nearlyEqual(conic.rotation, 1.25F) || !nearlyEqual(conic.cornerRadius, 30.0F) ||
+        !nearlyEqual(conic.middleColor.red, 0.7F) || !decoder.next(command)) {
+        return fail("Conic-gradient decoding failed");
     }
     gfx::ImageSurfaceCommand imageSurface{};
     if (!gfx::decodeImageSurface(command, imageSurface) || imageSurface.textureId != 9 ||

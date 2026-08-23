@@ -102,6 +102,10 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto dotGridFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("dotGridFragmentMain")));
     auto waveDotsVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("waveDotsVertexMain")));
     auto waveDotsFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("waveDotsFragmentMain")));
+    auto conicGradientVertexFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("conicGradientVertexMain")));
+    auto conicGradientFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("conicGradientFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !imageSurfaceVertexFunction || !imageSurfaceFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
@@ -111,7 +115,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         !patternVertexFunction || !patternFragmentFunction ||
         !linearGradientVertexFunction || !linearGradientFragmentFunction ||
         !dotGridVertexFunction || !dotGridFragmentFunction ||
-        !waveDotsVertexFunction || !waveDotsFragmentFunction) {
+        !waveDotsVertexFunction || !waveDotsFragmentFunction ||
+        !conicGradientVertexFunction || !conicGradientFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -299,6 +304,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(waveDotsDescriptor.get(), &error));
     if (!waveDotsPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the wave-dots pipeline", error));
+    }
+
+    auto conicDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    conicDescriptor->setVertexFunction(conicGradientVertexFunction.get());
+    conicDescriptor->setFragmentFunction(conicGradientFragmentFunction.get());
+    conicDescriptor->setRasterSampleCount(sampleCount);
+    auto* conicColor = conicDescriptor->colorAttachments()->object(0);
+    conicColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    conicColor->setBlendingEnabled(true);
+    conicColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    conicColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    conicColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    conicColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    conicGradientPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(conicDescriptor.get(), &error));
+    if (!conicGradientPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the conic-gradient pipeline", error));
     }
 }
 
@@ -835,6 +857,62 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(linearGradientPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawConicGradient) {
+            gfx::ConicGradientCommand gradient{};
+            if (!gfx::decodeConicGradient(command, gradient) ||
+                !std::isfinite(gradient.centerX) || !std::isfinite(gradient.centerY) ||
+                !std::isfinite(gradient.rotation) || !std::isfinite(gradient.cornerRadius) ||
+                gradient.centerX < 0.0F || gradient.centerX > 1.0F ||
+                gradient.centerY < 0.0F || gradient.centerY > 1.0F ||
+                gradient.cornerRadius < 0.0F || gradient.cornerRadius > 8192.0F) {
+                throw std::runtime_error("Malformed conic-gradient command");
+            }
+            if (clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (gradient.destination.right - gradient.destination.left) * drawableWidth * 0.5F,
+                (gradient.destination.top - gradient.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct ConicGradientVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                std::array<float, 2> center;
+                float rotation;
+                float cornerRadius;
+                std::array<float, 4> startColor;
+                std::array<float, 4> middleColor;
+                std::array<float, 4> endColor;
+            };
+            const float opacity = opacityStack.back();
+            const auto color = [opacity](gfx::Color value) {
+                return std::array<float, 4>{value.red, value.green, value.blue,
+                                            value.alpha * opacity};
+            };
+            const std::array<float, 2> center = {gradient.centerX * size[0],
+                                                  gradient.centerY * size[1]};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return ConicGradientVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, center, gradient.rotation, gradient.cornerRadius,
+                    color(gradient.startColor), color(gradient.middleColor),
+                    color(gradient.endColor)};
+            };
+            const ConicGradientVertex vertices[] = {
+                vertex(gradient.destination.left, gradient.destination.top, 0.0F, 0.0F),
+                vertex(gradient.destination.left, gradient.destination.bottom, 0.0F, size[1]),
+                vertex(gradient.destination.right, gradient.destination.bottom, size[0], size[1]),
+                vertex(gradient.destination.left, gradient.destination.top, 0.0F, 0.0F),
+                vertex(gradient.destination.right, gradient.destination.bottom, size[0], size[1]),
+                vertex(gradient.destination.right, gradient.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(conicGradientPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

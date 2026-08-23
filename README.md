@@ -182,6 +182,10 @@ the destination, horizontal/vertical/diagonal direction, rounded-corner radius, 
 colors. Metal interpolates and masks the fill per fragment, replacing client-colored
 rectangle and rounded-rectangle meshes.
 
+Three-stop conic backgrounds use `DrawConicGradient`. Center, rotation, rounded
+mask, and start/middle/end colors are evaluated per fragment. The demo's rotating
+title-bar badge therefore animates one angle value without textures or gradient fans.
+
 Solid boxes and borders now use one `DrawRoundedRect` record backed by an
 antialiased rounded-box SDF. This replaces the old 32-segment client fan/ring,
 shrinks animated frames, and eliminates polygon seam and one-pixel border overlap.

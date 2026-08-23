@@ -33,6 +33,7 @@ enum class Opcode : std::uint16_t {
     drawDotGrid = 20,
     drawWaveDots = 21,
     drawMesh = 22,
+    drawConicGradient = 23,
 };
 
 enum class Primitive : std::uint8_t {
@@ -148,6 +149,17 @@ struct LinearGradientCommand {
     Color endColor;
 };
 
+struct ConicGradientCommand {
+    ClipRect destination;
+    float centerX;
+    float centerY;
+    float rotation;
+    float cornerRadius;
+    Color startColor;
+    Color middleColor;
+    Color endColor;
+};
+
 struct DotGridCommand {
     ClipRect destination;
     std::uint32_t rows;
@@ -259,6 +271,7 @@ public:
     void drawDiagonalPattern(const DiagonalPatternCommand& pattern);
     void drawLinearGradient(const LinearGradientCommand& gradient);
     void drawDotGrid(const DotGridCommand& grid);
+    void drawConicGradient(const ConicGradientCommand& gradient);
     void drawWaveDots(const WaveDotsCommand& wave);
 
     std::vector<std::uint8_t> finish();
@@ -304,6 +317,7 @@ bool decodeCircle(const CommandView& command, CircleCommand& circle);
 bool decodeDiagonalPattern(const CommandView& command, DiagonalPatternCommand& pattern);
 bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gradient);
 bool decodeDotGrid(const CommandView& command, DotGridCommand& grid);
+bool decodeConicGradient(const CommandView& command, ConicGradientCommand& gradient);
 bool decodeWaveDots(const CommandView& command, WaveDotsCommand& wave);
 
 } // namespace gfx
