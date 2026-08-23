@@ -135,7 +135,9 @@ pointer, scroll, and keyboard focus from every lower route.
 
 MGIP carries pointer move, down, and up as separate events. The TypeScript host
 retains hover and pressed state and activates a component only when release lands
-inside the component that originally received the press.
+inside the component that originally received the press. A pressed component
+captures subsequent movement and receives element-local coordinates, enabling
+drag selection and other gestures without exposing window-space layout details.
 
 Keyboard events use backend-neutral logical keys. Clickable TypeScript elements
 participate in Tab/Shift-Tab focus traversal and activate with Enter or Space;
@@ -275,10 +277,10 @@ The React package also provides higher-level typed layout, shape, `Button`, and
 controlled `TextField` components, so normal application code rarely needs to
 use the renderer's intrinsic `mgfx-*` elements directly.
 
-Focused text fields render a measured caret between independently shaped prefix
-and suffix runs. Left/right arrows move the Unicode code-point insertion
-position; text input, Backspace, and native clipboard Paste edit at that caret
-instead of always appending to the field.
+Focused text fields render a measured caret between independently shaped text
+runs. Clicking positions the insertion point; dragging creates a highlighted
+Unicode code-point range. Left/right arrows collapse or move the selection, and
+text input, Backspace, Cut, Copy, and Paste operate on that range.
 
 Native title, initial size, and minimum size are declarative through the React
 `Window` component; its layout effect emits MGIP metadata independently from the

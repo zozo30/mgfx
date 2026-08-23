@@ -1,4 +1,4 @@
-import type { MeshData, PathData, Style, TextStyle } from "@mgfx/demo-client/ui";
+import type { MeshData, PathData, Point, Style, TextStyle } from "@mgfx/demo-client/ui";
 import type { Key } from "@mgfx/demo-client/protocol";
 import type { Key as ReactKey, ReactNode } from "react";
 
@@ -13,6 +13,9 @@ export interface MGFXProps {
   readonly onHoverChange?: (hovered: boolean) => void;
   readonly onPressChange?: (pressed: boolean) => void;
   readonly onFocusChange?: (focused: boolean) => void;
+  readonly onPointerDown?: (point: Point) => void;
+  readonly onPointerMove?: (point: Point) => void;
+  readonly onPointerUp?: (point: Point) => void;
   readonly onScroll?: (deltaX: number, deltaY: number) => void;
   readonly onKeyDown?: (key: Key) => void;
   readonly onTextInput?: (text: string) => void;

@@ -140,12 +140,27 @@ test("TextField edits Unicode at its movable caret", () => {
   }
   const surface = new ReactSurface(() => {});
   surface.render(<Form />); surface.resize({ width: 260, height: 48 });
-  surface.pointerDown({ x: 20, y: 20 }); surface.pointerUp({ x: 20, y: 20 });
+  surface.pointerDown({ x: 240, y: 20 }); surface.pointerUp({ x: 240, y: 20 });
   surface.keyDown({ key: Key.ArrowLeft, modifiers: 0, repeat: false });
   surface.textInput("Ω");
   assert.equal(observed, "abΩc");
   surface.keyDown({ key: Key.Backspace, modifiers: 0, repeat: false });
   assert.equal(observed, "abc");
+});
+
+test("TextField positions and replaces a pointer-dragged selection", () => {
+  let observed = "abcde";
+  function Form() {
+    const [value, setValue] = useState("abcde");
+    return <TextField value={value} onChange={(next) => { observed = next; setValue(next); }} />;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Form />); surface.resize({ width: 260, height: 48 });
+  surface.pointerDown({ x: 25, y: 20 });
+  surface.pointerMove({ x: 62, y: 20 });
+  surface.pointerUp({ x: 62, y: 20 });
+  surface.textInput("X");
+  assert.equal(observed, "aXe");
 });
 
 test("TextField semantic shortcuts use the native clipboard service", async () => {

@@ -37,6 +37,26 @@ test("retained component host performs flex layout and hit testing", () => {
   assert.equal(host.pointerDown({ x: 199, y: 99 }), false);
 });
 
+test("pointer capture reports element-local drag coordinates", () => {
+  const points: string[] = [];
+  class DragComponent extends Component {
+    build(): Element {
+      return row([{ ...box({ preferredSize: { width: 50, height: 30 } }, "drag"),
+        onPointerDown: (point) => points.push(`down:${point.x},${point.y}`),
+        onPointerMove: (point) => points.push(`move:${point.x},${point.y}`),
+        onPointerUp: (point) => points.push(`up:${point.x},${point.y}`) }],
+      { padding: { top: 10, right: 0, bottom: 0, left: 20 } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new DragComponent());
+  host.layout({ width: 100, height: 50 });
+  host.pointerDown({ x: 25, y: 15 });
+  host.pointerMove({ x: 60, y: 25 });
+  host.pointerUp({ x: 60, y: 25 });
+  assert.deepEqual(points, ["down:5,5", "move:40,15", "up:40,15"]);
+});
+
 test("keyboard focus traverses and activates controls", () => {
   let first = 0, second = 0;
   class KeyboardComponent extends Component {

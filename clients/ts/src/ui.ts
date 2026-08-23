@@ -143,6 +143,8 @@ export interface Element {
   type: ElementType; key: string; style: Style; children: readonly Element[];
   onClick?: () => void; onHoverChange?: (hovered: boolean) => void;
   onPressChange?: (pressed: boolean) => void; value?: string; textStyle?: TextStyle;
+  onPointerDown?: (point: Point) => void; onPointerMove?: (point: Point) => void;
+  onPointerUp?: (point: Point) => void;
   onFocusChange?: (focused: boolean) => void;
   onScroll?: (deltaX: number, deltaY: number) => void; scrollOffsetY?: number;
   onKeyDown?: (key: Key) => void; onTextInput?: (text: string) => void;
@@ -211,6 +213,10 @@ export class ComponentHost {
   }
   paint(encoder: FrameEncoder, viewport: Size): void { this.root?.paint(encoder, viewport); }
   pointerMove(point: Point): boolean {
+    if (this.pressed?.onPointerMove) {
+      this.pressed.onPointerMove(this.pressed.localPoint(point));
+      return true;
+    }
     const target = this.root?.hitTarget(point);
     if (target === this.hovered) return false;
     this.hovered?.onHoverChange?.(false);
@@ -225,6 +231,7 @@ export class ComponentHost {
     this.pressed?.onPressChange?.(false);
     this.pressed = target;
     target.onPressChange?.(true);
+    target.onPointerDown?.(target.localPoint(point));
     return true;
   }
   pointerUp(point: Point): boolean {
@@ -232,6 +239,7 @@ export class ComponentHost {
     if (!pressed) return false;
     this.pressed = undefined;
     pressed.onPressChange?.(false);
+    pressed.onPointerUp?.(pressed.localPoint(point));
     if (this.root?.hitTarget(point) === pressed) pressed.onClick?.();
     return true;
   }
@@ -310,6 +318,9 @@ class Node {
   onHoverChange: ((hovered: boolean) => void) | undefined;
   onPressChange: ((pressed: boolean) => void) | undefined;
   onFocusChange: ((focused: boolean) => void) | undefined;
+  onPointerDown: ((point: Point) => void) | undefined;
+  onPointerMove: ((point: Point) => void) | undefined;
+  onPointerUp: ((point: Point) => void) | undefined;
   onScroll: ((deltaX: number, deltaY: number) => void) | undefined;
   scrollOffsetY = 0;
   onKeyDown: ((key: Key) => void) | undefined;
@@ -324,6 +335,8 @@ class Node {
     this.type = element.type; this.key = element.key; this.style = element.style;
     this.onClick = element.onClick; this.onHoverChange = element.onHoverChange;
     this.onPressChange = element.onPressChange; this.onFocusChange = element.onFocusChange;
+    this.onPointerDown = element.onPointerDown; this.onPointerMove = element.onPointerMove;
+    this.onPointerUp = element.onPointerUp;
     this.onScroll = element.onScroll; this.scrollOffsetY = element.scrollOffsetY ?? 0;
     this.onKeyDown = element.onKeyDown; this.onTextInput = element.onTextInput;
     this.value = element.value ?? "";
@@ -481,6 +494,9 @@ class Node {
     if (modal) modal.collectTargets(targets);
     else for (const child of this.paintOrder()) child.collectTargets(targets);
   }
+  localPoint(point: Point): Point {
+    return { x: point.x - this.bounds.x, y: point.y - this.bounds.y };
+  }
   scrollTarget(point: Point): Node | undefined {
     if (!contains(this.bounds, point)) return undefined;
     const modal = this.modalChild();
@@ -493,7 +509,8 @@ class Node {
     return this.onScroll ? this : undefined;
   }
   private isFocusable(): boolean {
-    return this.onClick !== undefined || this.onKeyDown !== undefined || this.onTextInput !== undefined;
+    return this.onClick !== undefined || this.onKeyDown !== undefined || this.onTextInput !== undefined ||
+      this.onPointerDown !== undefined;
   }
   private paintOrder(): Node[] {
     return this.children.map((child, index) => ({ child, index }))

@@ -18,6 +18,8 @@ export interface HostProps {
   readonly textStyle?: TextStyle; readonly offsetY?: number; readonly onClick?: () => void;
   readonly onHoverChange?: (value: boolean) => void; readonly onPressChange?: (value: boolean) => void;
   readonly onFocusChange?: (value: boolean) => void; readonly onScroll?: (x: number, y: number) => void;
+  readonly onPointerDown?: (point: Point) => void; readonly onPointerMove?: (point: Point) => void;
+  readonly onPointerUp?: (point: Point) => void;
   readonly onKeyDown?: (key: Key) => void; readonly onTextInput?: (value: string) => void;
   readonly mesh?: MeshData;
   readonly path?: PathData;
@@ -149,12 +151,19 @@ function toElement(child: HostChild): Element[] {
       child.props.onPressChange, child.props.onFocusChange);
   }
   if (child.props.onTextInput || child.props.onKeyDown ||
-      (child.props.onFocusChange && !child.props.onClick)) {
+      (child.props.onFocusChange && !child.props.onClick) || child.props.onPointerDown) {
     element = focusable(element, {
       ...(child.props.onFocusChange ? { onFocusChange: child.props.onFocusChange } : {}),
       ...(child.props.onKeyDown ? { onKeyDown: child.props.onKeyDown } : {}),
       ...(child.props.onTextInput ? { onTextInput: child.props.onTextInput } : {}),
     });
+  }
+  if (child.props.onPointerDown || child.props.onPointerMove || child.props.onPointerUp) {
+    element = { ...element,
+      ...(child.props.onPointerDown ? { onPointerDown: child.props.onPointerDown } : {}),
+      ...(child.props.onPointerMove ? { onPointerMove: child.props.onPointerMove } : {}),
+      ...(child.props.onPointerUp ? { onPointerUp: child.props.onPointerUp } : {}),
+    };
   }
   return [element];
 }

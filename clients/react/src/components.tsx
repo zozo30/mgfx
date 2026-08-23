@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Key, type Color } from "@mgfx/demo-client/protocol";
-import type { MeshData, PathData, Style, TextStyle } from "@mgfx/demo-client/ui";
+import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style,
+  type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
 import { canonicalPath } from "./vector-path.js";
 
@@ -110,52 +111,109 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [caret, setCaret] = useState([...value].length);
+  const [anchor, setAnchor] = useState([...value].length);
+  const [dragging, setDragging] = useState(false);
   const clipboard = useNativeClipboard();
   useNativeCursor("text", hovered);
   const characters = [...value];
-  useEffect(() => setCaret((index) => Math.min(index, characters.length)), [value]);
+  useEffect(() => {
+    setCaret((index) => Math.min(index, characters.length));
+    setAnchor((index) => Math.min(index, characters.length));
+  }, [value]);
   const displayed = value || placeholder;
   const color = value ? textStyle?.color ?? rgba(1, 1, 1) : rgba(0.55, 0.60, 0.70);
+  const selectionStart = Math.min(anchor, caret);
+  const selectionEnd = Math.max(anchor, caret);
+  const hasSelection = selectionStart !== selectionEnd;
+  const fontSize = textStyle?.fontSize ?? 22;
+  const fontFamily = textStyle?.fontFamily ?? "system";
+  const fontWeight = textStyle?.fontWeight ?? "regular";
+  const paddingLeft = style.padding?.left ?? 12;
+  const characterWidth = (character: string) => {
+    if (fontFamily === "system" || fontFamily === "monospace") {
+      return (nativeTextAdvance(fontFamily, character, fontWeight) ??
+        (fontFamily === "monospace" ? 0.60 : 0.56)) * fontSize;
+    }
+    return fontSize * 6 / 7;
+  };
+  const indexAt = (point: Point) => {
+    const x = Math.max(0, point.x - paddingLeft);
+    let position = 0;
+    for (let index = 0; index < characters.length; index++) {
+      const width = characterWidth(characters[index]!);
+      if (x < position + width / 2) return index;
+      position += width;
+    }
+    return characters.length;
+  };
   const insert = (text: string) => {
     const incoming = [...text];
-    const available = Math.max(0, maxLength - characters.length);
+    const available = Math.max(0, maxLength - (characters.length - (selectionEnd - selectionStart)));
     const accepted = incoming.slice(0, available);
     if (accepted.length === 0) return;
-    onChange([...characters.slice(0, caret), ...accepted, ...characters.slice(caret)].join(""));
-    setCaret(caret + accepted.length);
+    const next = selectionStart + accepted.length;
+    onChange([...characters.slice(0, selectionStart), ...accepted,
+      ...characters.slice(selectionEnd)].join(""));
+    setCaret(next);
+    setAnchor(next);
   };
+  const caretNode = <Box style={{ preferredSize: { width: 2, height: fontSize },
+    background: rgba(0.60, 0.82, 1) }} />;
   return (
     <mgfx-stack style={{ preferredSize: { height: 48 }, padding: all(12), cornerRadius: 10,
       clip: true, background: focused ? rgba(0.16, 0.28, 0.52) : rgba(0.12, 0.14, 0.21),
       borderWidth: focused ? 2 : 1,
       borderColor: focused ? rgba(0.38, 0.62, 1) : rgba(0.24, 0.28, 0.38), ...style }}
       onHoverChange={setHovered}
-      onFocusChange={(next) => { setFocused(next); if (next) setCaret(characters.length); }}
+      onFocusChange={(next) => { setFocused(next); if (next) {
+        setCaret(characters.length); setAnchor(characters.length);
+      } }}
+      onPointerDown={(point) => {
+        const index = indexAt(point); setCaret(index); setAnchor(index); setDragging(true);
+      }}
+      onPointerMove={(point) => { if (dragging) setCaret(indexAt(point)); }}
+      onPointerUp={() => setDragging(false)}
       onTextInput={insert}
       onKeyDown={(key) => {
-        if (key === Key.Backspace && caret > 0) {
+        if (key === Key.Backspace && hasSelection) {
+          onChange([...characters.slice(0, selectionStart), ...characters.slice(selectionEnd)].join(""));
+          setCaret(selectionStart); setAnchor(selectionStart);
+        } else if (key === Key.Backspace && caret > 0) {
           onChange([...characters.slice(0, caret - 1), ...characters.slice(caret)].join(""));
-          setCaret(caret - 1);
+          setCaret(caret - 1); setAnchor(caret - 1);
         } else if (key === Key.ArrowLeft) {
-          setCaret(Math.max(0, caret - 1));
+          const next = hasSelection ? selectionStart : Math.max(0, caret - 1);
+          setCaret(next); setAnchor(next);
         } else if (key === Key.ArrowRight) {
-          setCaret(Math.min(characters.length, caret + 1));
+          const next = hasSelection ? selectionEnd : Math.min(characters.length, caret + 1);
+          setCaret(next); setAnchor(next);
         } else if (key === Key.Copy) {
-          clipboard.writeClipboard(value);
+          clipboard.writeClipboard(hasSelection
+            ? characters.slice(selectionStart, selectionEnd).join("") : value);
         } else if (key === Key.Cut) {
-          clipboard.writeClipboard(value);
-          onChange("");
-          setCaret(0);
+          clipboard.writeClipboard(hasSelection
+            ? characters.slice(selectionStart, selectionEnd).join("") : value);
+          if (hasSelection) {
+            onChange([...characters.slice(0, selectionStart),
+              ...characters.slice(selectionEnd)].join(""));
+            setCaret(selectionStart); setAnchor(selectionStart);
+          } else {
+            onChange(""); setCaret(0); setAnchor(0);
+          }
         } else if (key === Key.Paste) {
           void clipboard.readClipboard().then(insert);
         }
       }}>
       {focused ? <Row style={{ gap: 0, crossAxisAlignment: "center" }}>
-        <Text value={characters.slice(0, caret).join("")}
+        <Text value={characters.slice(0, selectionStart).join("")}
           style={{ ...textStyle, color: textStyle?.color ?? rgba(1, 1, 1) }} />
-        <Box style={{ preferredSize: { width: 2, height: textStyle?.fontSize ?? 22 },
-          background: rgba(0.60, 0.82, 1) }} />
-        <Text value={characters.length === 0 ? placeholder : characters.slice(caret).join("")}
+        {hasSelection && caret === selectionStart ? caretNode : null}
+        {hasSelection ? <Box style={{ background: rgba(0.20, 0.46, 0.88) }}>
+          <Text value={characters.slice(selectionStart, selectionEnd).join("")}
+            style={{ ...textStyle, color: textStyle?.color ?? rgba(1, 1, 1) }} />
+        </Box> : caretNode}
+        {hasSelection && caret === selectionEnd ? caretNode : null}
+        <Text value={characters.length === 0 ? placeholder : characters.slice(selectionEnd).join("")}
           style={{ ...textStyle, color: characters.length === 0
             ? rgba(0.55, 0.60, 0.70) : textStyle?.color ?? rgba(1, 1, 1) }} />
       </Row> : <Text value={displayed} style={{ ...textStyle, color }} />}
