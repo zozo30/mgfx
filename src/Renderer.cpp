@@ -86,10 +86,13 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("roundedRectVertexMain")));
     auto roundedRectFragmentFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("roundedRectFragmentMain")));
+    auto circleVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleVertexMain")));
+    auto circleFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
         !radialVertexFunction || !radialFragmentFunction ||
-        !roundedRectVertexFunction || !roundedRectFragmentFunction) {
+        !roundedRectVertexFunction || !roundedRectFragmentFunction ||
+        !circleVertexFunction || !circleFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -175,6 +178,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(roundedDescriptor.get(), &error));
     if (!roundedRectPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the rounded-rectangle pipeline", error));
+    }
+
+    auto circleDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    circleDescriptor->setVertexFunction(circleVertexFunction.get());
+    circleDescriptor->setFragmentFunction(circleFragmentFunction.get());
+    circleDescriptor->setRasterSampleCount(sampleCount);
+    auto* circleColor = circleDescriptor->colorAttachments()->object(0);
+    circleColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    circleColor->setBlendingEnabled(true);
+    circleColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    circleColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    circleColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    circleColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    circlePipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(circleDescriptor.get(), &error));
+    if (!circlePipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the circle pipeline", error));
     }
 }
 
@@ -503,6 +523,50 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(roundedRectPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawCircle) {
+            gfx::CircleCommand circle{};
+            if (!gfx::decodeCircle(command, circle) || !std::isfinite(circle.borderWidth) ||
+                circle.borderWidth < 0.0F || circle.borderWidth > 8192.0F) {
+                throw std::runtime_error("Malformed circle command");
+            }
+            if (clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (circle.destination.right - circle.destination.left) * drawableWidth * 0.5F,
+                (circle.destination.top - circle.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct CircleVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float borderWidth;
+                std::array<float, 4> fillColor;
+                std::array<float, 4> borderColor;
+            };
+            const std::array<float, 4> fill = {circle.fillColor.red, circle.fillColor.green,
+                circle.fillColor.blue, circle.fillColor.alpha * opacityStack.back()};
+            const std::array<float, 4> border = {circle.borderColor.red, circle.borderColor.green,
+                circle.borderColor.blue, circle.borderColor.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return CircleVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, circle.borderWidth, fill, border};
+            };
+            const CircleVertex vertices[] = {
+                vertex(circle.destination.left, circle.destination.top, 0.0F, 0.0F),
+                vertex(circle.destination.left, circle.destination.bottom, 0.0F, size[1]),
+                vertex(circle.destination.right, circle.destination.bottom, size[0], size[1]),
+                vertex(circle.destination.left, circle.destination.top, 0.0F, 0.0F),
+                vertex(circle.destination.right, circle.destination.bottom, size[0], size[1]),
+                vertex(circle.destination.right, circle.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(circlePipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

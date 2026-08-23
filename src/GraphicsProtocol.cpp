@@ -181,6 +181,19 @@ void CommandEncoder::drawRoundedRect(const RoundedRectCommand& rectangle) {
     }
 }
 
+void CommandEncoder::drawCircle(const CircleCommand& circle) {
+    beginCommand(Opcode::drawCircle, 13 * sizeof(float));
+    for (float value : {circle.destination.left, circle.destination.top,
+                        circle.destination.right, circle.destination.bottom,
+                        circle.borderWidth,
+                        circle.fillColor.red, circle.fillColor.green,
+                        circle.fillColor.blue, circle.fillColor.alpha,
+                        circle.borderColor.red, circle.borderColor.green,
+                        circle.borderColor.blue, circle.borderColor.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -393,6 +406,18 @@ bool decodeRoundedRect(const CommandView& command, RoundedRectCommand& rectangle
                            readFloat(command.payload + 32), readFloat(command.payload + 36)};
     rectangle.borderColor = {readFloat(command.payload + 40), readFloat(command.payload + 44),
                              readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    return true;
+}
+
+bool decodeCircle(const CommandView& command, CircleCommand& circle) {
+    if (command.opcode != Opcode::drawCircle || command.payloadSize != 52) return false;
+    circle.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                          readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    circle.borderWidth = readFloat(command.payload + 16);
+    circle.fillColor = {readFloat(command.payload + 20), readFloat(command.payload + 24),
+                        readFloat(command.payload + 28), readFloat(command.payload + 32)};
+    circle.borderColor = {readFloat(command.payload + 36), readFloat(command.payload + 40),
+                          readFloat(command.payload + 44), readFloat(command.payload + 48)};
     return true;
 }
 

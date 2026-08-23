@@ -57,6 +57,7 @@ export enum ServerCapability {
   SoftShadows = 1 << 15,
   RadialGradients = 1 << 16,
   RoundedRectangles = 1 << 17,
+  Circles = 1 << 18,
 }
 export interface ServerHello {
   readonly version: number;
@@ -137,6 +138,10 @@ export interface RadialGradientPaint {
 }
 export interface RoundedRectPaint {
   readonly destination: ClipRect; readonly cornerRadius: number; readonly borderWidth: number;
+  readonly fillColor: Color; readonly borderColor: Color;
+}
+export interface CirclePaint {
+  readonly destination: ClipRect; readonly borderWidth: number;
   readonly fillColor: Color; readonly borderColor: Color;
 }
 
@@ -675,6 +680,19 @@ export class FrameEncoder {
     const payload = Buffer.alloc(56);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(15, payload);
+  }
+
+  circle(value: CirclePaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.borderWidth,
+      value.fillColor.red, value.fillColor.green, value.fillColor.blue, value.fillColor.alpha,
+      value.borderColor.red, value.borderColor.green, value.borderColor.blue, value.borderColor.alpha];
+    if (values.some((item) => !Number.isFinite(item)) ||
+        value.borderWidth < 0 || value.borderWidth > 8192)
+      throw new RangeError("Circle values are outside supported bounds");
+    const payload = Buffer.alloc(52);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(16, payload);
   }
 
   finish(): Buffer {

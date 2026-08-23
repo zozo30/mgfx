@@ -139,6 +139,10 @@ with derivative antialiasing, replacing client-generated 32-segment fill and
 border meshes. The command inherits all display-list state and is advertised by
 `roundedRectangles`.
 
+`DrawCircle` similarly combines a solid circular fill and border ring. Metal
+evaluates radial edge distance with derivative antialiasing; component clients
+send no circle or ring tessellation. Support is advertised by `circles`.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

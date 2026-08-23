@@ -278,7 +278,7 @@ test("cached native advance participates in row measurement", () => {
   assert.ok(Math.abs(frame.readFloatLE(secondCommand + 8) - -0.6) < 0.0001);
 });
 
-test("filled and bordered circles emit portable triangle meshes", () => {
+test("filled and bordered circles emit one server SDF command", () => {
   class ShapeComponent extends Component {
     build(): Element {
       return circle({ preferredSize: { width: 40, height: 40 },
@@ -293,7 +293,8 @@ test("filled and bordered circles emit portable triangle meshes", () => {
   host.paint(encoder, { width: 40, height: 40 });
   encoder.endFrame();
   const frame = encoder.finish();
-  assert.equal(frame.readUInt32LE(12), 3); // Fill mesh, ring mesh, end-frame.
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 16);
 });
 
 test("rounded rectangle fill and border are independently drawable", () => {

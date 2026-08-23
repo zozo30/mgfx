@@ -797,28 +797,19 @@ function paintCircle(encoder: FrameEncoder, r: Rect, fill: Color | undefined,
   const segments = 32, radius = Math.min(r.width, r.height) / 2;
   if (radius <= 0) return;
   const center = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  if (gradient || (fill && fill.alpha > 0)) {
+  if (gradient) {
     const vertices: Vertex[] = [];
-    const vertex = (point: Point) => pointVertex(point,
-      gradient ? gradientColor(point, r, gradient) : fill!, viewport);
+    const vertex = (point: Point) => pointVertex(point, gradientColor(point, r, gradient), viewport);
     for (let index = 0; index < segments; index++) vertices.push(vertex(center),
       vertex(circlePoint(center, radius, index, segments)),
       vertex(circlePoint(center, radius, index + 1, segments)));
     encoder.triangles(vertices);
   }
-  if (border && border.alpha > 0 && borderWidth > 0) {
-    const inner = Math.max(0, radius - borderWidth), vertices: Vertex[] = [];
-    for (let index = 0; index < segments; index++) {
-      const outerA = circlePoint(center, radius, index, segments);
-      const outerB = circlePoint(center, radius, index + 1, segments);
-      const innerA = circlePoint(center, inner, index, segments);
-      const innerB = circlePoint(center, inner, index + 1, segments);
-      vertices.push(pointVertex(outerA, border, viewport), pointVertex(innerA, border, viewport),
-        pointVertex(innerB, border, viewport), pointVertex(outerA, border, viewport),
-        pointVertex(innerB, border, viewport), pointVertex(outerB, border, viewport));
-    }
-    encoder.triangles(vertices);
-  }
+  const transparent = { red: 0, green: 0, blue: 0, alpha: 0 };
+  if ((!gradient && fill && fill.alpha > 0) || (border && border.alpha > 0 && borderWidth > 0))
+    encoder.circle({ destination: normalizedRect(r, viewport), borderWidth,
+      fillColor: gradient ? transparent : fill ?? transparent,
+      borderColor: border ?? transparent });
 }
 
 function paintRoundedRect(encoder: FrameEncoder, r: Rect, requestedRadius: number,

@@ -175,6 +175,10 @@ Solid boxes and borders now use one `DrawRoundedRect` record backed by an
 antialiased rounded-box SDF. This replaces the old 32-segment client fan/ring,
 shrinks animated frames, and eliminates polygon seam and one-pixel border overlap.
 
+Solid `Circle` components use the equivalent `DrawCircle` SDF command, combining
+fill and ring in one antialiased quad. Dot grids therefore send six vertices per
+dot internally on Metal instead of separate 32-segment client meshes.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,

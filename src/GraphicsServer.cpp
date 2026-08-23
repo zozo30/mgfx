@@ -316,7 +316,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::opacityStack |
             mgfx::ipc::ServerCapability::softShadows |
             mgfx::ipc::ServerCapability::radialGradients |
-            mgfx::ipc::ServerCapability::roundedRectangles;
+            mgfx::ipc::ServerCapability::roundedRectangles |
+            mgfx::ipc::ServerCapability::circles;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

@@ -70,6 +70,7 @@ enum ServerCapability : std::uint32_t {
     softShadows = 1U << 15U,
     radialGradients = 1U << 16U,
     roundedRectangles = 1U << 17U,
+    circles = 1U << 18U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };

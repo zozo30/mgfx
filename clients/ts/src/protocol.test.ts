@@ -163,6 +163,23 @@ test("MGFX rounded rectangle combines fill and border in one command", () => {
     borderColor: { red: 0, green: 0, blue: 0, alpha: 0 } }));
 });
 
+test("MGFX circle combines fill and ring in one command", () => {
+  const frame = new FrameEncoder();
+  frame.circle({ destination: { left: -0.4, top: 0.4, right: 0.4, bottom: -0.4 },
+    borderWidth: 2.5,
+    fillColor: { red: 0.1, green: 0.8, blue: 0.4, alpha: 1 },
+    borderColor: { red: 0.7, green: 1, blue: 0.8, alpha: 0.9 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 16);
+  assert.equal(bytes.readUInt32LE(20), 52);
+  assert.equal(bytes.readFloatLE(40), 2.5);
+  assert.throws(() => frame.circle({
+    destination: { left: -1, top: 1, right: 1, bottom: -1 }, borderWidth: -1,
+    fillColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+    borderColor: { red: 0, green: 0, blue: 0, alpha: 0 } }));
+});
+
 test("text input decodes validated UTF-8", () => {
   assert.equal(decodeText(encodeText("árvíz")), "árvíz");
   assert.throws(() => decodeText(Buffer.from([0xc3, 0x28])));

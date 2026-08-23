@@ -177,3 +177,46 @@ fragment float4 roundedRectFragmentMain(RoundedRectVertexOut in [[stage_in]]) {
                                  in.borderColor.a) * borderCoverage;
     return fill + stroke;
 }
+
+struct CircleVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    float borderWidth;
+    packed_float4 fillColor;
+    packed_float4 borderColor;
+};
+
+struct CircleVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float borderWidth;
+    float4 fillColor;
+    float4 borderColor;
+};
+
+vertex CircleVertexOut circleVertexMain(const device CircleVertex* vertices [[buffer(0)]],
+                                        uint vertexId [[vertex_id]]) {
+    const CircleVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size,
+            value.borderWidth, value.fillColor, value.borderColor};
+}
+
+fragment float4 circleFragmentMain(CircleVertexOut in [[stage_in]]) {
+    const float radius = min(in.size.x, in.size.y) * 0.5;
+    const float distance = length(in.local - in.size * 0.5);
+    const float outerEdge = distance - radius;
+    const float outerAA = max(fwidth(outerEdge), 0.75);
+    const float outerCoverage = 1.0 - smoothstep(0.0, outerAA, outerEdge);
+    const float border = min(in.borderWidth, radius);
+    const float innerEdge = distance - max(0.0, radius - border);
+    const float innerAA = max(fwidth(innerEdge), 0.75);
+    const float innerCoverage = border > 0.0
+        ? 1.0 - smoothstep(0.0, innerAA, innerEdge) : outerCoverage;
+    const float borderCoverage = max(0.0, outerCoverage - innerCoverage);
+    const float4 fill = float4(in.fillColor.rgb * in.fillColor.a, in.fillColor.a) * innerCoverage;
+    const float4 stroke = float4(in.borderColor.rgb * in.borderColor.a,
+                                 in.borderColor.a) * borderCoverage;
+    return fill + stroke;
+}
