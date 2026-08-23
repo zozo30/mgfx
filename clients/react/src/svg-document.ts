@@ -142,8 +142,36 @@ function expandLocalUses(source: string): string {
   const serialize = (attributes: Readonly<Record<string, string>>, excluded: ReadonlySet<string>) =>
     Object.entries(attributes).filter(([name]) => !excluded.has(name))
       .map(([name, value]) => `${name}="${escape(value)}"`).join(" ");
-  const definitionExcluded = new Set(["id", "viewBox", "width", "height"]);
-  const useExcluded = new Set(["href", "xlink:href", "x", "y", "transform"]);
+  const definitionExcluded = new Set(["id", "viewBox", "width", "height", "preserveAspectRatio"]);
+  const useExcluded = new Set(["href", "xlink:href", "x", "y", "width", "height",
+    "transform", "preserveAspectRatio"]);
+  const symbolViewportTransform = (definition: LocalSvgReference,
+    instance: Readonly<Record<string, string>>): string | undefined => {
+    if (definition.tag !== "symbol" || definition.attributes.viewBox === undefined) return undefined;
+    const viewBox = definition.attributes.viewBox.trim().split(/[\s,]+/).map(Number);
+    if (viewBox.length !== 4 || !viewBox.every(Number.isFinite) || viewBox[2]! <= 0 || viewBox[3]! <= 0)
+      throw new Error("SVG symbol requires a positive numeric viewBox");
+    const width = Number(instance.width ?? definition.attributes.width ?? viewBox[2]);
+    const height = Number(instance.height ?? definition.attributes.height ?? viewBox[3]);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+      throw new Error("SVG symbol instance requires positive numeric width and height");
+    const aspect = (instance.preserveAspectRatio ?? definition.attributes.preserveAspectRatio ??
+      "xMidYMid meet").trim();
+    if (aspect === "none") {
+      const scaleX = width / viewBox[2]!, scaleY = height / viewBox[3]!;
+      return `matrix(${scaleX} 0 0 ${scaleY} ${-viewBox[0]! * scaleX} ${-viewBox[1]! * scaleY})`;
+    }
+    const parsed = aspect.match(/^(xMin|xMid|xMax)(YMin|YMid|YMax)(?:\s+(meet|slice))?$/);
+    if (!parsed) throw new Error(`Unsupported SVG preserveAspectRatio ${aspect}`);
+    if (parsed[3] === "slice")
+      throw new Error("SVG symbol preserveAspectRatio slice requires viewport clipping");
+    const scale = Math.min(width / viewBox[2]!, height / viewBox[3]!);
+    const alignX = parsed[1] === "xMin" ? 0 : parsed[1] === "xMax" ? 1 : 0.5;
+    const alignY = parsed[2] === "YMin" ? 0 : parsed[2] === "YMax" ? 1 : 0.5;
+    const translateX = (width - viewBox[2]! * scale) * alignX - viewBox[0]! * scale;
+    const translateY = (height - viewBox[3]! * scale) * alignY - viewBox[1]! * scale;
+    return `matrix(${scale} 0 0 ${scale} ${translateX} ${translateY})`;
+  };
   const usePattern = /<use\b([^>]*?)(?:\/\s*>|>\s*<\/use\s*>)/gi;
   let expansionCount = 0;
   const expandFragment = (fragment: string, stack: readonly string[]): string =>
@@ -158,9 +186,12 @@ function expandLocalUses(source: string): string {
       const definition = references.get(id);
       if (!definition) throw new Error(`SVG use references missing #${id}`);
       const definitionAttributes = serialize(definition.attributes, definitionExcluded);
+      const viewportTransform = symbolViewportTransform(definition, attributes);
+      const body = viewportTransform && definition.body !== undefined
+        ? `<g transform="${viewportTransform}">${definition.body}</g>` : definition.body;
       const referenced = definition.body === undefined
         ? `<${definition.tag}${definitionAttributes ? ` ${definitionAttributes}` : ""}/>`
-        : `<g${definitionAttributes ? ` ${definitionAttributes}` : ""}>${definition.body}</g>`;
+        : `<g${definitionAttributes ? ` ${definitionAttributes}` : ""}>${body}</g>`;
       const expanded = expandFragment(referenced, [...stack, id]);
       const x = Number(attributes.x ?? 0), y = Number(attributes.y ?? 0);
       if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("SVG use position must be finite");

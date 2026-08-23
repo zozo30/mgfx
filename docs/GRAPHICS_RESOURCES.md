@@ -69,7 +69,9 @@ Missing, cyclic, or external gradient references are rejected rather than partia
 Local `<use>` references to primitive, group, or symbol definitions expand before
 canonicalization. Each instance retains its own paint and transform while the
 definition itself remains non-rendering; external, missing, duplicate, cyclic,
-or expansion-bomb references are rejected.
+or expansion-bomb references are rejected. Symbol `viewBox` coordinates map to
+numeric instance dimensions with aligned `meet` or nonuniform `none` scaling.
+`slice` remains rejected until the display list can attach a clip to each instance.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the

@@ -60,7 +60,9 @@ lowers SVG dash arrays of up to 32 values;
 and uploads every canonical layer once.
 Local SVG `<use>` instances and `<symbol>` definitions are resolved by the
 frontend into independently transformed path instances; external, missing, and
-cyclic references remain rejected.
+cyclic references remain rejected. Symbol `viewBox` coordinates map into numeric
+instance `width` and `height` using aligned `meet` behavior or
+`preserveAspectRatio="none"`; `slice` is rejected until isolated viewport clipping exists.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.

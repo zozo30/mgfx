@@ -142,7 +142,9 @@ React sends the original path, paint, and style values only.
 Same-document SVG `<use href="#...">` and `xlink:href` instances resolve local
 primitive, group, and symbol definitions before path upload. Instance position,
 paint, and transforms are preserved, while unsafe external or cyclic references
-are rejected.
+are rejected. Symbol instances honor numeric `width`/`height`, `viewBox`, aligned
+`meet`, and `preserveAspectRatio="none"`; `slice` currently fails explicitly because
+it requires a per-instance clipping viewport.
 Direct React `Path` components also accept `conicGradient` and
 `strokeConicGradient`. Two through eight angular stops, a source-space center,
 and a radian rotation lower to one native path command; rotation animation does

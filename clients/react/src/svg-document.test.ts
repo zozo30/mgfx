@@ -50,6 +50,28 @@ test("SVG local use instances expand symbols into independently transformed nati
   assert.match(document.layers[2]?.path ?? "", /M62 8/);
 });
 
+test("SVG symbol instances map viewBox coordinates with meet alignment and none stretching", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 60">
+    <defs><symbol id="mark" viewBox="10 20 20 10"><rect x="10" y="20" width="20" height="10"/></symbol></defs>
+    <use href="#mark" x="5" y="4" width="40" height="40" fill="#20d890"/>
+    <use href="#mark" x="50" y="4" width="40" height="40"
+      preserveAspectRatio="none" fill="#4cc9ff"/>
+  </svg>`);
+  assert.equal(document.layers.length, 2);
+  assert.match(document.layers[0]?.path ?? "", /M5 14H45V34H5z/);
+  assert.match(document.layers[1]?.path ?? "", /M50 4H90V44H50z/);
+});
+
+test("SVG symbol instances reject invalid viewports and unsupported slice clipping", () => {
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 50 50"><defs>
+    <symbol id="mark" viewBox="0 0 10 10"><rect width="10" height="10"/></symbol>
+    </defs><use href="#mark" width="0" height="20"/></svg>`), /positive numeric width/);
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 50 50"><defs>
+    <symbol id="mark" viewBox="0 0 20 10"><rect width="20" height="10"/></symbol>
+    </defs><use href="#mark" width="20" height="20" preserveAspectRatio="xMidYMid slice"/></svg>`),
+  /requires viewport clipping/);
+});
+
 test("SVG local use rejects unresolved and cyclic references", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><use href="#missing"/></svg>`), /missing #missing/);
