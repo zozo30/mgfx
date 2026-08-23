@@ -123,6 +123,14 @@ signed-distance field per fragment. The command is drawn before the component's
 own clip and content, while inherited parent clips, transforms, and opacity remain
 active. Servers advertise this path with `softShadows`.
 
+## Radial gradients
+
+`DrawRadialGradient` carries one destination, a normalized focal point, pixel
+radius and corner radius, plus inner and outer colors. A dedicated fragment
+pipeline calculates smooth radial falloff and an antialiased rounded mask. It
+inherits transforms, opacity, and clipping and is advertised by
+`radialGradients`.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

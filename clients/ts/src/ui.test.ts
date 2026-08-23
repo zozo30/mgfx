@@ -112,6 +112,26 @@ test("component shadow draws before its own clipping and content", () => {
   assert.equal(frame.readUInt16LE(68), 4);
 });
 
+test("radial component fill lowers without a client triangle fan", () => {
+  class RadialComponent extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 100, height: 60 }, cornerRadius: 12,
+        backgroundRadialGradient: {
+          inner: { red: 1, green: 0.7, blue: 0.2, alpha: 1 },
+          outer: { red: 0.1, green: 0.05, blue: 0.3, alpha: 1 },
+          centerX: 0.25, centerY: 0.3, radius: 90,
+        } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new RadialComponent());
+  host.layout({ width: 100, height: 60 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 60 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 14);
+  assert.equal(frame.readUInt16LE(88), 3);
+});
+
 test("keyboard focus traverses and activates controls", () => {
   let first = 0, second = 0;
   class KeyboardComponent extends Component {

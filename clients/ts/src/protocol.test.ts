@@ -127,6 +127,24 @@ test("MGFX soft shadow is one fixed backend-neutral command", () => {
     color: { red: 0, green: 0, blue: 0, alpha: 1 } }));
 });
 
+test("MGFX radial gradient remains a compact server primitive", () => {
+  const frame = new FrameEncoder();
+  frame.radialGradient({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
+    centerX: 0.3, centerY: 0.4, radius: 120, cornerRadius: 16,
+    innerColor: { red: 1, green: 0.8, blue: 0.2, alpha: 1 },
+    outerColor: { red: 0.1, green: 0, blue: 0.4, alpha: 0.8 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 14);
+  assert.equal(bytes.readUInt32LE(20), 64);
+  assert.equal(bytes.readFloatLE(48), 120);
+  assert.throws(() => frame.radialGradient({
+    destination: { left: -1, top: 1, right: 1, bottom: -1 }, centerX: 2, centerY: 0,
+    radius: 10, cornerRadius: 0,
+    innerColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+    outerColor: { red: 0, green: 0, blue: 0, alpha: 1 } }));
+});
+
 test("text input decodes validated UTF-8", () => {
   assert.equal(decodeText(encodeText("árvíz")), "árvíz");
   assert.throws(() => decodeText(Buffer.from([0xc3, 0x28])));

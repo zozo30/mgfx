@@ -154,6 +154,20 @@ void CommandEncoder::drawShadow(const ShadowCommand& shadow) {
     }
 }
 
+void CommandEncoder::drawRadialGradient(const RadialGradientCommand& gradient) {
+    beginCommand(Opcode::drawRadialGradient, 16 * sizeof(float));
+    for (float value : {gradient.destination.left, gradient.destination.top,
+                        gradient.destination.right, gradient.destination.bottom,
+                        gradient.centerX, gradient.centerY, gradient.radius,
+                        gradient.cornerRadius,
+                        gradient.innerColor.red, gradient.innerColor.green,
+                        gradient.innerColor.blue, gradient.innerColor.alpha,
+                        gradient.outerColor.red, gradient.outerColor.green,
+                        gradient.outerColor.blue, gradient.outerColor.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -338,6 +352,21 @@ bool decodeShadow(const CommandView& command, ShadowCommand& shadow) {
     shadow.spread = readFloat(command.payload + 24);
     shadow.color = {readFloat(command.payload + 28), readFloat(command.payload + 32),
                     readFloat(command.payload + 36), readFloat(command.payload + 40)};
+    return true;
+}
+
+bool decodeRadialGradient(const CommandView& command, RadialGradientCommand& gradient) {
+    if (command.opcode != Opcode::drawRadialGradient || command.payloadSize != 64) return false;
+    gradient.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                            readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    gradient.centerX = readFloat(command.payload + 16);
+    gradient.centerY = readFloat(command.payload + 20);
+    gradient.radius = readFloat(command.payload + 24);
+    gradient.cornerRadius = readFloat(command.payload + 28);
+    gradient.innerColor = {readFloat(command.payload + 32), readFloat(command.payload + 36),
+                           readFloat(command.payload + 40), readFloat(command.payload + 44)};
+    gradient.outerColor = {readFloat(command.payload + 48), readFloat(command.payload + 52),
+                           readFloat(command.payload + 56), readFloat(command.payload + 60)};
     return true;
 }
 

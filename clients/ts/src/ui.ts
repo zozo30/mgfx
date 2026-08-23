@@ -33,9 +33,14 @@ export interface Shadow {
   readonly color: Color; readonly blur?: number; readonly spread?: number;
   readonly offsetX?: number; readonly offsetY?: number;
 }
+export interface RadialGradient {
+  readonly inner: Color; readonly outer: Color;
+  readonly centerX?: number; readonly centerY?: number; readonly radius?: number;
+}
 export interface Style {
   preferredSize?: Partial<Size>; padding?: Partial<Insets>; gap?: number;
   background?: Color; backgroundGradient?: LinearGradient;
+  backgroundRadialGradient?: RadialGradient;
   backgroundPattern?: DiagonalStripePattern; flexGrow?: number;
   backgroundImage?: ImagePaint;
   mainAxisAlignment?: "start" | "center" | "end" | "spaceBetween";
@@ -476,19 +481,30 @@ class Node {
       bottom: (this.bounds.y + this.bounds.height) / viewport.height });
     const background = this.style.background;
     const gradient = this.style.backgroundGradient;
+    const radial = this.style.backgroundRadialGradient;
     if (this.type === "mesh") {
       paintMesh(encoder, this.bounds, this.mesh, viewport);
     } else if (this.type === "path") {
       paintPath(encoder, this.bounds, this.path, viewport);
     } else if (this.type === "circle") {
-      paintCircle(encoder, this.bounds, background, gradient, this.style.borderWidth ?? 0,
+      if (radial) {
+        paintRadialGradient(encoder, this.bounds, radial,
+          Math.min(this.bounds.width, this.bounds.height) / 2, viewport);
+        paintCircle(encoder, this.bounds, undefined, undefined, this.style.borderWidth ?? 0,
+          this.style.borderColor, viewport);
+      } else paintCircle(encoder, this.bounds, background, gradient, this.style.borderWidth ?? 0,
         this.style.borderColor, viewport);
     } else if ((this.style.cornerRadius ?? 0) > 0) {
-      paintRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background, gradient,
+      if (radial) {
+        paintRadialGradient(encoder, this.bounds, radial, this.style.cornerRadius ?? 0, viewport);
+        paintRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined, undefined,
+          this.style.borderWidth ?? 0, this.style.borderColor, viewport);
+      } else paintRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background, gradient,
         this.style.borderWidth ?? 0, this.style.borderColor, viewport);
     } else {
       if (this.bounds.width > 0 && this.bounds.height > 0) {
-        if (gradient) encoder.triangles(gradientRectangleVertices(this.bounds, gradient, viewport));
+        if (radial) paintRadialGradient(encoder, this.bounds, radial, 0, viewport);
+        else if (gradient) encoder.triangles(gradientRectangleVertices(this.bounds, gradient, viewport));
         else if (background && background.alpha > 0)
           encoder.triangles(rectangleVertices(this.bounds, background, viewport));
         if (this.style.backgroundImage) {
@@ -590,6 +606,15 @@ class Node {
     const parentPoint = this.parent ? this.parent.pointFromRoot(point) : point;
     return this.inverseTransform(parentPoint);
   }
+}
+
+function paintRadialGradient(encoder: FrameEncoder, bounds: Rect, gradient: RadialGradient,
+  cornerRadius: number, viewport: Size): void {
+  if (bounds.width <= 0 || bounds.height <= 0) return;
+  encoder.radialGradient({ destination: normalizedRect(bounds, viewport),
+    centerX: gradient.centerX ?? 0.5, centerY: gradient.centerY ?? 0.5,
+    radius: gradient.radius ?? Math.hypot(bounds.width, bounds.height) / 2,
+    cornerRadius, innerColor: gradient.inner, outerColor: gradient.outer });
 }
 
 function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefined,

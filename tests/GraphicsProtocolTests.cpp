@@ -35,6 +35,9 @@ int main() {
     encoder.popOpacity();
     encoder.drawShadow({{-0.6F, 0.6F, 0.6F, -0.4F}, 14.0F, 18.0F, 2.0F,
                         {0.0F, 0.1F, 0.2F, 0.55F}});
+    encoder.drawRadialGradient({{-0.8F, 0.8F, 0.8F, -0.8F}, 0.3F, 0.4F, 120.0F, 16.0F,
+                                {1.0F, 0.8F, 0.2F, 1.0F},
+                                {0.1F, 0.0F, 0.4F, 0.8F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -89,6 +92,12 @@ int main() {
         !nearlyEqual(shadow.destination.bottom, -0.4F) ||
         !nearlyEqual(shadow.color.alpha, 0.55F) || !decoder.next(command)) {
         return fail("Shadow decoding failed");
+    }
+    gfx::RadialGradientCommand radial{};
+    if (!gfx::decodeRadialGradient(command, radial) || !nearlyEqual(radial.centerX, 0.3F) ||
+        !nearlyEqual(radial.radius, 120.0F) || !nearlyEqual(radial.outerColor.blue, 0.4F) ||
+        !decoder.next(command)) {
+        return fail("Radial-gradient decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

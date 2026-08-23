@@ -83,3 +83,44 @@ fragment float4 shadowFragmentMain(ShadowVertexOut in [[stage_in]]) {
     const float alpha = in.color.a * coverage;
     return float4(in.color.rgb * alpha, alpha);
 }
+
+struct RadialVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    packed_float2 center;
+    float radius;
+    float cornerRadius;
+    packed_float4 innerColor;
+    packed_float4 outerColor;
+};
+
+struct RadialVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float2 center;
+    float radius;
+    float cornerRadius;
+    float4 innerColor;
+    float4 outerColor;
+};
+
+vertex RadialVertexOut radialVertexMain(const device RadialVertex* vertices [[buffer(0)]],
+                                        uint vertexId [[vertex_id]]) {
+    const RadialVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size, value.center,
+            value.radius, value.cornerRadius, value.innerColor, value.outerColor};
+}
+
+fragment float4 radialFragmentMain(RadialVertexOut in [[stage_in]]) {
+    const float amount = clamp(distance(in.local, in.center) / in.radius, 0.0, 1.0);
+    const float4 color = mix(in.innerColor, in.outerColor, amount);
+    const float2 halfSize = in.size * 0.5;
+    const float radius = min(in.cornerRadius, min(halfSize.x, halfSize.y));
+    const float2 q = abs(in.local - halfSize) - halfSize + radius;
+    const float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    const float coverage = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
+    const float alpha = color.a * coverage;
+    return float4(color.rgb * alpha, alpha);
+}

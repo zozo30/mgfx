@@ -208,6 +208,8 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
             active={selected === index} onPress={() => setSelected(index)}
             style={{ preferredSize: { width: 128, height: 116 }, flexGrow: 1,
               padding: all(18), cornerRadius: 14,
+              backgroundRadialGradient: { inner: selected === index ? active : normal,
+                outer: normal, centerX: 0.18, centerY: 0.12, radius: 240 },
               shadow: { color: rgba(0, 0, 0, selected === index ? 0.66 : 0.42),
                 blur: selected === index ? 20 : 12, spread: selected === index ? 2 : 0,
                 offsetY: 7 } }}

@@ -80,8 +80,11 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto imageFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageFragmentMain")));
     auto shadowVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("shadowVertexMain")));
     auto shadowFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("shadowFragmentMain")));
+    auto radialVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("radialVertexMain")));
+    auto radialFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("radialFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
-        !shadowVertexFunction || !shadowFragmentFunction) {
+        !shadowVertexFunction || !shadowFragmentFunction ||
+        !radialVertexFunction || !radialFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -133,6 +136,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(shadowDescriptor.get(), &error));
     if (!shadowPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the shadow render pipeline", error));
+    }
+
+    auto radialDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    radialDescriptor->setVertexFunction(radialVertexFunction.get());
+    radialDescriptor->setFragmentFunction(radialFragmentFunction.get());
+    radialDescriptor->setRasterSampleCount(sampleCount);
+    auto* radialColor = radialDescriptor->colorAttachments()->object(0);
+    radialColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    radialColor->setBlendingEnabled(true);
+    radialColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    radialColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    radialColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    radialColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    radialPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(radialDescriptor.get(), &error));
+    if (!radialPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the radial-gradient pipeline", error));
     }
 }
 
@@ -357,6 +377,60 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(shadowPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawRadialGradient) {
+            gfx::RadialGradientCommand gradient{};
+            if (!gfx::decodeRadialGradient(command, gradient) ||
+                !std::isfinite(gradient.centerX) || !std::isfinite(gradient.centerY) ||
+                !std::isfinite(gradient.radius) || !std::isfinite(gradient.cornerRadius) ||
+                gradient.centerX < 0.0F || gradient.centerX > 1.0F ||
+                gradient.centerY < 0.0F || gradient.centerY > 1.0F ||
+                gradient.radius <= 0.0F || gradient.radius > 8192.0F ||
+                gradient.cornerRadius < 0.0F) {
+                throw std::runtime_error("Malformed radial-gradient command");
+            }
+            if (clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (gradient.destination.right - gradient.destination.left) * drawableWidth * 0.5F,
+                (gradient.destination.top - gradient.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            const std::array<float, 2> center = {
+                gradient.centerX * size[0], gradient.centerY * size[1]};
+            struct RadialVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                std::array<float, 2> center;
+                float radius;
+                float cornerRadius;
+                std::array<float, 4> innerColor;
+                std::array<float, 4> outerColor;
+            };
+            const std::array<float, 4> inner = {gradient.innerColor.red, gradient.innerColor.green,
+                gradient.innerColor.blue, gradient.innerColor.alpha * opacityStack.back()};
+            const std::array<float, 4> outer = {gradient.outerColor.red, gradient.outerColor.green,
+                gradient.outerColor.blue, gradient.outerColor.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return RadialVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, center, gradient.radius, gradient.cornerRadius,
+                    inner, outer};
+            };
+            const RadialVertex vertices[] = {
+                vertex(gradient.destination.left, gradient.destination.top, 0.0F, 0.0F),
+                vertex(gradient.destination.left, gradient.destination.bottom, 0.0F, size[1]),
+                vertex(gradient.destination.right, gradient.destination.bottom, size[0], size[1]),
+                vertex(gradient.destination.left, gradient.destination.top, 0.0F, 0.0F),
+                vertex(gradient.destination.right, gradient.destination.bottom, size[0], size[1]),
+                vertex(gradient.destination.right, gradient.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(radialPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

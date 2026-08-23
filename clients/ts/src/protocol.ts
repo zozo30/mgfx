@@ -55,6 +55,7 @@ export enum ServerCapability {
   TransformStack = 1 << 13,
   OpacityStack = 1 << 14,
   SoftShadows = 1 << 15,
+  RadialGradients = 1 << 16,
 }
 export interface ServerHello {
   readonly version: number;
@@ -127,6 +128,11 @@ export interface AffineTransform {
 export interface ShadowPaint {
   readonly destination: ClipRect; readonly cornerRadius: number;
   readonly blur: number; readonly spread: number; readonly color: Color;
+}
+export interface RadialGradientPaint {
+  readonly destination: ClipRect; readonly centerX: number; readonly centerY: number;
+  readonly radius: number; readonly cornerRadius: number;
+  readonly innerColor: Color; readonly outerColor: Color;
 }
 
 export type PathSegment =
@@ -637,6 +643,20 @@ export class FrameEncoder {
     const payload = Buffer.alloc(44);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(13, payload);
+  }
+
+  radialGradient(value: RadialGradientPaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.centerX, value.centerY, value.radius, value.cornerRadius,
+      value.innerColor.red, value.innerColor.green, value.innerColor.blue, value.innerColor.alpha,
+      value.outerColor.red, value.outerColor.green, value.outerColor.blue, value.outerColor.alpha];
+    if (values.some((item) => !Number.isFinite(item)) || value.centerX < 0 || value.centerX > 1 ||
+        value.centerY < 0 || value.centerY > 1 || value.radius <= 0 || value.radius > 8192 ||
+        value.cornerRadius < 0)
+      throw new RangeError("Radial gradient values are outside supported bounds");
+    const payload = Buffer.alloc(64);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(14, payload);
   }
 
   finish(): Buffer {
