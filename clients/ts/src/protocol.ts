@@ -58,6 +58,7 @@ export enum ServerCapability {
   RadialGradients = 1 << 16,
   RoundedRectangles = 1 << 17,
   Circles = 1 << 18,
+  DiagonalPatterns = 1 << 19,
 }
 export interface ServerHello {
   readonly version: number;
@@ -143,6 +144,10 @@ export interface RoundedRectPaint {
 export interface CirclePaint {
   readonly destination: ClipRect; readonly borderWidth: number;
   readonly fillColor: Color; readonly borderColor: Color;
+}
+export interface DiagonalPatternPaint {
+  readonly destination: ClipRect; readonly stripeWidth: number; readonly gap: number;
+  readonly offset: number; readonly backward: boolean; readonly color: Color;
 }
 
 export type PathSegment =
@@ -693,6 +698,18 @@ export class FrameEncoder {
     const payload = Buffer.alloc(52);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(16, payload);
+  }
+
+  diagonalPattern(value: DiagonalPatternPaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.stripeWidth, value.gap, value.offset,
+      value.backward ? 1 : 0, value.color.red, value.color.green, value.color.blue, value.color.alpha];
+    if (values.some((item) => !Number.isFinite(item)) || value.stripeWidth <= 0 ||
+        value.gap < 0 || value.stripeWidth > 1024 || value.gap > 1024)
+      throw new RangeError("Diagonal pattern values are outside supported bounds");
+    const payload = Buffer.alloc(48);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(17, payload);
   }
 
   finish(): Buffer {

@@ -27,6 +27,7 @@ enum class Opcode : std::uint16_t {
     drawRadialGradient = 14,
     drawRoundedRect = 15,
     drawCircle = 16,
+    drawDiagonalPattern = 17,
 };
 
 enum class Primitive : std::uint8_t {
@@ -112,6 +113,15 @@ struct CircleCommand {
     Color borderColor;
 };
 
+struct DiagonalPatternCommand {
+    ClipRect destination;
+    float stripeWidth;
+    float gap;
+    float offset;
+    bool backward;
+    Color color;
+};
+
 enum class FillRule : std::uint8_t { nonzero = 0, evenodd = 1 };
 enum class LineCap : std::uint8_t { butt = 0, round = 1 };
 enum class LineJoin : std::uint8_t { bevel = 0, round = 1 };
@@ -182,6 +192,7 @@ public:
     void drawRadialGradient(const RadialGradientCommand& gradient);
     void drawRoundedRect(const RoundedRectCommand& rectangle);
     void drawCircle(const CircleCommand& circle);
+    void drawDiagonalPattern(const DiagonalPatternCommand& pattern);
 
     std::vector<std::uint8_t> finish();
 
@@ -221,5 +232,6 @@ bool decodeShadow(const CommandView& command, ShadowCommand& shadow);
 bool decodeRadialGradient(const CommandView& command, RadialGradientCommand& gradient);
 bool decodeRoundedRect(const CommandView& command, RoundedRectCommand& rectangle);
 bool decodeCircle(const CommandView& command, CircleCommand& circle);
+bool decodeDiagonalPattern(const CommandView& command, DiagonalPatternCommand& pattern);
 
 } // namespace gfx

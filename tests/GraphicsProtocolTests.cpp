@@ -44,6 +44,8 @@ int main() {
     encoder.drawCircle({{-0.4F, 0.4F, 0.4F, -0.4F}, 2.5F,
                         {0.1F, 0.8F, 0.4F, 1.0F},
                         {0.7F, 1.0F, 0.8F, 0.9F}});
+    encoder.drawDiagonalPattern({{-0.9F, 0.3F, 0.9F, -0.3F}, 8.0F, 10.0F, 3.5F, true,
+                                 {1.0F, 0.5F, 0.1F, 0.8F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -117,6 +119,13 @@ int main() {
         !nearlyEqual(circle.fillColor.green, 0.8F) ||
         !nearlyEqual(circle.borderColor.alpha, 0.9F) || !decoder.next(command)) {
         return fail("Circle decoding failed");
+    }
+    gfx::DiagonalPatternCommand pattern{};
+    if (!gfx::decodeDiagonalPattern(command, pattern) ||
+        !nearlyEqual(pattern.stripeWidth, 8.0F) || !nearlyEqual(pattern.offset, 3.5F) ||
+        !pattern.backward || !nearlyEqual(pattern.color.alpha, 0.8F) ||
+        !decoder.next(command)) {
+        return fail("Diagonal-pattern decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

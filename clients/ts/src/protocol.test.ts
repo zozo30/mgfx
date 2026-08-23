@@ -180,6 +180,23 @@ test("MGFX circle combines fill and ring in one command", () => {
     borderColor: { red: 0, green: 0, blue: 0, alpha: 0 } }));
 });
 
+test("MGFX diagonal pattern is constant-size regardless of area", () => {
+  const frame = new FrameEncoder();
+  frame.diagonalPattern({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
+    stripeWidth: 8, gap: 10, offset: 3.5, backward: true,
+    color: { red: 1, green: 0.5, blue: 0.1, alpha: 0.8 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 17);
+  assert.equal(bytes.readUInt32LE(20), 48);
+  assert.equal(bytes.readFloatLE(40), 8);
+  assert.equal(bytes.readFloatLE(52), 1);
+  assert.throws(() => frame.diagonalPattern({
+    destination: { left: -1, top: 1, right: 1, bottom: -1 }, stripeWidth: 0,
+    gap: 2, offset: 0, backward: false,
+    color: { red: 1, green: 1, blue: 1, alpha: 1 } }));
+});
+
 test("text input decodes validated UTF-8", () => {
   assert.equal(decodeText(encodeText("árvíz")), "árvíz");
   assert.throws(() => decodeText(Buffer.from([0xc3, 0x28])));

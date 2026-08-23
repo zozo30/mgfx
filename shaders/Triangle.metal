@@ -220,3 +220,45 @@ fragment float4 circleFragmentMain(CircleVertexOut in [[stage_in]]) {
                                  in.borderColor.a) * borderCoverage;
     return fill + stroke;
 }
+
+struct PatternVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    float stripeWidth;
+    float gap;
+    float offset;
+    float backward;
+    packed_float4 color;
+};
+
+struct PatternVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float stripeWidth;
+    float gap;
+    float offset;
+    float backward;
+    float4 color;
+};
+
+vertex PatternVertexOut patternVertexMain(const device PatternVertex* vertices [[buffer(0)]],
+                                          uint vertexId [[vertex_id]]) {
+    const PatternVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size,
+            value.stripeWidth, value.gap, value.offset, value.backward, value.color};
+}
+
+fragment float4 patternFragmentMain(PatternVertexOut in [[stage_in]]) {
+    const float coordinate = in.backward > 0.5
+        ? in.local.x - in.local.y + in.size.y : in.local.x + in.local.y;
+    const float period = in.stripeWidth + in.gap;
+    const float distanceToCenter = abs(fract((coordinate + in.offset) / period) - 0.5) * period;
+    const float aa = max(fwidth(coordinate), 0.75);
+    const float coverage = 1.0 - smoothstep(in.stripeWidth * 0.5 - aa,
+                                            in.stripeWidth * 0.5 + aa,
+                                            distanceToCenter);
+    const float alpha = in.color.a * coverage;
+    return float4(in.color.rgb * alpha, alpha);
+}

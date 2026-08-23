@@ -194,6 +194,18 @@ void CommandEncoder::drawCircle(const CircleCommand& circle) {
     }
 }
 
+void CommandEncoder::drawDiagonalPattern(const DiagonalPatternCommand& pattern) {
+    beginCommand(Opcode::drawDiagonalPattern, 12 * sizeof(float));
+    for (float value : {pattern.destination.left, pattern.destination.top,
+                        pattern.destination.right, pattern.destination.bottom,
+                        pattern.stripeWidth, pattern.gap, pattern.offset,
+                        pattern.backward ? 1.0F : 0.0F,
+                        pattern.color.red, pattern.color.green,
+                        pattern.color.blue, pattern.color.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -418,6 +430,21 @@ bool decodeCircle(const CommandView& command, CircleCommand& circle) {
                         readFloat(command.payload + 28), readFloat(command.payload + 32)};
     circle.borderColor = {readFloat(command.payload + 36), readFloat(command.payload + 40),
                           readFloat(command.payload + 44), readFloat(command.payload + 48)};
+    return true;
+}
+
+bool decodeDiagonalPattern(const CommandView& command, DiagonalPatternCommand& pattern) {
+    if (command.opcode != Opcode::drawDiagonalPattern || command.payloadSize != 48) return false;
+    pattern.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                           readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    pattern.stripeWidth = readFloat(command.payload + 16);
+    pattern.gap = readFloat(command.payload + 20);
+    pattern.offset = readFloat(command.payload + 24);
+    const float direction = readFloat(command.payload + 28);
+    if (direction != 0.0F && direction != 1.0F) return false;
+    pattern.backward = direction == 1.0F;
+    pattern.color = {readFloat(command.payload + 32), readFloat(command.payload + 36),
+                     readFloat(command.payload + 40), readFloat(command.payload + 44)};
     return true;
 }
 

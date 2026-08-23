@@ -88,11 +88,14 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("roundedRectFragmentMain")));
     auto circleVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleVertexMain")));
     auto circleFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleFragmentMain")));
+    auto patternVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternVertexMain")));
+    auto patternFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
         !radialVertexFunction || !radialFragmentFunction ||
         !roundedRectVertexFunction || !roundedRectFragmentFunction ||
-        !circleVertexFunction || !circleFragmentFunction) {
+        !circleVertexFunction || !circleFragmentFunction ||
+        !patternVertexFunction || !patternFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -195,6 +198,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(circleDescriptor.get(), &error));
     if (!circlePipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the circle pipeline", error));
+    }
+
+    auto patternDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    patternDescriptor->setVertexFunction(patternVertexFunction.get());
+    patternDescriptor->setFragmentFunction(patternFragmentFunction.get());
+    patternDescriptor->setRasterSampleCount(sampleCount);
+    auto* patternColor = patternDescriptor->colorAttachments()->object(0);
+    patternColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    patternColor->setBlendingEnabled(true);
+    patternColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    patternColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    patternColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    patternColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    patternPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(patternDescriptor.get(), &error));
+    if (!patternPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the diagonal-pattern pipeline", error));
     }
 }
 
@@ -567,6 +587,53 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(circlePipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawDiagonalPattern) {
+            gfx::DiagonalPatternCommand pattern{};
+            if (!gfx::decodeDiagonalPattern(command, pattern) ||
+                !std::isfinite(pattern.stripeWidth) || !std::isfinite(pattern.gap) ||
+                !std::isfinite(pattern.offset) || pattern.stripeWidth <= 0.0F ||
+                pattern.gap < 0.0F || pattern.stripeWidth > 1024.0F || pattern.gap > 1024.0F) {
+                throw std::runtime_error("Malformed diagonal-pattern command");
+            }
+            if (clipEmpty() || pattern.color.alpha <= 0.0F) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (pattern.destination.right - pattern.destination.left) * drawableWidth * 0.5F,
+                (pattern.destination.top - pattern.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct PatternVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float stripeWidth;
+                float gap;
+                float offset;
+                float backward;
+                std::array<float, 4> color;
+            };
+            const std::array<float, 4> color = {pattern.color.red, pattern.color.green,
+                pattern.color.blue, pattern.color.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return PatternVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, pattern.stripeWidth, pattern.gap, pattern.offset,
+                    pattern.backward ? 1.0F : 0.0F, color};
+            };
+            const PatternVertex vertices[] = {
+                vertex(pattern.destination.left, pattern.destination.top, 0.0F, 0.0F),
+                vertex(pattern.destination.left, pattern.destination.bottom, 0.0F, size[1]),
+                vertex(pattern.destination.right, pattern.destination.bottom, size[0], size[1]),
+                vertex(pattern.destination.left, pattern.destination.top, 0.0F, 0.0F),
+                vertex(pattern.destination.right, pattern.destination.bottom, size[0], size[1]),
+                vertex(pattern.destination.right, pattern.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(patternPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

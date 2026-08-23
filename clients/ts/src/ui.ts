@@ -732,28 +732,9 @@ function paintDiagonalStripes(encoder: FrameEncoder, r: Rect,
   pattern: DiagonalStripePattern | undefined, viewport: Size): void {
   if (!pattern || pattern.color.alpha <= 0 || r.width <= 0 || r.height <= 0) return;
   const width = Math.max(1, pattern.stripeWidth ?? 8);
-  const gap = Math.max(0, pattern.gap ?? 8), period = width + gap;
-  const offset = ((pattern.offset ?? 0) % period + period) % period;
-  const slant = pattern.direction === "backward" ? -r.height : r.height;
-  const vertices: Vertex[] = [];
-  for (let x = -r.height - width + offset; x < r.width + r.height + width; x += period) {
-    const topLeft = { x: r.x + x + slant, y: r.y };
-    const topRight = { x: topLeft.x + width, y: r.y };
-    const bottomLeft = { x: r.x + x, y: r.y + r.height };
-    const bottomRight = { x: bottomLeft.x + width, y: r.y + r.height };
-    vertices.push(pointVertex(topLeft, pattern.color, viewport),
-      pointVertex(bottomLeft, pattern.color, viewport),
-      pointVertex(bottomRight, pattern.color, viewport),
-      pointVertex(topLeft, pattern.color, viewport),
-      pointVertex(bottomRight, pattern.color, viewport),
-      pointVertex(topRight, pattern.color, viewport));
-  }
-  if (vertices.length === 0) return;
-  encoder.pushClip({ left: r.x / viewport.width, top: r.y / viewport.height,
-    right: (r.x + r.width) / viewport.width,
-    bottom: (r.y + r.height) / viewport.height });
-  encoder.triangles(vertices);
-  encoder.popClip();
+  encoder.diagonalPattern({ destination: normalizedRect(r, viewport), stripeWidth: width,
+    gap: Math.max(0, pattern.gap ?? 8), offset: pattern.offset ?? 0,
+    backward: pattern.direction === "backward", color: pattern.color });
 }
 
 export function constrain(size: Size, c: Constraints): Size {

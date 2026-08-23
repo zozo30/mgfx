@@ -143,6 +143,11 @@ border meshes. The command inherits all display-list state and is advertised by
 evaluates radial edge distance with derivative antialiasing; component clients
 send no circle or ring tessellation. Support is advertised by `circles`.
 
+`DrawDiagonalPattern` carries a destination plus pixel stripe width, gap, phase,
+direction, and color. The fragment shader derives a periodic antialiased mask;
+wire size stays constant as the patterned area grows. Support is advertised by
+`diagonalPatterns`.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

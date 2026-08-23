@@ -342,7 +342,7 @@ test("linear gradients lower to interpolated portable vertex colors", () => {
   assert.equal(frame.readFloatLE(thirdVertexColor + 8), 1);
 });
 
-test("diagonal patterns fill a clipped area with portable stripe geometry", () => {
+test("diagonal patterns lower to one constant-size server command", () => {
   class PatternComponent extends Component {
     build(): Element {
       return box({ preferredSize: { width: 120, height: 60 },
@@ -359,7 +359,8 @@ test("diagonal patterns fill a clipped area with portable stripe geometry", () =
   host.paint(encoder, { width: 120, height: 60 });
   encoder.endFrame();
   const frame = encoder.finish();
-  assert.equal(frame.readUInt32LE(12), 6); // Base, clip, stripes, pop, border, end.
+  assert.equal(frame.readUInt32LE(12), 4); // Base, pattern, border, end.
+  assert.equal(frame.readUInt16LE(80), 17);
 });
 
 test("indexed normalized meshes lower to backend-neutral colored triangles", () => {

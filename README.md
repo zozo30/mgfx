@@ -179,6 +179,10 @@ Solid `Circle` components use the equivalent `DrawCircle` SDF command, combining
 fill and ring in one antialiased quad. Dot grids therefore send six vertices per
 dot internally on Metal instead of separate 32-segment client meshes.
 
+Animated diagonal fills now use one constant-size `DrawDiagonalPattern` record.
+Stripe width, gap, phase, direction, and color are evaluated per fragment, so
+large patterned areas no longer expand the Unix-socket frame with stripe quads.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,
