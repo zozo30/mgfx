@@ -154,6 +154,12 @@ function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
 }
 
 const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
+  <style>
+    .content { clip-path: url(#contentWindow); }
+    .signal { stroke: url(#signal); stroke-width: 4; stroke-dasharray: 7 4 2 4;
+      stroke-dashoffset: 2; stroke-linecap: square; stroke-linejoin: miter;
+      stroke-miterlimit: 6; }
+  </style>
   <defs>
     <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="5" y1="5" x2="80" y2="36"
       spreadMethod="reflect">
@@ -179,14 +185,12 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
   <g transform="translate(4 4)">
     <rect x="1" y="1" width="150" height="62" rx="12" fill="url(#panel)"
       stroke="currentColor" stroke-width="2"/>
-    <g clip-path="url(#contentWindow)">
+    <g class="content">
     <circle cx="34" cy="32" r="17" fill="url(#orb)" stroke="url(#orb)" stroke-width="3"
       stroke-dasharray="5 3" stroke-dashoffset="1"/>
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
-    <use href="#signalGlyph" x="78" y="24" width="53" height="18"
-      preserveAspectRatio="xMidYMid slice"
-      stroke="url(#signal)" stroke-width="4" stroke-dasharray="7 4 2 4" stroke-dashoffset="2"
-      stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="6"/>
+    <use class="signal" href="#signalGlyph" x="78" y="24" width="53" height="18"
+      preserveAspectRatio="xMidYMid slice"/>
     </g>
   </g>
 </svg>`;

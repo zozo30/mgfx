@@ -147,6 +147,10 @@ are rejected. Symbol instances honor numeric `width`/`height`, `viewBox`, aligne
 lower to balanced display-list clip commands around the persistent path draw.
 Local `clip-path="url(#...)"` references support one numeric user-space `<rect>`;
 group transforms and nested clip intersections remain native display-list state.
+Internal `<style>` sheets lower a bounded CSS cascade for simple tag, class, ID,
+and compound selectors. Paint, opacity, stroke/dash geometry, transforms,
+visibility, gradient-stop styling, and local clip references remain native;
+external at-rules and unsupported selectors or declarations fail explicitly.
 Direct React `Path` components also accept `conicGradient` and
 `strokeConicGradient`. Two through eight angular stops, a source-space center,
 and a radian rotation lower to one native path command; rotation animation does

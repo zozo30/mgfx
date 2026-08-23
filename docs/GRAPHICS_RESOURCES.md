@@ -76,6 +76,10 @@ cached path reference; rotated and skewed viewport clips await polygon clipping.
 Local `<clipPath>` references containing one numeric `userSpaceOnUse` `<rect>` use
 that same source-space clip field. Nested group clips intersect before the frame is
 encoded; rounded, object-bounding-box, rotated, and skewed clips remain explicit fallbacks.
+Bounded internal CSS applies simple tag/class/ID compound selectors using normal
+specificity and source order, followed by inline style. Supported declarations map
+only to existing native paint, stroke, transform, visibility, gradient-stop, and
+clip state; at-rules, combinators, `!important`, and unknown properties are rejected.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the

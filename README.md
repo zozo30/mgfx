@@ -65,6 +65,11 @@ instance `width` and `height` using aligned `meet`, clipped `slice`, or
 `preserveAspectRatio="none"` behavior.
 Local axis-aligned `<clipPath>` definitions containing one numeric, user-space
 `<rect>` also lower to the same balanced clip stack; nested clips are intersected.
+Bounded internal `<style>` sheets support simple tag, class, ID, and compound
+selectors for native paint, opacity, stroke geometry, transforms, visibility,
+gradient stops, and local clip references. Presentation attributes, selector
+specificity/source order, and inline styles follow their normal cascade order;
+at-rules, descendant selectors, `!important`, and unsupported properties are rejected.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.

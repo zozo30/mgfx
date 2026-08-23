@@ -108,6 +108,56 @@ test("SVG clip paths reject missing, external, and non-rectangular definitions",
     <rect width="10" height="10" clip-path="url(#round)"/></svg>`), /rounded rects/);
 });
 
+test("SVG internal CSS cascades tag, class, id, inline, gradient, and clip styles", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 60 40"><style>
+    path { fill: #203040; stroke: #ffffff; }
+    .paint { fill: #20d890; stroke-width: 3; }
+    #hero { fill: #4cc9ff; stroke-linecap: square; }
+    .hidden { display: none; }
+    .gradient { fill: url(#glow); clip-path: url(#window); }
+    stop.hot { stop-color: #ff8020; stop-opacity: 0.5; }
+  </style><defs>
+    <linearGradient id="glow"><stop class="hot"/><stop offset="1" stop-color="#8060ff"/></linearGradient>
+    <clipPath id="window"><rect x="30" y="5" width="20" height="20"/></clipPath>
+  </defs>
+  <path id="hero" class="paint" d="M0 0H20V20H0Z" style="fill: #ffe75a"/>
+  <path class="hidden" d="M0 0H60V40H0Z"/>
+  <circle class="gradient" cx="40" cy="15" r="12"/>
+  </svg>`);
+  assert.equal(document.layers.length, 2);
+  assert.ok((document.layers[0]?.fill?.red ?? 0) > 0.9);
+  assert.equal(document.layers[0]?.strokeWidth, 3);
+  assert.equal(document.layers[0]?.lineCap, "square");
+  assert.deepEqual(document.layers[1]?.clip, { x: 30, y: 5, width: 20, height: 20 });
+  assert.ok((document.layers[1]?.fillGradient?.startColor.red ?? 0) > 0.9);
+  assert.equal(document.layers[1]?.fillGradient?.startColor.alpha, 0.5);
+});
+
+test("SVG internal CSS rejects unsafe or unsupported stylesheet features", () => {
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><style>@import url(https://example.com/a.css);</style><rect width="10" height="10"/></svg>`),
+  /external or nested content/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><style>.card path { fill: red; }</style><path d="M0 0H10V10H0Z"/></svg>`),
+  /Unsupported SVG CSS selector/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><style>.card { filter: blur(2px); }</style><path class="card" d="M0 0H10V10H0Z"/></svg>`),
+  /Unsupported SVG CSS property filter/);
+});
+
+test("SVG CSS styles retain symbol paint and compose use transforms with instance position", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 60 40"><style>
+    .mark { fill: #20d890; }
+    .large { transform: scale(2); }
+  </style><defs><symbol id="mark" class="mark" viewBox="0 0 10 8">
+    <rect width="10" height="8"/></symbol></defs>
+    <use class="large" href="#mark" x="5" y="4" width="10" height="8"/>
+  </svg>`);
+  assert.equal(document.layers.length, 1);
+  assert.match(document.layers[0]?.path ?? "", /M10 8H30V24H10z/);
+  assert.ok((document.layers[0]?.fill?.green ?? 0) > 0.8);
+});
+
 test("SVG local use rejects unresolved and cyclic references", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><use href="#missing"/></svg>`), /missing #missing/);

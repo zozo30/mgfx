@@ -57,6 +57,8 @@ interface PaintState {
   readonly strokeGradientId?: string;
   readonly strokeWidth: number;
   readonly opacity: number;
+  readonly displayed: boolean;
+  readonly visible: boolean;
   readonly fillOpacity: number;
   readonly strokeOpacity: number;
   readonly fillRule: "nonzero" | "evenodd";
@@ -106,6 +108,18 @@ interface ClipDefinition {
   readonly error?: string;
 }
 
+interface CssSelector {
+  readonly tag?: string;
+  readonly id?: string;
+  readonly classes: readonly string[];
+  readonly specificity: number;
+}
+
+interface CssRule {
+  readonly selector: CssSelector;
+  readonly declarations: Readonly<Record<string, string>>;
+}
+
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 const white: Color = { red: 1, green: 1, blue: 1, alpha: 1 };
 const primitiveTags = new Set(["path", "line", "polyline", "polygon", "rect", "circle", "ellipse"]);
@@ -116,10 +130,10 @@ interface LocalSvgReference {
   readonly body?: string;
 }
 
-function expandLocalUses(source: string): string {
+function expandLocalUses(source: string, cssRules: readonly CssRule[]): string {
   const references = new Map<string, LocalSvgReference>();
   const remember = (tag: string, attributeSource: string, body?: string) => {
-    const attributes = svgAttributes(attributeSource);
+    const attributes = styledAttributes(attributeSource, tag, cssRules);
     const id = attributes.id?.trim();
     if (!id) return;
     if (references.has(id)) throw new Error(`SVG contains duplicate local id #${id}`);
@@ -150,8 +164,9 @@ function expandLocalUses(source: string): string {
   const serialize = (attributes: Readonly<Record<string, string>>, excluded: ReadonlySet<string>) =>
     Object.entries(attributes).filter(([name]) => !excluded.has(name))
       .map(([name, value]) => `${name}="${escape(value)}"`).join(" ");
-  const definitionExcluded = new Set(["id", "viewBox", "width", "height", "preserveAspectRatio"]);
-  const useExcluded = new Set(["href", "xlink:href", "x", "y", "width", "height",
+  const definitionExcluded = new Set(["id", "class", "viewBox", "width", "height",
+    "preserveAspectRatio"]);
+  const useExcluded = new Set(["href", "xlink:href", "class", "x", "y", "width", "height",
     "transform", "preserveAspectRatio"]);
   const symbolViewportTransform = (definition: LocalSvgReference,
     instance: Readonly<Record<string, string>>): { transform: string; clip?: Rect } | undefined => {
@@ -187,7 +202,7 @@ function expandLocalUses(source: string): string {
   const expandFragment = (fragment: string, stack: readonly string[]): string =>
     fragment.replace(usePattern, (_token, attributeSource: string) => {
       if (++expansionCount > 4096) throw new RangeError("SVG exceeds 4096 local use instances");
-      const attributes = withInlineStyle(svgAttributes(attributeSource));
+      const attributes = styledAttributes(attributeSource, "use", cssRules);
       const href = attributes.href ?? attributes["xlink:href"];
       const match = href?.match(/^#([^\s]+)$/);
       if (!match) throw new Error("SVG use requires a local fragment reference");
@@ -223,16 +238,19 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
   if (/\bdata-mgfx-clip\s*=/i.test(source)) throw new Error("SVG uses a reserved MGFX attribute");
   if (/<(?:script|image|foreignObject)\b|<!\s*(?:doctype|entity)\b/i.test(source))
     throw new Error("SVG contains external or executable content");
-  const expandedSource = expandLocalUses(source.replace(/<!--[\s\S]*?-->/g, ""));
+  const cleanedSource = source.replace(/<!--[\s\S]*?-->/g, "");
+  const cssRules = parseSvgStyles(cleanedSource);
+  const expandedSource = expandLocalUses(cleanedSource, cssRules);
   const svgMatch = expandedSource.match(/<svg\b([^>]*)>/i);
   if (!svgMatch) throw new Error("SVG document has no root element");
-  const rootAttributes = withInlineStyle(svgAttributes(svgMatch[1]!));
+  const rootAttributes = styledAttributes(svgMatch[1]!, "svg", cssRules);
   const viewBox = parseViewBox(rootAttributes);
-  const gradients = parseLinearGradients(expandedSource, defaultColor);
-  const radialGradients = parseRadialGradients(expandedSource, defaultColor);
-  const clipPaths = parseClipPaths(expandedSource);
+  const gradients = parseLinearGradients(expandedSource, defaultColor, cssRules);
+  const radialGradients = parseRadialGradients(expandedSource, defaultColor, cssRules);
+  const clipPaths = parseClipPaths(expandedSource, cssRules);
   const initial: PaintState = { fill: { red: 0, green: 0, blue: 0, alpha: 1 },
-    strokeWidth: 1, opacity: 1, fillOpacity: 1, strokeOpacity: 1,
+    strokeWidth: 1, opacity: 1, displayed: true, visible: true,
+    fillOpacity: 1, strokeOpacity: 1,
     fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
     currentColor: defaultColor, transform: identity };
   const stack: PaintState[] = [initial];
@@ -250,7 +268,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       continue;
     }
     const attributeSource = token.replace(/^<\s*[\w:-]+|\/?\s*>$/g, "");
-    const attributes = withInlineStyle(svgAttributes(attributeSource));
+    const attributes = styledAttributes(attributeSource, name, cssRules);
     const parent = stack[stack.length - 1]!;
     const state = inherit(parent, attributes, clipPaths);
     if (name === "defs" || name === "symbol" || name === "clippath") {
@@ -264,6 +282,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     }
     if (hiddenDepth > 0) continue;
     if (!primitiveTags.has(name)) continue;
+    if (!state.displayed || !state.visible) continue;
     const rawPath = svgPrimitivePath(name, attributes);
     if (!rawPath) continue;
     const path = applyMatrix(rawPath, state.transform);
@@ -307,6 +326,71 @@ function withInlineStyle(attributes: Readonly<Record<string, string>>): Readonly
   return { ...attributes, ...declarations };
 }
 
+const cssProperties = new Set(["color", "fill", "stroke", "opacity", "fill-opacity",
+  "stroke-opacity", "stroke-width", "fill-rule", "stroke-linecap", "stroke-linejoin",
+  "stroke-miterlimit", "stroke-dasharray", "stroke-dashoffset", "clip-path", "transform",
+  "stop-color", "stop-opacity", "display", "visibility"]);
+
+function parseSvgStyles(source: string): readonly CssRule[] {
+  const rules: CssRule[] = [];
+  for (const style of source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+    const body = style[1]!.replace(/\/\*[\s\S]*?\*\//g, "").trim();
+    if (body.includes("@") || body.includes("<") || body.includes(">"))
+      throw new Error("SVG CSS contains unsupported external or nested content");
+    const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
+    const remainder = body.replace(rulePattern, "").trim();
+    if (remainder.length > 0) throw new Error("SVG CSS contains invalid rule syntax");
+    for (const match of body.matchAll(rulePattern)) {
+      const declarations: Record<string, string> = {};
+      for (const item of match[2]!.split(";")) {
+        if (!item.trim()) continue;
+        const separator = item.indexOf(":");
+        if (separator < 1) throw new Error("SVG CSS contains an invalid declaration");
+        const property = item.slice(0, separator).trim().toLowerCase();
+        const value = item.slice(separator + 1).trim();
+        if (!cssProperties.has(property)) throw new Error(`Unsupported SVG CSS property ${property}`);
+        if (!value || /!\s*important/i.test(value))
+          throw new Error("SVG CSS requires non-important declaration values");
+        declarations[property] = value;
+      }
+      for (const rawSelector of match[1]!.split(",")) {
+        const value = rawSelector.trim();
+        const parsed = value.match(/^([A-Za-z][\w:-]*)?((?:[.#][\w-]+)*)$/);
+        if (!parsed || !value) throw new Error(`Unsupported SVG CSS selector ${value}`);
+        const suffixes = [...parsed[2]!.matchAll(/([.#])([\w-]+)/g)];
+        const ids = suffixes.filter((item) => item[1] === "#").map((item) => item[2]!);
+        if (ids.length > 1) throw new Error(`Unsupported SVG CSS selector ${value}`);
+        const classes = suffixes.filter((item) => item[1] === ".").map((item) => item[2]!);
+        const tag = parsed[1]?.toLowerCase();
+        rules.push({ selector: { ...(tag ? { tag } : {}), ...(ids[0] ? { id: ids[0] } : {}),
+          classes, specificity: (ids[0] ? 100 : 0) + classes.length * 10 + (tag ? 1 : 0) },
+        declarations });
+      }
+    }
+  }
+  return rules;
+}
+
+function styledAttributes(attributeSource: string, tag: string,
+  rules: readonly CssRule[]): Readonly<Record<string, string>> {
+  const attributes = svgAttributes(attributeSource);
+  const result: Record<string, string> = { ...attributes };
+  const weights = new Map<string, number>();
+  const classes = new Set((attributes.class ?? "").trim().split(/\s+/).filter(Boolean));
+  for (const rule of rules) {
+    const selector = rule.selector;
+    if (selector.tag && selector.tag !== tag.toLowerCase() ||
+        selector.id && selector.id !== attributes.id ||
+        selector.classes.some((name) => !classes.has(name))) continue;
+    for (const [property, value] of Object.entries(rule.declarations)) {
+      if (selector.specificity < (weights.get(property) ?? 0)) continue;
+      result[property] = value;
+      weights.set(property, selector.specificity);
+    }
+  }
+  return withInlineStyle(result);
+}
+
 function parseViewBox(attributes: Readonly<Record<string, string>>): Rect {
   const values = attributes.viewBox?.trim().split(/[\s,]+/).map(Number);
   if (values?.length === 4 && values.every(Number.isFinite) && values[2]! > 0 && values[3]! > 0)
@@ -317,10 +401,10 @@ function parseViewBox(attributes: Readonly<Record<string, string>>): Rect {
   throw new Error("SVG requires a positive viewBox or numeric width and height");
 }
 
-function parseClipPaths(source: string): ReadonlyMap<string, ClipDefinition> {
+function parseClipPaths(source: string, cssRules: readonly CssRule[]): ReadonlyMap<string, ClipDefinition> {
   const definitions = new Map<string, ClipDefinition>();
   for (const match of source.matchAll(/<clipPath\b([^>]*)>([\s\S]*?)<\/clipPath\s*>/gi)) {
-    const attributes = withInlineStyle(svgAttributes(match[1]!));
+    const attributes = styledAttributes(match[1]!, "clippath", cssRules);
     const id = attributes.id?.trim();
     if (!id) continue;
     if (definitions.has(id)) throw new Error(`SVG contains duplicate clip path #${id}`);
@@ -335,7 +419,7 @@ function parseClipPaths(source: string): ReadonlyMap<string, ClipDefinition> {
       definitions.set(id, { error: `SVG clip path #${id} requires exactly one rect` });
       continue;
     }
-    const rectAttributes = withInlineStyle(svgAttributes(rects[0]![1]!));
+    const rectAttributes = styledAttributes(rects[0]![1]!, "rect", cssRules);
     const values = [Number(rectAttributes.x ?? 0), Number(rectAttributes.y ?? 0),
       Number(rectAttributes.width), Number(rectAttributes.height)];
     if (!values.every(Number.isFinite) || values[2]! <= 0 || values[3]! <= 0) {
@@ -386,6 +470,10 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     ? parent.strokeGradientId : strokeGradientId;
   const strokeWidth = numberAttribute(attributes["stroke-width"], parent.strokeWidth);
   const opacity = clamp01(parent.opacity * numberAttribute(attributes.opacity, 1));
+  const displayed = parent.displayed && attributes.display?.trim().toLowerCase() !== "none";
+  const visibilityValue = attributes.visibility?.trim().toLowerCase();
+  const visible = visibilityValue === undefined ? parent.visible
+    : visibilityValue !== "hidden" && visibilityValue !== "collapse";
   const fillOpacity = clamp01(numberAttribute(attributes["fill-opacity"], parent.fillOpacity));
   const strokeOpacity = clamp01(numberAttribute(attributes["stroke-opacity"], parent.strokeOpacity));
   const fillRule = attributes["fill-rule"] === "evenodd" ? "evenodd" :
@@ -430,7 +518,7 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   return { ...(fill ? { fill } : {}), ...(fillGradientId ? { fillGradientId } : {}),
     ...(stroke ? { stroke } : {}),
     ...(inheritedStrokeGradientId ? { strokeGradientId: inheritedStrokeGradientId } : {}),
-    strokeWidth, opacity, fillOpacity, strokeOpacity,
+    strokeWidth, opacity, displayed, visible, fillOpacity, strokeOpacity,
     fillRule, lineCap, lineJoin, currentColor,
     ...(miterLimit !== undefined ? { miterLimit } : {}),
     ...(inheritedDash ? { dash: inheritedDash } : {}),
@@ -458,14 +546,15 @@ function scaleDash(dash: DashStyle, scale: number): DashStyle {
     : { length: dash.length * scale, gap: dash.gap * scale, ...phase };
 }
 
-function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<string, GradientDefinition> {
+function parseLinearGradients(source: string, currentColor: Color,
+  cssRules: readonly CssRule[]): ReadonlyMap<string, GradientDefinition> {
   const raw = new Map<string, RawGradientDefinition>();
   for (const match of source.matchAll(/<linearGradient\b([^>]*?)(?:\/\s*>|>([\s\S]*?)<\/linearGradient\s*>)/gi)) {
-    const attributes = withInlineStyle(svgAttributes(match[1]!));
+    const attributes = styledAttributes(match[1]!, "lineargradient", cssRules);
     const id = attributes.id?.trim();
     if (!id) continue;
     const stops = [...(match[2] ?? "").matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
-      const values = withInlineStyle(svgAttributes(stop[1]!));
+      const values = styledAttributes(stop[1]!, "stop", cssRules);
       const color = parseColor(values["stop-color"] ?? "black", currentColor)!;
       return { offset: unitInterval(values.offset ?? "0"),
         color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
@@ -506,14 +595,15 @@ function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<
   return definitions;
 }
 
-function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<string, RadialGradientDefinition> {
+function parseRadialGradients(source: string, currentColor: Color,
+  cssRules: readonly CssRule[]): ReadonlyMap<string, RadialGradientDefinition> {
   const raw = new Map<string, RawRadialGradientDefinition>();
   for (const match of source.matchAll(/<radialGradient\b([^>]*?)(?:\/\s*>|>([\s\S]*?)<\/radialGradient\s*>)/gi)) {
-    const attributes = withInlineStyle(svgAttributes(match[1]!));
+    const attributes = styledAttributes(match[1]!, "radialgradient", cssRules);
     const id = attributes.id?.trim();
     if (!id) continue;
     const stops = [...(match[2] ?? "").matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
-      const values = withInlineStyle(svgAttributes(stop[1]!));
+      const values = styledAttributes(stop[1]!, "stop", cssRules);
       const color = parseColor(values["stop-color"] ?? "black", currentColor)!;
       return { offset: unitInterval(values.offset ?? "0"),
         color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
