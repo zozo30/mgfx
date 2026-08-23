@@ -92,6 +92,7 @@ export const ExtendedServerCapability = {
   PathGradientSpreadModes: 1n << 42n,
   RadialPathGradients: 1n << 43n,
   MultiStopRadialPathGradients: 1n << 44n,
+  RadialPathGradientSpreadModes: 1n << 45n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -253,6 +254,7 @@ export interface PathPaint {
     readonly axisY: { readonly x: number; readonly y: number };
     readonly innerColor: Color; readonly outerColor: Color;
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+    readonly spread?: "pad" | "repeat" | "reflect";
   };
   readonly stroke?: Color;
   readonly strokeGradient?: PathGradientPaint;
@@ -765,7 +767,12 @@ export class FrameEncoder {
     const extended = paint.strokeGradient !== undefined;
     const radialGradient = paint.fillRadialGradient !== undefined;
     const radialStops = paint.fillRadialGradient?.stops ?? [];
-    const multiRadialGradient = radialStops.length > 0;
+    const multiRadialGradient = radialStops.length > 0 ||
+      (paint.fillRadialGradient?.spread !== undefined && paint.fillRadialGradient.spread !== "pad");
+    const encodedRadialStops = radialStops.length > 0 ? radialStops : paint.fillRadialGradient ? [
+      { offset: 0, color: paint.fillRadialGradient.innerColor },
+      { offset: 1, color: paint.fillRadialGradient.outerColor },
+    ] : [];
     const styled = paint.miterLimit !== undefined;
     const fillStops = paint.fillGradient?.stops ?? [];
     const strokeStops = paint.strokeGradient?.stops ?? [];
@@ -775,7 +782,7 @@ export class FrameEncoder {
         (index === 0 || stop.offset >= stops[index - 1]!.offset) &&
         [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha].every(Number.isFinite)));
     if (!validateStops(fillStops) || !validateStops(strokeStops) ||
-        (multiRadialGradient && !validateStops(radialStops)))
+        (multiRadialGradient && !validateStops(encodedRadialStops)))
       throw new RangeError("Path gradients require 2 through 8 ordered finite stops");
     const multiGradient = fillStops.length > 2 || strokeStops.length > 2 ||
       (paint.fillGradient?.spread !== undefined && paint.fillGradient.spread !== "pad") ||
@@ -791,7 +798,7 @@ export class FrameEncoder {
       throw new RangeError("Path dash arrays require 2 through 32 positive values in pairs");
     const multiDash = paint.dash === undefined ? [] : "values" in paint.dash
       ? paint.dash.values : [paint.dash.length, paint.dash.gap];
-    const payload = Buffer.alloc(multiRadialGradient ? 160 + radialStops.length * 20 :
+    const payload = Buffer.alloc(multiRadialGradient ? 160 + encodedRadialStops.length * 20 :
       radialGradient ? 184 : multiGradient ? 192 + multiDash.length * 4 +
       (fillStops.length + strokeStops.length) * 20 : dashArray ? 192 + paint.dash.values.length * 4 :
       styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
@@ -836,8 +843,9 @@ export class FrameEncoder {
       const determinant = radial.axisX.x * radial.axisY.y - radial.axisX.y * radial.axisY.x;
       if (Math.abs(determinant) < 0.000001) throw new RangeError("Radial path axes must be invertible");
       if (multiRadialGradient) {
-        payload.writeUInt8(radialStops.length, 152);
-        radialStops.forEach((stop, index) => {
+        payload.writeUInt8(encodedRadialStops.length, 152);
+        payload.writeUInt8(radial.spread === "repeat" ? 1 : radial.spread === "reflect" ? 2 : 0, 153);
+        encodedRadialStops.forEach((stop, index) => {
           const offset = 160 + index * 20;
           payload.writeFloatLE(stop.offset, offset);
           [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha]

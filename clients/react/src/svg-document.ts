@@ -37,6 +37,7 @@ export interface RadialGradientPaint {
   readonly innerColor: Color;
   readonly outerColor: Color;
   readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+  readonly spread?: "pad" | "repeat" | "reflect";
 }
 
 export interface SvgVectorDocument {
@@ -84,6 +85,7 @@ interface RadialGradientDefinition {
   readonly cx: string; readonly cy: string; readonly radius: string;
   readonly transform: Matrix;
   readonly stops: readonly { readonly offset: number; readonly color: Color }[];
+  readonly spread: "pad" | "repeat" | "reflect";
 }
 
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -287,7 +289,7 @@ function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<
   for (const match of source.matchAll(/<radialGradient\b([^>]*)>([\s\S]*?)<\/radialGradient\s*>/gi)) {
     const attributes = withInlineStyle(svgAttributes(match[1]!));
     const id = attributes.id?.trim();
-    if (!id || attributes.spreadMethod && attributes.spreadMethod !== "pad") continue;
+    if (!id) continue;
     const cx = attributes.cx ?? "50%", cy = attributes.cy ?? "50%";
     if ((attributes.fx !== undefined && attributes.fx !== cx) ||
         (attributes.fy !== undefined && attributes.fy !== cy)) continue;
@@ -301,7 +303,8 @@ function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<
     definitions.set(id, {
       units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
       cx, cy, radius: attributes.r ?? "50%", transform: parseTransform(attributes.gradientTransform),
-      stops,
+      stops, spread: attributes.spreadMethod === "repeat" ? "repeat" :
+        attributes.spreadMethod === "reflect" ? "reflect" : "pad",
     });
   }
   return definitions;
@@ -338,7 +341,7 @@ function resolveRadialGradient(definitions: ReadonlyMap<string, RadialGradientDe
   return { center, axisX: { x: edgeX.x - center.x, y: edgeX.y - center.y },
     axisY: { x: edgeY.x - center.x, y: edgeY.y - center.y },
     innerColor: stops[0]!.color, outerColor: stops[stops.length - 1]!.color,
-    ...(needsExplicitStops ? { stops } : {}) };
+    ...(needsExplicitStops ? { stops } : {}), spread: definition.spread };
 }
 
 function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,

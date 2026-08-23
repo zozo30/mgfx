@@ -52,7 +52,8 @@ inherits fill/stroke presentation attributes through nested groups; applies affi
 group transforms in source coordinates; resolves two- through eight-stop `<linearGradient>` definitions,
 including local `href`/`xlink:href` inheritance and `pad`, `repeat`, or `reflect`
 spread, in user space or object-bounding-box space; resolves centered two- through
-eight-stop `<radialGradient>` fills with `pad` spread into native elliptical path paint;
+eight-stop `<radialGradient>` fills with `pad`, `repeat`, or `reflect` spread into
+native elliptical path paint;
 lowers SVG dash arrays of up to 32 values;
 and uploads every canonical layer once.
 Frames then contain only `DrawPath` references at the component's current layout

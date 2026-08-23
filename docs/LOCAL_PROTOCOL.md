@@ -114,6 +114,7 @@ Multi-stop path gradients are advertised by `1 << 41`.
 Path-gradient repeat and reflect spread modes are advertised by `1 << 42`.
 Two-stop radial path gradients are advertised by `1 << 43`.
 Multi-stop radial path gradients are advertised by `1 << 44`.
+Radial path repeat and reflect spread modes are advertised by `1 << 45`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -275,6 +276,7 @@ two-stop, pad-spread radial fill; capability bit 43 is required.
 
 MGFX opcode `33` (`DrawMultiRadialPath`) starts with the 128-byte `DrawPath`
 base, followed by six `f32` values for center and radius vectors, `u8 stopCount`,
-seven reserved zero bytes, then each stop as `f32 offset` plus RGBA. Payload size
+`u8 spread`, six reserved zero bytes, then each stop as `f32 offset` plus RGBA.
+Spread is pad (`0`), repeat (`1`), or reflect (`2`). Payload size
 is `160 + stopCount * 20`, with 2 through 8 ordered stops in `[0,1]`. Capability
-bit 44 is required. The first implementation uses SVG `pad` spread.
+bit 44 is required for the stop table and bit 45 for repeat or reflect.

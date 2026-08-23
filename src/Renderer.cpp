@@ -1318,7 +1318,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     struct RadialPathUniforms {
                         std::array<float, 2> center, axisX, axisY;
                         std::uint32_t stopCount = 0;
-                        std::uint32_t reserved = 0;
+                        std::uint32_t spread = 0;
                         std::array<std::array<float, 4>, 2> offsets{};
                         std::array<std::array<float, 4>, 8> colors{};
                     };
@@ -1327,6 +1327,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                         {radial->axisYX, radial->axisYY}};
                     uniforms.stopCount = static_cast<std::uint32_t>(
                         radial->stops.empty() ? 2U : radial->stops.size());
+                    uniforms.spread = static_cast<std::uint32_t>(radial->spread);
                     const auto setStop = [&](std::size_t index, float offset, gfx::Color stopColor) {
                         uniforms.offsets[index / 4U][index % 4U] = offset;
                         uniforms.colors[index] = {stopColor.red, stopColor.green, stopColor.blue,

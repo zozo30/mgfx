@@ -38,7 +38,7 @@ struct RadialPathUniforms {
     packed_float2 axisX;
     packed_float2 axisY;
     uint stopCount;
-    uint reserved;
+    uint spread;
     packed_float4 offsets[2];
     packed_float4 colors[8];
 };
@@ -58,7 +58,12 @@ fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]],
         ? float2((delta.x * gradient.axisY.y - delta.y * gradient.axisY.x) / determinant,
                  (gradient.axisX.x * delta.y - gradient.axisX.y * delta.x) / determinant)
         : float2(1.0);
-    const float amount = clamp(length(radial), 0.0, 1.0);
+    const float rawAmount = length(radial);
+    const float repeated = rawAmount - floor(rawAmount);
+    const float reflectedCycle = fmod(rawAmount, 2.0);
+    const float amount = gradient.spread == 1 ? repeated : gradient.spread == 2 ?
+        (reflectedCycle <= 1.0 ? reflectedCycle : 2.0 - reflectedCycle) :
+        clamp(rawAmount, 0.0, 1.0);
     float4 color = gradient.colors[0];
     if (amount >= gradient.offsets[(gradient.stopCount - 1) / 4][(gradient.stopCount - 1) % 4]) {
         color = gradient.colors[gradient.stopCount - 1];

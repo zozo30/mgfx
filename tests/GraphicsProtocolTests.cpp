@@ -99,7 +99,8 @@ int main() {
     radialPath.destination = {-0.4F, 0.4F, 0.4F, -0.4F};
     radialPath.viewBox = {0.0F, 0.0F, 24.0F, 24.0F};
     radialPath.radialGradient = {12.0F, 12.0F, 10.0F, 0.0F, 0.0F, 8.0F,
-        {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.8F, 0.5F, 1.0F}, {}};
+        {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.8F, 0.5F, 1.0F}, {},
+        gfx::PathGradient::Spread::pad};
     encoder.drawPath(radialPath);
     gfx::PathCommand multiRadialPath = radialPath;
     multiRadialPath.radialGradient.stops = {
@@ -107,6 +108,7 @@ int main() {
         {0.4F, {0.2F, 0.9F, 0.7F, 1.0F}},
         {1.0F, {0.1F, 0.8F, 0.5F, 1.0F}},
     };
+    multiRadialPath.radialGradient.spread = gfx::PathGradient::Spread::reflect;
     encoder.drawPath(multiRadialPath);
     encoder.drawText({gfx::FontFamily::systemRounded, gfx::FontWeight::semibold,
                       gfx::FontStyle::italic,
@@ -281,6 +283,7 @@ int main() {
     gfx::PathCommand multiRadialPathDecoded{};
     if (!gfx::decodePath(command, multiRadialPathDecoded) ||
         multiRadialPathDecoded.radialGradient.stops.size() != 3U ||
+        multiRadialPathDecoded.radialGradient.spread != gfx::PathGradient::Spread::reflect ||
         !nearlyEqual(multiRadialPathDecoded.radialGradient.stops[1].offset, 0.4F) ||
         !nearlyEqual(multiRadialPathDecoded.radialGradient.stops[1].color.green, 0.9F) ||
         !decoder.next(command)) {

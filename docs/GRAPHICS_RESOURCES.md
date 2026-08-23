@@ -56,10 +56,10 @@ becomes a stable path resource with its own compact paint command. Linear gradie
 resolve from `<defs>` in either SVG user space or object-bounding-box
 space, including stop opacity, gradient transforms, and fragment-only `href` or
 `xlink:href` inheritance, then use native `DrawPath`
-gradient paint. Centered two- through eight-stop radial fills with `pad` spread
-resolve into a center and two radius vectors, preserving elliptical and transformed
-fields without client tessellation. Offset focal points and repeating radial spread
-deliberately remain on the raster fallback. `stroke-dasharray`
+gradient paint. Centered two- through eight-stop radial fills with `pad`, `repeat`,
+or `reflect` spread resolve into a center and two radius vectors, preserving elliptical
+and transformed fields without client tessellation. Offset focal points deliberately
+remain on the raster fallback. `stroke-dasharray`
 sequences of up to 32 values plus
 `stroke-dashoffset` lower to native dashed path paint. Odd sequences are repeated
 to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
@@ -218,6 +218,8 @@ remain independent, and support is advertised by `radialPathGradients`.
 `DrawMultiRadialPath` extends the same fragment path with two through eight
 ordered stops. The stop table changes paint only and is advertised independently
 by `multiStopRadialPathGradients`.
+Repeat and reflect wrap radial distance in the same fragment shader before stop
+selection and are advertised by `radialPathGradientSpreadModes`.
 
 ## Linear gradients
 

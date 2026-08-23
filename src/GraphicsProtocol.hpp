@@ -277,6 +277,7 @@ struct PathCommand {
         float axisXX, axisXY, axisYX, axisYY;
         Color innerColor, outerColor;
         std::vector<PathGradient::Stop> stops;
+        PathGradient::Spread spread = PathGradient::Spread::pad;
     };
     bool fillRadialGradient = false;
     RadialGradient radialGradient{};

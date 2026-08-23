@@ -126,10 +126,10 @@ Multi-stop gradients stay native: the protocol carries ordered colors and the
 graphics server splits cached triangles at stop boundaries for exact interpolation.
 SVG `spreadMethod="repeat"` and `"reflect"` use the same server path, including
 hard cycle seams without client-generated triangles.
-Centered 2–8 stop SVG radial fills with `pad` spread also stay native. React sends
-the center, transformed elliptical basis, and ordered stop table; Metal evaluates
-radial distance and interpolates the matching interval per fragment. Offset focal
-points and repeating radial spread use the existing raster fallback.
+Centered 2–8 stop SVG radial fills with `pad`, `repeat`, or `reflect` spread also
+stay native. React sends the center, transformed elliptical basis, ordered stop
+table, and spread mode; Metal wraps radial distance and interpolates the matching
+interval per fragment. Offset focal points use the existing raster fallback.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

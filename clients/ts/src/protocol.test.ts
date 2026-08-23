@@ -42,7 +42,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.MultiStopPathGradients |
     ExtendedServerCapability.PathGradientSpreadModes |
     ExtendedServerCapability.RadialPathGradients |
-    ExtendedServerCapability.MultiStopRadialPathGradients;
+    ExtendedServerCapability.MultiStopRadialPathGradients |
+    ExtendedServerCapability.RadialPathGradientSpreadModes;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -481,6 +482,7 @@ test("multi-stop radial path paint remains one bounded native command", () => {
       center: { x: 20, y: 10 }, axisX: { x: 20, y: 0 }, axisY: { x: 0, y: 10 },
       innerColor: { red: 1, green: 1, blue: 1, alpha: 1 },
       outerColor: { red: 0.1, green: 0.8, blue: 0.5, alpha: 1 },
+      spread: "reflect",
       stops: [
         { offset: 0, color: { red: 1, green: 1, blue: 1, alpha: 1 } },
         { offset: 0.4, color: { red: 0.2, green: 0.9, blue: 0.7, alpha: 1 } },
@@ -492,6 +494,7 @@ test("multi-stop radial path paint remains one bounded native command", () => {
   assert.equal(bytes.readUInt16LE(16), 33);
   assert.equal(bytes.readUInt32LE(20), 220);
   assert.equal(bytes.readUInt8(24 + 152), 3);
+  assert.equal(bytes.readUInt8(24 + 153), 2);
   assert.ok(Math.abs(bytes.readFloatLE(24 + 160 + 20) - 0.4) < 0.00001);
 });
 
