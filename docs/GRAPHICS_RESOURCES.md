@@ -58,9 +58,8 @@ space, including stop opacity, gradient transforms, and fragment-only `href` or
 `xlink:href` inheritance, then use native `DrawPath`
 gradient paint. Centered two- through eight-stop radial fills with `pad`, `repeat`,
 or `reflect` spread resolve into a center and two radius vectors, preserving elliptical
-and transformed fields without client tessellation. Offset focal points deliberately
-use the native focal-ray solver when focal radius is zero; nonzero `fr` deliberately
-remains on the raster fallback. `stroke-dasharray`
+and transformed fields without client tessellation. Offset focal points and nonzero
+focal radii use the native two-circle solver. `stroke-dasharray`
 sequences of up to 32 values plus
 `stroke-dashoffset` lower to native dashed path paint. Odd sequences are repeated
 to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
@@ -225,6 +224,10 @@ selection and are advertised by `radialPathGradientSpreadModes`.
 into the elliptical basis and solves the ray intersection with the outer unit circle
 per fragment, preserving multi-stop and spread behavior without shifted-circle
 approximations. Support is advertised by `focalRadialPathGradients`.
+`DrawTwoCircleRadialPath` additionally carries focal radius divided by outer
+radius. Metal solves the quadratic formed by the interpolated center and radius;
+pixels inside the focal circle receive the first stop. Support is advertised by
+`twoCircleRadialPathGradients`.
 
 ## Linear gradients
 

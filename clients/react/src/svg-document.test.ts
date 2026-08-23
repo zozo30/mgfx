@@ -96,7 +96,7 @@ test("SVG centered radial gradients lower to source-space basis paint", () => {
 
 test("SVG multi-stop radial gradients retain ordered native stops", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 40 40"><defs>
-    <radialGradient id="orb" fx="35%" fy="40%" spreadMethod="reflect"><stop offset="0" stop-color="#ffffff"/>
+    <radialGradient id="orb" fx="35%" fy="40%" fr="5%" spreadMethod="reflect"><stop offset="0" stop-color="#ffffff"/>
       <stop offset="45%" stop-color="#40e0b0"/><stop offset="1" stop-color="#108050"/>
     </radialGradient></defs><circle cx="20" cy="20" r="18" fill="url(#orb)"/></svg>`);
   const radial = document.layers[0]?.fillRadialGradient;
@@ -104,6 +104,7 @@ test("SVG multi-stop radial gradients retain ordered native stops", () => {
   assert.equal(radial?.spread, "reflect");
   assert.ok(Math.abs((radial?.focal?.x ?? 0) - 14.6) < 0.001);
   assert.ok(Math.abs((radial?.focal?.y ?? 0) - 16.4) < 0.001);
+  assert.ok(Math.abs((radial?.focalRadius ?? 0) - 0.1) < 0.0001);
   assert.equal(radial?.stops?.[1]?.offset, 0.45);
   assert.ok((radial?.stops?.[1]?.color.green ?? 0) > 0.85);
 });

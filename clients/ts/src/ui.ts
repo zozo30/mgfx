@@ -255,6 +255,7 @@ export interface PathData {
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect";
     readonly focal?: Point;
+    readonly focalRadius?: number;
   };
   readonly stroke?: Color;
   readonly strokeGradient?: {

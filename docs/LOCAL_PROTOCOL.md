@@ -116,6 +116,7 @@ Two-stop radial path gradients are advertised by `1 << 43`.
 Multi-stop radial path gradients are advertised by `1 << 44`.
 Radial path repeat and reflect spread modes are advertised by `1 << 45`.
 Offset focal points for radial path gradients are advertised by `1 << 46`.
+Two-circle radial path gradients with nonzero focal radius are advertised by `1 << 47`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -287,3 +288,9 @@ source-space `f32` focal coordinates before its stop header. The header therefor
 starts at byte 160, stops at byte 168, and payload size is
 `168 + stopCount * 20`. The focal point must lie strictly inside the ellipse;
 capability bit 46 is required. This represents SVG `fx`/`fy` with zero `fr`.
+
+MGFX opcode `35` (`DrawTwoCircleRadialPath`) extends opcode 34 with normalized
+`f32 focalRadius` and one reserved zero `f32`. Its stop header begins at byte 168,
+stops at byte 176, and payload size is `176 + stopCount * 20`. Focal radius must
+be in `(0,1)`, and the complete focal circle must lie inside the outer ellipse.
+Capability bit 47 is required.

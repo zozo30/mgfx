@@ -100,7 +100,7 @@ int main() {
     radialPath.viewBox = {0.0F, 0.0F, 24.0F, 24.0F};
     radialPath.radialGradient = {12.0F, 12.0F, 10.0F, 0.0F, 0.0F, 8.0F,
         {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.8F, 0.5F, 1.0F}, {},
-        gfx::PathGradient::Spread::pad, false, 0.0F, 0.0F};
+        gfx::PathGradient::Spread::pad, false, 0.0F, 0.0F, 0.0F};
     encoder.drawPath(radialPath);
     gfx::PathCommand multiRadialPath = radialPath;
     multiRadialPath.radialGradient.stops = {
@@ -115,6 +115,9 @@ int main() {
     focalRadialPath.radialGradient.focalX = 9.0F;
     focalRadialPath.radialGradient.focalY = 10.0F;
     encoder.drawPath(focalRadialPath);
+    gfx::PathCommand twoCircleRadialPath = focalRadialPath;
+    twoCircleRadialPath.radialGradient.focalRadius = 0.2F;
+    encoder.drawPath(twoCircleRadialPath);
     encoder.drawText({gfx::FontFamily::systemRounded, gfx::FontWeight::semibold,
                       gfx::FontStyle::italic,
                       0.08F,
@@ -301,6 +304,14 @@ int main() {
         focalRadialPathDecoded.radialGradient.stops.size() != 2U ||
         !decoder.next(command)) {
         return fail("Focal radial path decoding failed");
+    }
+    gfx::PathCommand twoCircleRadialPathDecoded{};
+    if (!gfx::decodePath(command, twoCircleRadialPathDecoded) ||
+        !twoCircleRadialPathDecoded.radialGradient.hasFocalPoint ||
+        !nearlyEqual(twoCircleRadialPathDecoded.radialGradient.focalRadius, 0.2F) ||
+        twoCircleRadialPathDecoded.radialGradient.stops.size() != 2U ||
+        !decoder.next(command)) {
+        return fail("Two-circle radial path decoding failed");
     }
     gfx::TextCommand text{};
     if (!gfx::decodeText(command, text) || text.family != gfx::FontFamily::systemRounded ||

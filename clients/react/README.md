@@ -129,8 +129,9 @@ hard cycle seams without client-generated triangles.
 Centered 2–8 stop SVG radial fills with `pad`, `repeat`, or `reflect` spread also
 stay native. React sends the center, transformed elliptical basis, ordered stop
 table, and spread mode; Metal wraps radial distance and interpolates the matching
-interval per fragment. Offset `fx`/`fy` focal points with zero `fr` use Metal's
-native focal-ray solver; nonzero focal radii use the existing raster fallback.
+interval per fragment. Offset `fx`/`fy` and nonzero `fr` use Metal's native
+two-circle solver; the client normalizes focal radius against outer radius and
+sends no gradient geometry.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

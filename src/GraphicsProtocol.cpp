@@ -344,11 +344,15 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         path.gradient.spread != PathGradient::Spread::pad ||
         path.strokeGradientPaint.spread != PathGradient::Spread::pad;
     const bool radialGradient = path.fillRadialGradient;
-    const bool focalRadialGradient = radialGradient && path.radialGradient.hasFocalPoint;
+    const bool twoCircleRadialGradient = radialGradient && path.radialGradient.hasFocalPoint &&
+        path.radialGradient.focalRadius > 0.0F;
+    const bool focalRadialGradient = radialGradient && path.radialGradient.hasFocalPoint &&
+        !twoCircleRadialGradient;
     const bool multiRadialGradient = radialGradient && !focalRadialGradient &&
         (!path.radialGradient.stops.empty() ||
          path.radialGradient.spread != PathGradient::Spread::pad);
-    const std::size_t radialStopCount = (multiRadialGradient || focalRadialGradient)
+    const std::size_t radialStopCount =
+        (multiRadialGradient || focalRadialGradient || twoCircleRadialGradient)
         ? (path.radialGradient.stops.empty() ? 2U : path.radialGradient.stops.size()) : 0U;
     const std::size_t multiDashCount = dashArray ? path.dashPattern.size() : dashed ? 2U : 0U;
     const std::uint32_t multiSize = static_cast<std::uint32_t>(192 + multiDashCount * 4 +
@@ -357,9 +361,11 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         160 + radialStopCount * 20);
     const std::uint32_t focalRadialSize = static_cast<std::uint32_t>(
         168 + radialStopCount * 20);
-    beginCommand(focalRadialGradient ? Opcode::drawFocalRadialPath : multiRadialGradient ? Opcode::drawMultiRadialPath : radialGradient ? Opcode::drawRadialPath : multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
+    const std::uint32_t twoCircleRadialSize = static_cast<std::uint32_t>(
+        176 + radialStopCount * 20);
+    beginCommand(twoCircleRadialGradient ? Opcode::drawTwoCircleRadialPath : focalRadialGradient ? Opcode::drawFocalRadialPath : multiRadialGradient ? Opcode::drawMultiRadialPath : radialGradient ? Opcode::drawRadialPath : multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
                          : dashed ? Opcode::drawDashedPath : Opcode::drawPath,
-                 focalRadialGradient ? focalRadialSize : multiRadialGradient ? multiRadialSize : radialGradient ? 184U : multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
+                 twoCircleRadialGradient ? twoCircleRadialSize : focalRadialGradient ? focalRadialSize : multiRadialGradient ? multiRadialSize : radialGradient ? 184U : multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
                  styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     appendU32(bytes_, path.pathId);
     bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
@@ -390,14 +396,18 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                         path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
         appendFloat(bytes_, value);
     }
-    if (multiRadialGradient || focalRadialGradient) {
+    if (multiRadialGradient || focalRadialGradient || twoCircleRadialGradient) {
         for (float value : {path.radialGradient.centerX, path.radialGradient.centerY,
                             path.radialGradient.axisXX, path.radialGradient.axisXY,
                             path.radialGradient.axisYX, path.radialGradient.axisYY})
             appendFloat(bytes_, value);
-        if (focalRadialGradient) {
+        if (focalRadialGradient || twoCircleRadialGradient) {
             appendFloat(bytes_, path.radialGradient.focalX);
             appendFloat(bytes_, path.radialGradient.focalY);
+        }
+        if (twoCircleRadialGradient) {
+            appendFloat(bytes_, path.radialGradient.focalRadius);
+            appendFloat(bytes_, 0.0F);
         }
         bytes_.push_back(static_cast<std::uint8_t>(radialStopCount));
         bytes_.push_back(static_cast<std::uint8_t>(path.radialGradient.spread));
@@ -887,7 +897,9 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const bool radialGradient = command.opcode == Opcode::drawRadialPath;
     const bool multiRadialGradient = command.opcode == Opcode::drawMultiRadialPath;
     const bool focalRadialGradient = command.opcode == Opcode::drawFocalRadialPath;
-    const bool anyRadialGradient = radialGradient || multiRadialGradient || focalRadialGradient;
+    const bool twoCircleRadialGradient = command.opcode == Opcode::drawTwoCircleRadialPath;
+    const bool anyRadialGradient = radialGradient || multiRadialGradient ||
+        focalRadialGradient || twoCircleRadialGradient;
     const bool extendedDashed = extended && command.payloadSize == 192U;
     const bool validDashArraySize = dashArray && command.payloadSize >= 200U &&
         command.payloadSize <= 320U && readU32(command.payload + 184) >= 2U &&
@@ -913,9 +925,12 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         fillSpread <= 2U && strokeSpread <= 2U && readU16(command.payload + 190) == 0U &&
         command.payloadSize == 192U + multiDashCount * 4U +
             (fillStopCount + strokeStopCount) * 20U;
-    const std::size_t radialHeaderOffset = focalRadialGradient ? 160U : 152U;
-    const std::size_t radialStopsOffset = focalRadialGradient ? 168U : 160U;
-    const std::uint8_t radialStopCount = (multiRadialGradient || focalRadialGradient) &&
+    const std::size_t radialHeaderOffset = twoCircleRadialGradient ? 168U :
+        focalRadialGradient ? 160U : 152U;
+    const std::size_t radialStopsOffset = twoCircleRadialGradient ? 176U :
+        focalRadialGradient ? 168U : 160U;
+    const std::uint8_t radialStopCount =
+        (multiRadialGradient || focalRadialGradient || twoCircleRadialGradient) &&
         command.payloadSize >= radialStopsOffset ? command.payload[radialHeaderOffset] : 0U;
     const bool validMultiRadialSize = multiRadialGradient && radialStopCount >= 2U &&
         radialStopCount <= 8U && command.payloadSize == 160U + radialStopCount * 20U &&
@@ -925,6 +940,10 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         radialStopCount <= 8U && command.payloadSize == 168U + radialStopCount * 20U &&
         command.payload[161] <= 2U && readU16(command.payload + 162) == 0U &&
         readU32(command.payload + 164) == 0U;
+    const bool validTwoCircleRadialSize = twoCircleRadialGradient && radialStopCount >= 2U &&
+        radialStopCount <= 8U && command.payloadSize == 176U + radialStopCount * 20U &&
+        command.payload[169] <= 2U && readU32(command.payload + 164) == 0U &&
+        readU16(command.payload + 170) == 0U && readU32(command.payload + 172) == 0U;
     if ((!dashed && !extended && !styled && !dashArray && !multiGradient &&
          !anyRadialGradient && command.opcode != Opcode::drawPath) ||
         (!dashArray && !multiGradient && !anyRadialGradient &&
@@ -935,6 +954,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         (radialGradient && command.payloadSize != 184U) ||
         (multiRadialGradient && !validMultiRadialSize) ||
         (focalRadialGradient && !validFocalRadialSize) ||
+        (twoCircleRadialGradient && !validTwoCircleRadialSize) ||
         command.payload[4] > (anyRadialGradient ? 31U : 15U) ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::square) ||
@@ -989,10 +1009,16 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         } else {
             path.radialGradient.spread = static_cast<PathGradient::Spread>(
                 command.payload[radialHeaderOffset + 1U]);
-            if (focalRadialGradient) {
+            if (focalRadialGradient || twoCircleRadialGradient) {
                 path.radialGradient.hasFocalPoint = true;
                 path.radialGradient.focalX = readFloat(command.payload + 152);
                 path.radialGradient.focalY = readFloat(command.payload + 156);
+            }
+            if (twoCircleRadialGradient) {
+                path.radialGradient.focalRadius = readFloat(command.payload + 160);
+                if (!std::isfinite(path.radialGradient.focalRadius) ||
+                    path.radialGradient.focalRadius <= 0.0F ||
+                    path.radialGradient.focalRadius >= 1.0F) return false;
             }
             float previous = -1.0F;
             for (std::uint8_t index = 0; index < radialStopCount; ++index) {

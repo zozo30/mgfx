@@ -44,7 +44,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.RadialPathGradients |
     ExtendedServerCapability.MultiStopRadialPathGradients |
     ExtendedServerCapability.RadialPathGradientSpreadModes |
-    ExtendedServerCapability.FocalRadialPathGradients;
+    ExtendedServerCapability.FocalRadialPathGradients |
+    ExtendedServerCapability.TwoCircleRadialPathGradients;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -515,6 +516,23 @@ test("focal radial path paint carries an offset highlight without client geometr
   assert.equal(bytes.readFloatLE(24 + 152), 14);
   assert.equal(bytes.readFloatLE(24 + 156), 7);
   assert.equal(bytes.readUInt8(24 + 160), 2);
+});
+
+test("two-circle radial paint carries a normalized focal radius", () => {
+  const frame = new FrameEncoder();
+  frame.path(9, { left: 0, top: 1, right: 1, bottom: 0 },
+    { x: 0, y: 0, width: 40, height: 20 }, { fillRadialGradient: {
+      center: { x: 20, y: 10 }, axisX: { x: 20, y: 0 }, axisY: { x: 0, y: 10 },
+      focal: { x: 16, y: 8 }, focalRadius: 0.2,
+      innerColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+      outerColor: { red: 0.1, green: 0.8, blue: 0.5, alpha: 1 },
+    } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 35);
+  assert.equal(bytes.readUInt32LE(20), 216);
+  assert.ok(Math.abs(bytes.readFloatLE(24 + 160) - 0.2) < 0.00001);
+  assert.equal(bytes.readUInt8(24 + 168), 2);
 });
 
 test("indexed meshes upload once and frames reference their resource", () => {

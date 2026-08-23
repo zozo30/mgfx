@@ -38,8 +38,10 @@ struct RadialPathUniforms {
     packed_float2 axisX;
     packed_float2 axisY;
     packed_float2 focal;
+    float focalRadius;
     uint stopCount;
     uint spread;
+    uint reserved;
     packed_float4 offsets[2];
     packed_float4 colors[8];
 };
@@ -60,13 +62,17 @@ fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]],
                  (gradient.axisX.x * delta.y - gradient.axisX.y * delta.x) / determinant)
         : float2(1.0);
     const float2 focalDelta = radial - gradient.focal;
-    const float distanceSquared = dot(focalDelta, focalDelta);
-    const float focalProjection = dot(gradient.focal, focalDelta);
-    const float discriminant = max(focalProjection * focalProjection -
-        distanceSquared * (dot(gradient.focal, gradient.focal) - 1.0), 0.0);
-    const float denominator = -focalProjection + sqrt(discriminant);
-    const float rawAmount = distanceSquared <= 0.0000001 ? 0.0 :
-        denominator > 0.000001 ? distanceSquared / denominator : 1.0;
+    const float radiusDelta = 1.0 - gradient.focalRadius;
+    const float a = dot(gradient.focal, gradient.focal) - radiusDelta * radiusDelta;
+    const float b = 2.0 * (dot(focalDelta, gradient.focal) -
+                           gradient.focalRadius * radiusDelta);
+    const float c = dot(focalDelta, focalDelta) -
+                    gradient.focalRadius * gradient.focalRadius;
+    const float discriminant = max(b * b - 4.0 * a * c, 0.0);
+    const float solvedAmount = abs(a) > 0.000001 ?
+        (-b - sqrt(discriminant)) / (2.0 * a) :
+        abs(b) > 0.000001 ? -c / b : 0.0;
+    const float rawAmount = c <= 0.0 ? 0.0 : max(solvedAmount, 0.0);
     const float repeated = rawAmount - floor(rawAmount);
     const float reflectedCycle = fmod(rawAmount, 2.0);
     const float amount = gradient.spread == 1 ? repeated : gradient.spread == 2 ?
