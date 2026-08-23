@@ -174,8 +174,7 @@ function SvgDocumentPreview({ time }: { readonly time: number }) {
         color: rgba(0.82, 0.86, 0.94) }} />
     </Stack>
     <Svg source={vectorDocument} color={rgba(0.30 + pulse * 0.3, 0.78, 1)}
-      style={{ preferredSize: { width: 320, height: 88 }, flexGrow: 1,
-        transform: { scaleX: 0.98 + pulse * 0.02, scaleY: 0.98 + pulse * 0.02 } }} />
+      style={{ preferredSize: { width: 320, height: 88 }, flexGrow: 1 }} />
   </Row>;
 }
 
