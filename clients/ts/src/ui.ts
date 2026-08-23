@@ -43,6 +43,8 @@ export interface TextStyle {
   color?: Color;
   fontFamily?: "pixel" | "system" | "monospace";
   lineHeight?: number;
+  wrap?: boolean;
+  textAlign?: "start" | "center" | "end";
 }
 
 const nativeTextAdvances = new Map<string, number>();
@@ -53,6 +55,59 @@ export function cacheNativeTextAdvance(family: "system" | "monospace", value: st
 }
 export function nativeTextAdvance(family: "system" | "monospace", value: string): number | undefined {
   return nativeTextAdvances.get(nativeTextKey(family, value));
+}
+
+export function nativeTextMetricRuns(value: string, style: TextStyle): readonly string[] {
+  if (style.fontFamily !== "system" && style.fontFamily !== "monospace") return [];
+  if (!style.wrap) return value.split("\n").filter(Boolean);
+  const runs = new Set<string>();
+  let wordCount = 0;
+  for (const paragraph of value.split("\n")) {
+    for (const word of paragraph.match(/\S+/gu) ?? []) { runs.add(word); wordCount += 1; }
+  }
+  if (wordCount > 1) runs.add(" ");
+  return [...runs];
+}
+
+interface LaidOutTextLine { readonly value: string; readonly width: number }
+
+function textRunWidth(value: string, style: TextStyle, fontSize: number): number {
+  if (value.length === 0) return 0;
+  if (style.fontFamily && style.fontFamily !== "pixel") {
+    const exact = nativeTextAdvance(style.fontFamily, value);
+    const average = style.fontFamily === "monospace" ? 0.60 : 0.56;
+    return (exact ?? [...value].length * average) * fontSize;
+  }
+  const cell = fontSize / 7;
+  return value.length * cell * 6 - cell;
+}
+
+function layoutTextLines(value: string, style: TextStyle, maximumWidth: number): LaidOutTextLine[] {
+  const fontSize = style.fontSize ?? 16;
+  if (!style.wrap || maximumWidth <= 0) {
+    return value.split("\n").map((line) => ({ value: line,
+      width: textRunWidth(line, style, fontSize) }));
+  }
+  const result: LaidOutTextLine[] = [];
+  const spaceWidth = textRunWidth(" ", style, fontSize);
+  for (const paragraph of value.split("\n")) {
+    const words = paragraph.match(/\S+/gu) ?? [];
+    if (words.length === 0) { result.push({ value: "", width: 0 }); continue; }
+    let line = "", width = 0;
+    for (const word of words) {
+      const wordWidth = textRunWidth(word, style, fontSize);
+      const candidateWidth = line ? width + spaceWidth + wordWidth : wordWidth;
+      if (line && candidateWidth > maximumWidth) {
+        result.push({ value: line, width });
+        line = word; width = wordWidth;
+      } else {
+        line += line ? ` ${word}` : word;
+        width = candidateWidth;
+      }
+    }
+    result.push({ value: line, width });
+  }
+  return result;
 }
 export interface MeshData {
   readonly positions: readonly Point[];
@@ -288,19 +343,8 @@ class Node {
     let width = 0, height = 0;
     if (this.type === "text" && this.value) {
       const fontSize = this.textStyle.fontSize ?? 16;
-      const lines = this.value.split("\n");
-      if (this.textStyle.fontFamily && this.textStyle.fontFamily !== "pixel") {
-        const averageAdvance = this.textStyle.fontFamily === "monospace" ? 0.60 : 0.56;
-        width = Math.max(0, ...lines.map((line) => {
-          const exactAdvance = nativeTextAdvance(this.textStyle.fontFamily as "system" | "monospace", line);
-          return exactAdvance !== undefined ? exactAdvance * fontSize
-            : [...line].length * fontSize * averageAdvance;
-        }));
-      } else {
-        const cell = fontSize / 7;
-        width = Math.max(0, ...lines.map((line) => line.length === 0 ? 0
-          : line.length * cell * 6 - cell));
-      }
+      const lines = layoutTextLines(this.value, this.textStyle, inner.maxWidth);
+      width = Math.max(0, ...lines.map((line) => line.width));
       const lineHeight = this.textStyle.lineHeight ?? fontSize * 1.2;
       height = fontSize + Math.max(0, lines.length - 1) * lineHeight;
     }
@@ -733,22 +777,25 @@ const glyphs: Readonly<Record<string, readonly number[]>> = {
 const fallback = [31,17,1,2,4,0,4] as const;
 function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: TextStyle, viewport: Size): void {
   const fontSize = style.fontSize ?? 16, color = style.color ?? { red:1,green:1,blue:1,alpha:1 }, cell = fontSize / 7;
-  const lines = value.split("\n"), lineHeight = style.lineHeight ?? fontSize * 1.2;
+  const lines = layoutTextLines(value, style, bounds.width);
+  const lineHeight = style.lineHeight ?? fontSize * 1.2;
+  const lineX = (width: number) => bounds.x + (style.textAlign === "center"
+    ? (bounds.width - width) / 2 : style.textAlign === "end" ? bounds.width - width : 0);
   if (style.fontFamily && style.fontFamily !== "pixel") {
     const family = style.fontFamily;
     lines.forEach((line, index) => {
-      if (line.length === 0) return;
-      encoder.systemText(line, bounds.x / viewport.width * 2 - 1,
+      if (line.value.length === 0) return;
+      encoder.systemText(line.value, lineX(line.width) / viewport.width * 2 - 1,
         1 - (bounds.y + index * lineHeight) / viewport.height * 2,
         fontSize / viewport.height * 2, color, family);
     });
     return;
   }
   const vertices: Vertex[] = [];
-  lines.forEach((line, lineIndex) => [...line.toUpperCase()]
+  lines.forEach((line, lineIndex) => [...line.value.toUpperCase()]
     .forEach((character, characterIndex) => (glyphs[character] ?? fallback).forEach((bits, row) => {
       for (let column = 0; column < 5; column++) if (bits & (1 << (4 - column))) vertices.push(...rectangleVertices({
-        x: bounds.x + characterIndex * cell * 6 + column * cell,
+        x: lineX(line.width) + characterIndex * cell * 6 + column * cell,
         y: bounds.y + lineIndex * lineHeight + row * cell, width: cell, height: cell,
       }, color, viewport));
     })));

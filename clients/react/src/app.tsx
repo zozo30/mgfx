@@ -279,9 +279,11 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
           <IconGallery icons={vectorIcons} time={animationTime} />
           <Row style={{ preferredSize: { height: 92 }, padding: all(16), cornerRadius: 12,
             background: rgba(0.045, 0.065, 0.10), crossAxisAlignment: "center" }}>
-            <Text value={"CoreText shaping: Árvíztűrő — Ω → MGFX\n" +
-              "Two measured lines, two compact DrawText commands"}
-              style={{ fontSize: 21, lineHeight: 27, fontFamily: "system",
+            <Text value={"CoreText shaping: Árvíztűrő — Ω → MGFX. Exact native " +
+              "metrics wrap this sentence in the language-neutral layout engine before compact " +
+              "DrawText commands reach Metal."}
+              style={{ fontSize: 21, lineHeight: 27, fontFamily: "system", wrap: true,
+                textAlign: "center",
                 color: rgba(0.62, 0.88, 1) }} />
           </Row>
           <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,

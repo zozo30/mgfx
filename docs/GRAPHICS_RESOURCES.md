@@ -72,6 +72,12 @@ measured independently and lower to one `DrawText` command per nonempty line;
 blank lines still contribute configured line-height spacing. The pixel font is
 available only through an explicit diagnostic style.
 
+Optional automatic wrapping stays frontend-owned: the component layout engine
+greedily fits words using cached native word and space advances, then emits only
+the resulting lines. Start, center, and end alignment use those same widths, so
+the graphics server remains a display-list executor rather than a UI layout
+engine.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

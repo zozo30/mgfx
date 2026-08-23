@@ -50,7 +50,7 @@ test("React Path uploads canonical curves once and emits DrawPath instead of tri
   assert.equal(frame.readUInt16LE(40), 7);
 });
 
-test("React requests exact native metrics per line and relayouts", async () => {
+test("React requests wrapping metrics per unique text run and relayouts once", async () => {
   let frames = 0, requests = 0;
   const measured = new Set<string>();
   const surface = new ReactSurface(() => { frames += 1; }, undefined, {
@@ -62,16 +62,16 @@ test("React requests exact native metrics per line and relayouts", async () => {
       return 8.75;
     },
   });
-  surface.render(<mgfx-text value={"ASYNC METRIC 937\nSECOND LINE 937"}
-    textStyle={{ fontSize: 20, lineHeight: 24, fontFamily: "system" }} />);
+  surface.render(<mgfx-text value="ASYNC METRIC 937 SECOND LINE 937"
+    textStyle={{ fontSize: 20, lineHeight: 24, fontFamily: "system", wrap: true }} />);
   surface.resize({ width: 400, height: 60 });
   const approximateFrames = frames;
   await new Promise<void>((resolve) => setImmediate(resolve));
-  assert.equal(requests, 2);
-  assert.deepEqual(measured, new Set(["ASYNC METRIC 937", "SECOND LINE 937"]));
+  assert.equal(requests, 6);
+  assert.deepEqual(measured, new Set(["ASYNC", "METRIC", "937", "SECOND", "LINE", " "]));
   assert.equal(frames, approximateFrames + 1);
   surface.resize({ width: 420, height: 60 });
-  assert.equal(requests, 2);
+  assert.equal(requests, 6);
 });
 
 test("native router pushes and pops React route history", () => {

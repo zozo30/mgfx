@@ -199,7 +199,9 @@ React `Text` now defaults to native `system` rendering; `fontFamily: "pixel"`
 keeps the built-in 5x7 font available only as a diagnostic/bootstrap mode, and
 `monospace` selects the native fixed-pitch family. Native modes emit one compact
 UTF-8 `DrawText` command per visible line. Explicit newlines and configurable
-line height participate in intrinsic measurement. The
+line height participate in intrinsic measurement. `wrap: true` performs greedy
+word wrapping against layout constraints with exact cached word/space advances,
+and `textAlign` supports start, center, or end placement. The
 macOS server shapes Unicode with CoreText and caches vector glyph outlines;
 future Vulkan and DirectX hosts can execute the same display-list command using
 their platform text service. The component runtime asynchronously requests and

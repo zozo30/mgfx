@@ -4,7 +4,7 @@ import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants
 import { FrameEncoder, type FontFamily, type Key, type KeyEvent, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
   box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
-  nativeTextAdvance, row, scrollView, stack, text,
+  nativeTextAdvance, nativeTextMetricRuns, row, scrollView, stack, text,
   type Element, type Point, type Size, type Style, type TextStyle,
   mesh, path as vectorPath, type MeshData, type PathData,
 } from "@mgfx/demo-client/ui";
@@ -234,13 +234,13 @@ export class ReactSurface {
         const value = child.props.value ?? child.children
           .filter((item): item is TextNode => item.kind === "text").map((item) => item.value).join("");
         if (family === "system" || family === "monospace") {
-          for (const line of value.split("\n")) {
-            if (!line || nativeTextAdvance(family, line) !== undefined) continue;
-            const key = `${family}\0${line}`;
+          for (const run of nativeTextMetricRuns(value, child.props.textStyle ?? {})) {
+            if (nativeTextAdvance(family, run) !== undefined) continue;
+            const key = `${family}\0${run}`;
             if (!this.requestedTextMetrics.has(key) && this.resourceCommands?.measureText) {
               this.requestedTextMetrics.add(key);
-              void this.resourceCommands.measureText(family, line).then((advance) => {
-                cacheNativeTextAdvance(family, line, advance);
+              void this.resourceCommands.measureText(family, run).then((advance) => {
+                cacheNativeTextAdvance(family, run, advance);
                 if (!this.metricRelayoutScheduled) {
                   this.metricRelayoutScheduled = true;
                   queueMicrotask(() => {

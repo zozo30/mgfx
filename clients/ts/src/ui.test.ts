@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FrameEncoder, Key } from "./protocol.js";
-import { box, cacheNativeTextAdvance, circle, Component, ComponentHost, constrain, focusable, mesh, row, scrollView, stack, text, type Element } from "./ui.js";
+import { box, cacheNativeTextAdvance, circle, column, Component, ComponentHost, constrain, focusable, mesh, row, scrollView, stack, text, type Element } from "./ui.js";
 
 test("constraints clamp desired sizes", () => {
   assert.deepEqual(constrain({ width: 200, height: 5 }, {
@@ -137,6 +137,31 @@ test("multiline system text emits one compact shaped command per visible line", 
   assert.equal(frame.readUInt16LE(secondCommand), 8);
   assert.equal(frame.subarray(secondCommand + 8 + 32,
     secondCommand + 8 + 32 + Buffer.byteLength("Ω")).toString(), "Ω");
+});
+
+test("native metrics drive automatic wrapping and centered line placement", () => {
+  cacheNativeTextAdvance("system", "ONE", 2);
+  cacheNativeTextAdvance("system", "TWO", 2);
+  cacheNativeTextAdvance("system", " ", 0.5);
+  class WrappedComponent extends Component {
+    build(): Element {
+      return column([text("ONE TWO", { fontSize: 10, lineHeight: 12,
+        fontFamily: "system", wrap: true, textAlign: "center" })], {
+        padding: { top: 0, right: 35, bottom: 0, left: 35 },
+        crossAxisAlignment: "stretch",
+      });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new WrappedComponent());
+  host.layout({ width: 100, height: 30 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 30 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 3);
+  assert.equal(frame.readUInt16LE(16), 8);
+  assert.ok(Math.abs(frame.readFloatLE(28) - -0.2) < 0.0001);
+  const secondCommand = 16 + 8 + 32 + Buffer.byteLength("ONE");
+  assert.equal(frame.readUInt16LE(secondCommand), 8);
 });
 
 test("cached native advance participates in row measurement", () => {
