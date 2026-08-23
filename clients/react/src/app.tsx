@@ -65,7 +65,7 @@ export function DiagonalPattern({ time }: { readonly time: number }) {
       background: rgba(0.035, 0.045, 0.07), borderWidth: 1,
       borderColor: rgba(0.22, 0.28, 0.40), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="DIAGONAL AREA PATTERN" style={{ fontSize: 14,
+        <Text value="DIAGONAL AREA PATTERN" style={{ fontSize: 22,
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Box style={{ preferredSize: { height: 64 }, flexGrow: 1,
@@ -89,7 +89,7 @@ function ImagePreview({ sourceSize }: {
     <Row style={{ preferredSize: { height: 126 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="PERSISTENT IMAGE / SVG" style={{ fontSize: 14,
+        <Text value="PERSISTENT IMAGE / SVG" style={{ fontSize: 22,
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Image textureId={1} sourceWidth={sourceSize.width} sourceHeight={sourceSize.height}
@@ -105,7 +105,7 @@ function ServerVectorPath({ time }: { readonly time: number }) {
     <Row style={{ preferredSize: { height: 94 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="SERVER PATH CACHE" style={{ fontSize: 14,
+        <Text value="SERVER PATH CACHE" style={{ fontSize: 22,
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Path
@@ -128,7 +128,7 @@ function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
     <Row style={{ preferredSize: { height: 112 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="LUCIDE VECTOR STROKES" style={{ fontSize: 14,
+        <Text value="LUCIDE VECTOR STROKES" style={{ fontSize: 22,
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Row style={{ gap: 22, flexGrow: 1, mainAxisAlignment: "center",
@@ -188,7 +188,7 @@ function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons
         },
         mainAxisAlignment: "spaceBetween",
         crossAxisAlignment: "center" }}>
-        <Text value="MGFX React" style={{ fontSize: 24, fontFamily: "system",
+        <Text value="MGFX React" style={{ fontSize: 32, fontFamily: "system",
           color: rgba(0.9, 0.96, 1) }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
           <Image textureId={1} sourceWidth={headerImageSize.width}
@@ -204,11 +204,11 @@ function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons
             active={selected === index} onPress={() => setSelected(index)}
             style={{ preferredSize: { width: 128, height: 116 }, flexGrow: 1,
               padding: all(18), cornerRadius: 14 }}
-            textStyle={{ fontSize: 18, color: rgba(0.04, 0.05, 0.08) }} />
+            textStyle={{ fontSize: 26, color: rgba(0.04, 0.05, 0.08) }} />
         ))}
       </Row>
       <TextField value={value} onChange={setValue} placeholder="TYPE INTO REACT" maxLength={28}
-        textStyle={{ fontSize: 16 }} />
+        textStyle={{ fontSize: 22 }} />
       <WavePattern time={animationTime} />
       <DiagonalPattern time={animationTime} />
       <ImagePreview sourceSize={headerImageSize} />
@@ -217,7 +217,7 @@ function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons
       <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
         <Stack style={{ preferredSize: { height: 48 }, padding: all(14), cornerRadius: 10,
           background: rgba(0.30, 0.32, 0.42), flexGrow: 1 }}>
-          <Text value={`STATE CARD ${selected + 1}`} style={{ fontSize: 14 }} />
+          <Text value={`STATE CARD ${selected + 1}`} style={{ fontSize: 22 }} />
         </Stack>
         <Button label="COPY" disabled={!value} onPress={() => clipboard.writeClipboard(value)}
           background={rgba(0.20, 0.48, 0.52)}
@@ -240,7 +240,7 @@ function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons
     </Column>
     <Dialog open={dialogOpen} title="MODAL LAYER 1000" onDismiss={() => setDialogOpen(false)}>
       <Text value="ROUTE INPUT IS ISOLATED BEHIND THIS LAYER"
-        style={{ fontSize: 14, color: rgba(0.68, 0.74, 0.86) }} />
+        style={{ fontSize: 22, color: rgba(0.68, 0.74, 0.86) }} />
       <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
         <Button label="CLOSE" onPress={() => setDialogOpen(false)}
           style={{ preferredSize: { width: 150 } }} />
@@ -270,7 +270,7 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
             backgroundGradient: { start: rgba(0.08, 0.46, 0.36),
               end: rgba(0.28, 0.12, 0.68), direction: "horizontal" },
             mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
-            <Text value="Graphics Route — native glyph outlines" style={{ fontSize: 24,
+            <Text value="Graphics Route — native glyph outlines" style={{ fontSize: 32,
               fontFamily: "system", color: rgba(0.9, 1, 0.97) }} />
             <Button label="BACK" onPress={router.back} background={rgba(0.08, 0.12, 0.20)}
               style={{ preferredSize: { width: 120, height: 42 } }} />
@@ -282,18 +282,18 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
             <Text value={"CoreText shaping: Árvíztűrő — Ω → MGFX. Exact native " +
               "metrics wrap this sentence in the language-neutral layout engine before compact " +
               "DrawText commands reach Metal."}
-              style={{ fontSize: 21, lineHeight: 27, fontFamily: "system", wrap: true,
+              style={{ fontSize: 26, lineHeight: 32, fontFamily: "system", wrap: true,
                 textAlign: "center",
                 color: rgba(0.62, 0.88, 1) }} />
           </Row>
           <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,
             background: rgba(0.055, 0.07, 0.11), borderWidth: 1,
             borderColor: rgba(0.22, 0.30, 0.46) }}>
-            <Text value="HISTORY ROUTER" style={{ fontSize: 18, color: rgba(0.62, 0.88, 1) }} />
+            <Text value="HISTORY ROUTER" style={{ fontSize: 26, color: rgba(0.62, 0.88, 1) }} />
             <Text value="THIS SCREEN REPLACED THE ACTIVE REACT SUBTREE"
-              style={{ fontSize: 14, color: rgba(0.68, 0.72, 0.82) }} />
+              style={{ fontSize: 22, color: rgba(0.68, 0.72, 0.82) }} />
             <Text value={`ROUTE ${router.route}  BACK ${router.canGoBack ? "READY" : "EMPTY"}`}
-              style={{ fontSize: 14, color: rgba(0.42, 0.92, 0.68) }} />
+              style={{ fontSize: 22, color: rgba(0.42, 0.92, 0.68) }} />
           </Column>
         </Column>
       </Stack>

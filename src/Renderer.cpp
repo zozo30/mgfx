@@ -20,7 +20,7 @@ std::string errorMessage(const char* prefix, NS::Error* error) {
 
 } // namespace
 
-Renderer::Renderer(MTL::Device* device)
+Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     : device_(NS::RetainPtr(device)),
       commandQueue_(NS::TransferPtr(device->newCommandQueue())) {
     if (!device_) {
@@ -61,6 +61,7 @@ Renderer::Renderer(MTL::Device* device)
     auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
     descriptor->setVertexFunction(vertexFunction.get());
     descriptor->setFragmentFunction(fragmentFunction.get());
+    descriptor->setRasterSampleCount(sampleCount);
     auto* color = descriptor->colorAttachments()->object(0);
     color->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
     color->setBlendingEnabled(true);
@@ -77,6 +78,7 @@ Renderer::Renderer(MTL::Device* device)
     auto imageDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
     imageDescriptor->setVertexFunction(imageVertexFunction.get());
     imageDescriptor->setFragmentFunction(imageFragmentFunction.get());
+    imageDescriptor->setRasterSampleCount(sampleCount);
     imageDescriptor->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
     auto* imageColor = imageDescriptor->colorAttachments()->object(0);
     imageColor->setBlendingEnabled(true);

@@ -209,6 +209,12 @@ caches exact native advances, then performs one corrected layout without
 blocking frames on the Unix socket. Font uploads and multiline rich text are the
 next text layer.
 
+The native Metal host selects 4× multisample antialiasing when the device
+supports it, smoothing glyph outlines, vector paths, circles, and mesh edges in
+one backend-level quality setting. React typography uses Retina-appropriate
+drawable sizes (22 px body text and 32 px titles in the demo) rather than the
+too-small bootstrap values.
+
 ## Requirements
 
 - macOS

@@ -56,7 +56,7 @@ export function Dialog({ open, title, onDismiss, children, width = 520,
       <mgfx-column onClick={() => {}} style={{ preferredSize: { width }, padding: all(24), gap: 18,
         cornerRadius: 18, background: rgba(0.055, 0.07, 0.12, 0.98),
         borderWidth: 2, borderColor: rgba(0.42, 0.62, 1, 0.8) }}>
-        <Text value={title} style={{ fontSize: 22, color: rgba(0.82, 0.91, 1) }} />
+        <Text value={title} style={{ fontSize: 28, color: rgba(0.82, 0.91, 1) }} />
         {children}
       </mgfx-column>
     </mgfx-column>

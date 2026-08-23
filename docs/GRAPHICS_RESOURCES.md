@@ -72,6 +72,11 @@ measured independently and lower to one `DrawText` command per nonempty line;
 blank lines still contribute configured line-height spacing. The pixel font is
 available only through an explicit diagnostic style.
 
+Metal uses 4× MSAA when supported, so small cached outline glyphs and vector
+icons receive hardware edge coverage before source-over resolve. Typography
+still chooses drawable-pixel sizes in the frontend; the React defaults are
+calibrated for Retina rather than reusing the smaller pixel-font values.
+
 Optional automatic wrapping stays frontend-owned: the component layout engine
 greedily fits words using cached native word and space advances, then emits only
 the resulting lines. Start, center, and end alignment use those same widths, so

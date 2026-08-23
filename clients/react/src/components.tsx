@@ -59,7 +59,7 @@ export function Text({ value, style }: {
   readonly value: string;
   readonly style?: TextStyle;
 }) {
-  return <mgfx-text value={value} textStyle={{ fontFamily: "system", ...style }} />;
+  return <mgfx-text value={value} textStyle={{ fontFamily: "system", fontSize: 22, ...style }} />;
 }
 
 export interface ButtonProps {
@@ -89,7 +89,7 @@ export function Button({ label, onPress, style = {}, textStyle, background = rgb
     onFocusChange: setFocused,
   };
   return (
-    <mgfx-stack {...handlers} style={{ preferredSize: { height: 48 }, padding: all(14),
+    <mgfx-stack {...handlers} style={{ preferredSize: { height: 48 }, padding: all(12),
       cornerRadius: 10, clip: true, ...style, background: color }}>
       <Text value={label} style={textStyle ?? {}} />
     </mgfx-stack>
@@ -114,7 +114,7 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const displayed = value || placeholder;
   const color = value ? textStyle?.color ?? rgba(1, 1, 1) : rgba(0.55, 0.60, 0.70);
   return (
-    <mgfx-stack style={{ preferredSize: { height: 48 }, padding: all(14), cornerRadius: 10,
+    <mgfx-stack style={{ preferredSize: { height: 48 }, padding: all(12), cornerRadius: 10,
       clip: true, background: focused ? rgba(0.16, 0.28, 0.52) : rgba(0.12, 0.14, 0.21),
       borderWidth: focused ? 2 : 1,
       borderColor: focused ? rgba(0.38, 0.62, 1) : rgba(0.24, 0.28, 0.38), ...style }}

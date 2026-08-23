@@ -13,7 +13,7 @@
 
 class Renderer final {
 public:
-    explicit Renderer(MTL::Device* device);
+    explicit Renderer(MTL::Device* device, std::uint32_t sampleCount = 1);
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;

@@ -130,6 +130,7 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
 
 @implementation AppDelegate {
     id<MTLDevice> _device;
+    NSUInteger _sampleCount;
     NSWindow* _window;
     InteractiveMetalView* _metalView;
     NSTimer* _controlTimer;
@@ -156,7 +157,9 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     }
 
     try {
-        _renderer = std::make_unique<Renderer>((__bridge MTL::Device*)_device);
+        _sampleCount = [_device supportsTextureSampleCount:4] ? 4 : 1;
+        _renderer = std::make_unique<Renderer>((__bridge MTL::Device*)_device,
+                                               static_cast<std::uint32_t>(_sampleCount));
         _graphicsServer = std::make_unique<GraphicsServer>(mgfx::ipc::defaultSocketPath());
         _graphicsServer->start();
     } catch (const std::exception& exception) {
@@ -282,6 +285,7 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     const NSRect frame = NSMakeRect(0.0, 0.0, config.width, config.height);
     _metalView = [[InteractiveMetalView alloc] initWithFrame:frame device:_device];
     _metalView.colorPixelFormat = MTLPixelFormatBGRA8Unorm;
+    _metalView.sampleCount = _sampleCount;
     _metalView.clearColor = MTLClearColorMake(0.025, 0.035, 0.055, 1.0);
     _metalView.preferredFramesPerSecond = 60;
     _metalView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
