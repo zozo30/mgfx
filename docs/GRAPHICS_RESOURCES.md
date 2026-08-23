@@ -66,10 +66,14 @@ The built-in 5×7 font remains a bootstrap and diagnostic path. The implemented
 `DrawText` command carries UTF-8, a portable system-family choice, position,
 regular/medium/semibold/bold weight, regular/italic style, size, and color. The
 macOS server shapes it with CoreText, converts glyph outlines through the shared
-path tessellator, and caches geometry by family, weight, style, and string.
+path tessellator, and caches geometry by family, weight, style, spacing, and string.
 Metal therefore receives compact cached vector text instead of one
 rectangle pair per lit pixel. Other native hosts can execute the same command
 through DirectWrite or a HarfBuzz/FreeType service.
+
+Optional letter spacing is transported in em units and applied by the native
+shaper, not by splitting a string into client-side glyph commands. Its value is
+part of shaping, measurement, and geometry cache identity.
 
 Clients request the exact native advance once per unique family/string through
 correlated `TextMeasure`/`TextMetrics` MGIP messages. React first lays out with a

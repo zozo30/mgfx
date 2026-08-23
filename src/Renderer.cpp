@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <iterator>
 #include <array>
@@ -1171,10 +1172,12 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
             std::string cacheKey{static_cast<char>(text.family), static_cast<char>(text.weight),
                                  static_cast<char>(text.style)};
+            cacheKey.append(reinterpret_cast<const char*>(&text.letterSpacing),
+                            sizeof(text.letterSpacing));
             cacheKey += text.text;
             auto [found, inserted] = textCache_.try_emplace(cacheKey);
             if (inserted) found->second = gfx::shapeSystemText(
-                text.text, text.family, text.weight, text.style);
+                text.text, text.family, text.weight, text.style, text.letterSpacing);
             const std::vector<gfx::PathPoint>& points = found->second.triangles;
             if (points.empty() || clipEmpty()) continue;
             if (encoder == nullptr) {

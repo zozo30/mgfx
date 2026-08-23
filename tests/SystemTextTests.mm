@@ -34,6 +34,15 @@ int main() {
         std::cerr << "Semibold italic system font produced no shaped geometry\n";
         return 1;
     }
+    const float trackedAdvance = gfx::measureSystemText(
+        "TRACKING", gfx::FontFamily::systemSans, gfx::FontWeight::medium,
+        gfx::FontStyle::regular, 0.08F);
+    const float regularAdvance = gfx::measureSystemText(
+        "TRACKING", gfx::FontFamily::systemSans, gfx::FontWeight::medium);
+    if (trackedAdvance <= regularAdvance) {
+        std::cerr << "Letter spacing did not increase native text advance\n";
+        return 1;
+    }
     for (const gfx::PathPoint& point : sans.triangles) {
         if (!std::isfinite(point[0]) || !std::isfinite(point[1])) {
             std::cerr << "System glyph outline contains non-finite geometry\n";

@@ -341,7 +341,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::waveDots |
             mgfx::ipc::ServerCapability::meshResources |
             mgfx::ipc::ServerCapability::conicGradients |
-            mgfx::ipc::ServerCapability::typographyStyles;
+            mgfx::ipc::ServerCapability::typographyStyles |
+            mgfx::ipc::ServerCapability::textLetterSpacing;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -481,7 +482,8 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
                     ? gfx::FontWeight::semibold : gfx::FontWeight::regular;
                 const gfx::FontStyle style = measure.style == mgfx::ipc::TextStyle::italic
                     ? gfx::FontStyle::italic : gfx::FontStyle::regular;
-                const float advance = gfx::measureSystemText(measure.text, family, weight, style);
+                const float advance = gfx::measureSystemText(
+                    measure.text, family, weight, style, measure.letterSpacing);
                 active->send(mgfx::ipc::MessageType::textMetrics,
                              mgfx::ipc::encodeTextMetrics(advance), message.sequence);
             }

@@ -136,11 +136,12 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const fontFamily = textStyle?.fontFamily ?? "system";
   const fontWeight = textStyle?.fontWeight ?? "regular";
   const fontStyle = textStyle?.fontStyle ?? "regular";
+  const letterSpacing = (textStyle?.letterSpacing ?? 0) / fontSize;
   const paddingLeft = style.padding?.left ?? 12;
   const characterWidth = (character: string) => {
     if (fontFamily === "system" || fontFamily === "monospace") {
-      return (nativeTextAdvance(fontFamily, character, fontWeight, fontStyle) ??
-        (fontFamily === "monospace" ? 0.60 : 0.56)) * fontSize;
+      return (nativeTextAdvance(fontFamily, character, fontWeight, fontStyle, letterSpacing) ??
+        (fontFamily === "monospace" ? 0.60 : 0.56) + letterSpacing) * fontSize;
     }
     return fontSize * 6 / 7;
   };

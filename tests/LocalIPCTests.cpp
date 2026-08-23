@@ -1,5 +1,6 @@
 #include "LocalIPC.hpp"
 
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -77,10 +78,11 @@ int main() {
     mgfx::ipc::TextMeasure textMeasure{};
     if (!mgfx::ipc::decodeTextMeasure(mgfx::ipc::encodeTextMeasure(
             {mgfx::ipc::TextFamily::systemSans, mgfx::ipc::TextWeight::bold,
-             mgfx::ipc::TextStyle::italic, "Árvíztűrő — Ω"}), textMeasure) ||
+             mgfx::ipc::TextStyle::italic, 0.08F, "Árvíztűrő — Ω"}), textMeasure) ||
         textMeasure.family != mgfx::ipc::TextFamily::systemSans ||
         textMeasure.weight != mgfx::ipc::TextWeight::bold ||
         textMeasure.style != mgfx::ipc::TextStyle::italic ||
+        std::fabs(textMeasure.letterSpacing - 0.08F) > 0.00001F ||
         textMeasure.text != "Árvíztűrő — Ω") {
         std::cerr << "Native text measurement request round trip failed\n";
         return 1;

@@ -180,6 +180,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
         mainAxisAlignment: "spaceBetween",
         crossAxisAlignment: "center" }}>
         <Text value="MGFX React" style={{ fontSize: 32, fontFamily: "system", fontWeight: "semibold",
+          letterSpacing: 0.5,
           color: rgba(0.9, 0.96, 1) }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
           <ConicBadge time={animationTime} />

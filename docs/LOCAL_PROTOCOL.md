@@ -71,7 +71,7 @@ created or shown a drawable surface.
 | 25 | `TextureDestroy` | client → server | Nonzero `u32` resource ID |
 | 26 | `PathCreate` | client → server | Nonzero `u32` ID, segment count, reserved fields, canonical path segments |
 | 27 | `PathDestroy` | client → server | Nonzero `u32` resource ID |
-| 28 | `TextMeasure` | client → server | `u8 family`, `u8 weight`, two reserved zero bytes, UTF-8 text; nonzero sequence |
+| 28 | `TextMeasure` | client → server | `u8 family`, `u8 weight`, `u8 style`, `u8 extension`; optional `f32 letterSpacing` in em when extension is 1, then UTF-8 text; nonzero sequence |
 | 29 | `TextMetrics` | server → client | `f32 advance` in em units; echoes request sequence |
 | 30 | `MeshCreate` | client → server | Nonzero `u32` ID, vertex/index counts, colored vertices, triangle indices |
 | 31 | `MeshDestroy` | client → server | Nonzero `u32` resource ID |
@@ -89,6 +89,8 @@ Persistent RGBA8 texture resources and MGFX `DrawImage` are advertised by
 `1 << 10`.
 Persistent canonical path resources are advertised by `1 << 11`.
 Correlated native text measurement is advertised by `1 << 12`.
+Native medium/semibold/italic typography is advertised by `1 << 26`, and
+native letter spacing by `1 << 27`.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.

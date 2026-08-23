@@ -338,7 +338,8 @@ void CommandEncoder::drawPath(const PathCommand& path) {
 }
 
 void CommandEncoder::drawText(const TextCommand& text) {
-    constexpr std::size_t headerSize = 32;
+    const bool hasLetterSpacing = text.letterSpacing != 0.0F;
+    const std::size_t headerSize = hasLetterSpacing ? 36 : 32;
     if (text.text.size() > std::numeric_limits<std::uint32_t>::max() - headerSize) {
         throw std::length_error("Text command exceeds 4 GiB");
     }
@@ -347,12 +348,13 @@ void CommandEncoder::drawText(const TextCommand& text) {
     bytes_.push_back(static_cast<std::uint8_t>(text.family));
     bytes_.push_back(static_cast<std::uint8_t>(text.weight));
     bytes_.push_back(static_cast<std::uint8_t>(text.style));
-    bytes_.push_back(0);
+    bytes_.push_back(hasLetterSpacing ? 1 : 0);
     for (float value : {text.left, text.top, text.fontSize,
                         text.color.red, text.color.green,
                         text.color.blue, text.color.alpha}) {
         appendFloat(bytes_, value);
     }
+    if (hasLetterSpacing) appendFloat(bytes_, text.letterSpacing);
     bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
 }
 
@@ -689,18 +691,22 @@ bool decodePath(const CommandView& command, PathCommand& path) {
 }
 
 bool decodeText(const CommandView& command, TextCommand& text) {
-    constexpr std::size_t headerSize = 32;
+    constexpr std::size_t baseHeaderSize = 32;
+    if (command.opcode != Opcode::drawText || command.payloadSize <= baseHeaderSize) return false;
+    const bool hasLetterSpacing = command.payload[3] == 1;
+    const std::size_t headerSize = hasLetterSpacing ? 36 : baseHeaderSize;
     if (command.opcode != Opcode::drawText || command.payloadSize <= headerSize ||
         command.payloadSize > headerSize + 65536 ||
         command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemMonospace) ||
         command.payload[1] > static_cast<std::uint8_t>(FontWeight::semibold) ||
         command.payload[2] > static_cast<std::uint8_t>(FontStyle::italic) ||
-        command.payload[3] != 0) {
+        command.payload[3] > 1) {
         return false;
     }
     text.family = static_cast<FontFamily>(command.payload[0]);
     text.weight = static_cast<FontWeight>(command.payload[1]);
     text.style = static_cast<FontStyle>(command.payload[2]);
+    text.letterSpacing = hasLetterSpacing ? readFloat(command.payload + 32) : 0.0F;
     text.left = readFloat(command.payload + 4);
     text.top = readFloat(command.payload + 8);
     text.fontSize = readFloat(command.payload + 12);
@@ -708,7 +714,8 @@ bool decodeText(const CommandView& command, TextCommand& text) {
                   readFloat(command.payload + 24), readFloat(command.payload + 28)};
     text.text.assign(reinterpret_cast<const char*>(command.payload + headerSize),
                      command.payloadSize - headerSize);
-    return text.text.find('\0') == std::string::npos;
+    return std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10.0F &&
+           text.text.find('\0') == std::string::npos;
 }
 
 } // namespace gfx

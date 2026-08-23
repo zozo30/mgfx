@@ -83,6 +83,7 @@ export interface TextStyle {
   fontFamily?: "pixel" | "system" | "monospace";
   fontWeight?: "regular" | "medium" | "semibold" | "bold";
   fontStyle?: "regular" | "italic";
+  letterSpacing?: number;
   lineHeight?: number;
   wrap?: boolean;
   textAlign?: "start" | "center" | "end";
@@ -91,17 +92,18 @@ export interface TextStyle {
 const nativeTextAdvances = new Map<string, number>();
 const nativeTextKey = (family: "system" | "monospace", value: string,
   weight: "regular" | "medium" | "semibold" | "bold" = "regular",
-  style: "regular" | "italic" = "regular") => `${family}\0${weight}\0${style}\0${value}`;
+  style: "regular" | "italic" = "regular", letterSpacing = 0) =>
+  `${family}\0${weight}\0${style}\0${letterSpacing}\0${value}`;
 export function cacheNativeTextAdvance(family: "system" | "monospace", value: string,
   advance: number, weight: "regular" | "medium" | "semibold" | "bold" = "regular",
-  style: "regular" | "italic" = "regular"): void {
+  style: "regular" | "italic" = "regular", letterSpacing = 0): void {
   if (Number.isFinite(advance) && advance >= 0)
-    nativeTextAdvances.set(nativeTextKey(family, value, weight, style), advance);
+    nativeTextAdvances.set(nativeTextKey(family, value, weight, style, letterSpacing), advance);
 }
 export function nativeTextAdvance(family: "system" | "monospace", value: string,
   weight: "regular" | "medium" | "semibold" | "bold" = "regular",
-  style: "regular" | "italic" = "regular"): number | undefined {
-  return nativeTextAdvances.get(nativeTextKey(family, value, weight, style));
+  style: "regular" | "italic" = "regular", letterSpacing = 0): number | undefined {
+  return nativeTextAdvances.get(nativeTextKey(family, value, weight, style, letterSpacing));
 }
 
 export function nativeTextMetricRuns(value: string, style: TextStyle): readonly string[] {
@@ -121,9 +123,11 @@ interface LaidOutTextLine { readonly value: string; readonly width: number }
 function textRunWidth(value: string, style: TextStyle, fontSize: number): number {
   if (value.length === 0) return 0;
   if (style.fontFamily && style.fontFamily !== "pixel") {
-    const exact = nativeTextAdvance(style.fontFamily, value, style.fontWeight, style.fontStyle);
+    const tracking = (style.letterSpacing ?? 0) / fontSize;
+    const exact = nativeTextAdvance(
+      style.fontFamily, value, style.fontWeight, style.fontStyle, tracking);
     const average = style.fontFamily === "monospace" ? 0.60 : 0.56;
-    return (exact ?? [...value].length * average) * fontSize;
+    return (exact ?? [...value].length * (average + tracking)) * fontSize;
   }
   const cell = fontSize / 7;
   return value.length * cell * 6 - cell;
@@ -903,11 +907,12 @@ function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: Te
     ? (bounds.width - width) / 2 : style.textAlign === "end" ? bounds.width - width : 0);
   if (style.fontFamily && style.fontFamily !== "pixel") {
     const family = style.fontFamily;
+    const tracking = (style.letterSpacing ?? 0) / fontSize;
     lines.forEach((line, index) => {
       if (line.value.length === 0) return;
       encoder.systemText(line.value, lineX(line.width) / viewport.width * 2 - 1,
         1 - (bounds.y + index * lineHeight) / viewport.height * 2,
-        fontSize / viewport.height * 2, color, family, style.fontWeight, style.fontStyle);
+        fontSize / viewport.height * 2, color, family, style.fontWeight, style.fontStyle, tracking);
     });
     return;
   }

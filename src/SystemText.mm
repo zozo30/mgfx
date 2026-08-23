@@ -98,7 +98,7 @@ CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style) {
 } // namespace
 
 ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
-                            FontStyle style) {
+                            FontStyle style, float letterSpacing) {
     ShapedText shaped;
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
@@ -106,7 +106,11 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
     if (string == nil || string.length == 0) return shaped;
     CTFontRef baseFont = createFont(family, weight, style);
     if (baseFont == nullptr) return shaped;
-    NSDictionary* attributes = @{(__bridge id)kCTFontAttributeName: (__bridge id)baseFont};
+    NSMutableDictionary* attributes = [@{
+        (__bridge id)kCTFontAttributeName: (__bridge id)baseFont} mutableCopy];
+    if (letterSpacing != 0.0F) {
+        attributes[(__bridge id)kCTKernAttributeName] = @(letterSpacing * designSize);
+    }
     NSAttributedString* attributed = [[NSAttributedString alloc] initWithString:string
                                                                      attributes:attributes];
     CTLineRef line = CTLineCreateWithAttributedString((__bridge CFAttributedStringRef)attributed);
@@ -155,14 +159,18 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
 }
 
 float measureSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
-                        FontStyle style) {
+                        FontStyle style, float letterSpacing) {
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
                                             encoding:NSUTF8StringEncoding];
     if (string == nil || string.length == 0) return 0.0F;
     CTFontRef font = createFont(family, weight, style);
     if (font == nullptr) return 0.0F;
-    NSDictionary* attributes = @{(__bridge id)kCTFontAttributeName: (__bridge id)font};
+    NSMutableDictionary* attributes = [@{
+        (__bridge id)kCTFontAttributeName: (__bridge id)font} mutableCopy];
+    if (letterSpacing != 0.0F) {
+        attributes[(__bridge id)kCTKernAttributeName] = @(letterSpacing * designSize);
+    }
     NSAttributedString* attributed = [[NSAttributedString alloc] initWithString:string
                                                                      attributes:attributes];
     CTLineRef line = CTLineCreateWithAttributedString((__bridge CFAttributedStringRef)attributed);

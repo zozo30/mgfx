@@ -17,9 +17,11 @@ struct ShapedText {
 // units, with (0, 0) at the top-left and positive Y moving downward.
 ShapedText shapeSystemText(const std::string& utf8, FontFamily family,
                             FontWeight weight = FontWeight::regular,
-                            FontStyle style = FontStyle::regular);
+                            FontStyle style = FontStyle::regular,
+                            float letterSpacing = 0.0F);
 float measureSystemText(const std::string& utf8, FontFamily family,
                         FontWeight weight = FontWeight::regular,
-                        FontStyle style = FontStyle::regular);
+                        FontStyle style = FontStyle::regular,
+                        float letterSpacing = 0.0F);
 
 } // namespace gfx

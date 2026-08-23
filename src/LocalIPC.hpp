@@ -81,6 +81,7 @@ enum ServerCapability : std::uint32_t {
     meshResources = 1U << 24U,
     conicGradients = 1U << 25U,
     typographyStyles = 1U << 26U,
+    textLetterSpacing = 1U << 27U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
@@ -91,6 +92,7 @@ struct TextMeasure {
     TextFamily family;
     TextWeight weight;
     TextStyle style;
+    float letterSpacing;
     std::string text;
 };
 

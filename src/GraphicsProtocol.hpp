@@ -241,6 +241,7 @@ struct TextCommand {
     FontFamily family;
     FontWeight weight;
     FontStyle style;
+    float letterSpacing;
     float left;
     float top;
     float fontSize;

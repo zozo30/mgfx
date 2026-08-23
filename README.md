@@ -279,6 +279,11 @@ as part of server/client cache keys, so styled UI hierarchy does not compromise
 layout accuracy. Servers advertise this extension with the
 `typographyStyles` capability bit.
 
+`letterSpacing` is expressed in logical pixels at the component layer and
+normalized to em units on the wire. CoreText applies the tracking while shaping;
+the same value participates in exact measurement and both client/server cache
+keys. Zero spacing retains the original compact text payload for compatibility.
+
 ## Requirements
 
 - macOS

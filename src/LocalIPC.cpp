@@ -610,24 +610,33 @@ bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& i
 }
 
 std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure) {
-    std::vector<std::uint8_t> payload(4 + measure.text.size());
+    const bool hasLetterSpacing = measure.letterSpacing != 0.0F;
+    const std::size_t headerSize = hasLetterSpacing ? 8 : 4;
+    std::vector<std::uint8_t> payload(headerSize + measure.text.size());
     payload[0] = static_cast<std::uint8_t>(measure.family);
     payload[1] = static_cast<std::uint8_t>(measure.weight);
     payload[2] = static_cast<std::uint8_t>(measure.style);
-    std::copy(measure.text.begin(), measure.text.end(), payload.begin() + 4);
+    payload[3] = hasLetterSpacing ? 1 : 0;
+    if (hasLetterSpacing) writeFloat(payload.data() + 4, measure.letterSpacing);
+    std::copy(measure.text.begin(), measure.text.end(), payload.begin() + headerSize);
     return payload;
 }
 
 bool decodeTextMeasure(const std::vector<std::uint8_t>& payload, TextMeasure& measure) {
-    if (payload.size() <= 4 || payload.size() > 65'540 ||
+    if (payload.size() <= 4 ||
         payload[0] > static_cast<std::uint8_t>(TextFamily::systemMonospace) ||
         payload[1] > static_cast<std::uint8_t>(TextWeight::semibold) ||
-        payload[2] > static_cast<std::uint8_t>(TextStyle::italic) || payload[3] != 0) return false;
+        payload[2] > static_cast<std::uint8_t>(TextStyle::italic) || payload[3] > 1) return false;
+    const bool hasLetterSpacing = payload[3] == 1;
+    const std::size_t headerSize = hasLetterSpacing ? 8 : 4;
+    if (payload.size() <= headerSize || payload.size() > headerSize + 65'536) return false;
     measure.family = static_cast<TextFamily>(payload[0]);
     measure.weight = static_cast<TextWeight>(payload[1]);
     measure.style = static_cast<TextStyle>(payload[2]);
-    measure.text.assign(payload.begin() + 4, payload.end());
-    return measure.text.find('\0') == std::string::npos;
+    measure.letterSpacing = hasLetterSpacing ? readFloat(payload.data() + 4) : 0.0F;
+    measure.text.assign(payload.begin() + static_cast<std::ptrdiff_t>(headerSize), payload.end());
+    return std::isfinite(measure.letterSpacing) && std::fabs(measure.letterSpacing) <= 10.0F &&
+           measure.text.find('\0') == std::string::npos;
 }
 
 std::vector<std::uint8_t> encodeTextMetrics(float advance) {
