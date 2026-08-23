@@ -78,6 +78,10 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto fragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("fragmentMain")));
     auto imageVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageVertexMain")));
     auto imageFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageFragmentMain")));
+    auto imageSurfaceVertexFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("imageSurfaceVertexMain")));
+    auto imageSurfaceFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("imageSurfaceFragmentMain")));
     auto shadowVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("shadowVertexMain")));
     auto shadowFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("shadowFragmentMain")));
     auto radialVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("radialVertexMain")));
@@ -95,6 +99,7 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto linearGradientFragmentFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("linearGradientFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
+        !imageSurfaceVertexFunction || !imageSurfaceFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
         !radialVertexFunction || !radialFragmentFunction ||
         !roundedRectVertexFunction || !roundedRectFragmentFunction ||
@@ -135,6 +140,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     imagePipelineState_ = NS::TransferPtr(device_->newRenderPipelineState(imageDescriptor.get(), &error));
     if (!imagePipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the image render pipeline", error));
+    }
+
+    auto imageSurfaceDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    imageSurfaceDescriptor->setVertexFunction(imageSurfaceVertexFunction.get());
+    imageSurfaceDescriptor->setFragmentFunction(imageSurfaceFragmentFunction.get());
+    imageSurfaceDescriptor->setRasterSampleCount(sampleCount);
+    auto* imageSurfaceColor = imageSurfaceDescriptor->colorAttachments()->object(0);
+    imageSurfaceColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    imageSurfaceColor->setBlendingEnabled(true);
+    imageSurfaceColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    imageSurfaceColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    imageSurfaceColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    imageSurfaceColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    imageSurfacePipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(imageSurfaceDescriptor.get(), &error));
+    if (!imageSurfacePipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the image-surface pipeline", error));
     }
 
     auto shadowDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -404,6 +426,60 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(imagePipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->setFragmentTexture(found->second.get(), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawImageSurface) {
+            gfx::ImageSurfaceCommand image{};
+            if (!gfx::decodeImageSurface(command, image) ||
+                !std::isfinite(image.cornerRadius) || image.cornerRadius < 0.0F ||
+                image.cornerRadius > 8192.0F) {
+                throw std::runtime_error("Malformed image-surface command");
+            }
+            const auto found = textures_.find(image.textureId);
+            if (found == textures_.end() || clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (image.destination.right - image.destination.left) * drawableWidth * 0.5F,
+                (image.destination.top - image.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct ImageSurfaceVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> uv;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float cornerRadius;
+                float sampling;
+                std::array<float, 4> tint;
+            };
+            const std::array<float, 4> tint = {image.tint.red, image.tint.green,
+                image.tint.blue, image.tint.alpha * opacityStack.back()};
+            const float sampling = image.sampling == gfx::ImageSampling::nearest ? 1.0F : 0.0F;
+            const auto vertex = [&](float x, float y, float u, float v,
+                                    float localX, float localY) {
+                return ImageSurfaceVertex{transformPoint(currentTransform(), {x, y}), {u, v},
+                    {localX, localY}, size, image.cornerRadius, sampling, tint};
+            };
+            const ImageSurfaceVertex vertices[] = {
+                vertex(image.destination.left, image.destination.top,
+                       image.uv.left, image.uv.top, 0.0F, 0.0F),
+                vertex(image.destination.left, image.destination.bottom,
+                       image.uv.left, image.uv.bottom, 0.0F, size[1]),
+                vertex(image.destination.right, image.destination.bottom,
+                       image.uv.right, image.uv.bottom, size[0], size[1]),
+                vertex(image.destination.left, image.destination.top,
+                       image.uv.left, image.uv.top, 0.0F, 0.0F),
+                vertex(image.destination.right, image.destination.bottom,
+                       image.uv.right, image.uv.bottom, size[0], size[1]),
+                vertex(image.destination.right, image.destination.top,
+                       image.uv.right, image.uv.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(imageSurfacePipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->setFragmentTexture(found->second.get(), 0);

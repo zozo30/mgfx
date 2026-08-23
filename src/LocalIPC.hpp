@@ -73,6 +73,7 @@ enum ServerCapability : std::uint32_t {
     circles = 1U << 18U,
     diagonalPatterns = 1U << 19U,
     linearGradients = 1U << 20U,
+    imageSurfaces = 1U << 21U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };

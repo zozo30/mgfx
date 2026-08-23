@@ -34,6 +34,11 @@ ID, UV rectangle, destination, and tint. The Metal backend retains the native
 texture and uses a separate sampled-image pipeline, providing the base for real
 PNG/JPEG decoders, SVG raster fallback, and font glyph atlases.
 
+Rounded pictures use the compatible `DrawImageSurface` extension. It adds a
+pixel-space corner radius and portable linear/nearest sampling choice; Metal masks
+the sampled texture with an antialiased rounded SDF, so cards and avatars need no
+client-generated clipping geometry.
+
 The React client includes bounded PNG, JPEG, and SVG decoders. Raster files are converted to
 premultiplied RGBA8, uploaded once, and displayed with `fill`, `contain`, or
 `cover` geometry computed by the backend-neutral UI runtime.

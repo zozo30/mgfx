@@ -266,6 +266,22 @@ test("RGBA textures are persistent resource uploads and frames reference their I
   assert.equal(bytes.readUInt32LE(24), 7);
 });
 
+test("rounded image surfaces encode radius and sampling without client geometry", () => {
+  const frame = new FrameEncoder();
+  frame.imageSurface(9, { left: -0.5, top: 0.5, right: 0.5, bottom: -0.5 },
+    { left: 0.1, top: 0.2, right: 0.9, bottom: 0.8 },
+    { red: 0.8, green: 1, blue: 0.7, alpha: 0.9 }, 14, "nearest");
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 19);
+  assert.equal(bytes.readUInt32LE(20), 64);
+  assert.equal(bytes.readUInt32LE(24), 9);
+  assert.equal(bytes.readUInt32LE(28), 1);
+  assert.equal(bytes.readFloatLE(80), 14);
+  assert.throws(() => frame.imageSurface(0,
+    { left: 0, top: 1, right: 1, bottom: 0 }, undefined, undefined, 0));
+});
+
 test("canonical paths upload once and frames reference server-side vector geometry", () => {
   const upload = encodePathCreate(12, [
     { verb: "move", x: 2, y: 12 },

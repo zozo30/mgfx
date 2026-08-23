@@ -29,6 +29,7 @@ enum class Opcode : std::uint16_t {
     drawCircle = 16,
     drawDiagonalPattern = 17,
     drawLinearGradient = 18,
+    drawImageSurface = 19,
 };
 
 enum class Primitive : std::uint8_t {
@@ -79,6 +80,17 @@ struct ImageCommand {
     ClipRect destination;
     ClipRect uv;
     Color tint;
+};
+
+enum class ImageSampling : std::uint8_t { linear = 0, nearest = 1 };
+
+struct ImageSurfaceCommand {
+    std::uint32_t textureId;
+    ImageSampling sampling;
+    ClipRect destination;
+    ClipRect uv;
+    Color tint;
+    float cornerRadius;
 };
 
 struct ShadowCommand {
@@ -193,6 +205,7 @@ public:
     void pushClip(ClipRect clip);
     void popClip();
     void drawImage(const ImageCommand& image);
+    void drawImageSurface(const ImageSurfaceCommand& image);
     void drawPath(const PathCommand& path);
     void drawText(const TextCommand& text);
     void pushTransform(AffineTransform transform);
@@ -236,6 +249,7 @@ bool decodeClear(const CommandView& command, Color& color);
 bool decodeDraw(const CommandView& command, DrawCommand& draw);
 bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
+bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);
 bool decodePushTransform(const CommandView& command, AffineTransform& transform);

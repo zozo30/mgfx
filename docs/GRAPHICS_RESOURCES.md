@@ -27,8 +27,13 @@ are decoded in the client runtime, not by a graphics backend. The server uploads
 the validated pixels into a native texture resource.
 
 `DrawImage` references a texture ID and carries destination rectangle, normalized
-UV rectangle, tint, sampling mode, and opacity. Nine-slice and repeating image
+UV rectangle, and tint; inherited opacity applies on the server. Nine-slice and repeating image
 patterns can be tessellated by the frontend into several ordinary image quads.
+
+The implemented `DrawImageSurface` extension adds a rounded-corner radius and an
+explicit linear/nearest sampling flag while retaining the same texture, UV, tint,
+transform, opacity, and clip semantics. Metal applies the rounded mask per fragment;
+support is advertised by `imageSurfaces`.
 
 ## SVG and vector paths
 

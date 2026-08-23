@@ -50,6 +50,10 @@ int main() {
                                 gfx::GradientDirection::diagonal,
                                 {0.2F, 0.8F, 1.0F, 1.0F},
                                 {0.7F, 0.2F, 1.0F, 0.75F}});
+    encoder.drawImageSurface({9, gfx::ImageSampling::nearest,
+                              {-0.6F, 0.6F, 0.6F, -0.6F},
+                              {0.1F, 0.2F, 0.9F, 0.8F},
+                              {0.8F, 1.0F, 0.7F, 0.9F}, 14.0F});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -138,6 +142,13 @@ int main() {
         !nearlyEqual(linear.startColor.green, 0.8F) ||
         !nearlyEqual(linear.endColor.alpha, 0.75F) || !decoder.next(command)) {
         return fail("Linear-gradient decoding failed");
+    }
+    gfx::ImageSurfaceCommand imageSurface{};
+    if (!gfx::decodeImageSurface(command, imageSurface) || imageSurface.textureId != 9 ||
+        imageSurface.sampling != gfx::ImageSampling::nearest ||
+        !nearlyEqual(imageSurface.uv.left, 0.1F) ||
+        !nearlyEqual(imageSurface.cornerRadius, 14.0F) || !decoder.next(command)) {
+        return fail("Image-surface decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

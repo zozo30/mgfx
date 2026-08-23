@@ -21,15 +21,17 @@ export const Stack = ({ children, style }: LayoutProps) =>
   <mgfx-stack style={style ?? {}}>{children}</mgfx-stack>;
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
-export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit }: {
+export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, sampling }: {
   readonly textureId: number; readonly style?: Style;
   readonly sourceWidth?: number; readonly sourceHeight?: number;
   readonly fit?: "fill" | "contain" | "cover";
+  readonly sampling?: "linear" | "nearest";
 }) => <mgfx-box style={{ ...style, backgroundImage: {
   textureId,
   ...(sourceWidth !== undefined && sourceHeight !== undefined
     ? { sourceSize: { width: sourceWidth, height: sourceHeight } } : {}),
   ...(fit ? { fit } : {}),
+  ...(sampling ? { sampling } : {}),
 } }} />;
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;

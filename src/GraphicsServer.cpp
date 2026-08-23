@@ -319,7 +319,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::roundedRectangles |
             mgfx::ipc::ServerCapability::circles |
             mgfx::ipc::ServerCapability::diagonalPatterns |
-            mgfx::ipc::ServerCapability::linearGradients;
+            mgfx::ipc::ServerCapability::linearGradients |
+            mgfx::ipc::ServerCapability::imageSurfaces;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

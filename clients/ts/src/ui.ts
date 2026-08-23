@@ -22,6 +22,7 @@ export interface ImagePaint {
   readonly tint?: Color;
   readonly sourceSize?: Size;
   readonly fit?: "fill" | "contain" | "cover";
+  readonly sampling?: "linear" | "nearest";
 }
 export interface Transform {
   readonly translateX?: number; readonly translateY?: number;
@@ -495,16 +496,24 @@ class Node {
       } else paintCircle(encoder, this.bounds, background, gradient, this.style.borderWidth ?? 0,
         this.style.borderColor, viewport);
     } else if ((this.style.cornerRadius ?? 0) > 0) {
+      let combinedBorder = false;
       if (radial) {
         paintRadialGradient(encoder, this.bounds, radial, this.style.cornerRadius ?? 0, viewport);
-        paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined,
-          this.style.borderWidth ?? 0, this.style.borderColor, viewport);
       } else if (gradient) {
         paintLinearGradient(encoder, this.bounds, gradient, this.style.cornerRadius ?? 0, viewport);
-        paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined,
+      } else if (this.style.backgroundImage) {
+        paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background,
+          0, undefined, viewport);
+      } else {
+        paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background,
           this.style.borderWidth ?? 0, this.style.borderColor, viewport);
-      } else paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background,
-        this.style.borderWidth ?? 0, this.style.borderColor, viewport);
+        combinedBorder = true;
+      }
+      paintImage(encoder, this.bounds, this.style.backgroundImage,
+        this.style.cornerRadius ?? 0, viewport);
+      if (!combinedBorder) paintServerRoundedRect(encoder, this.bounds,
+        this.style.cornerRadius ?? 0, undefined, this.style.borderWidth ?? 0,
+        this.style.borderColor, viewport);
     } else {
       let combinedBorder = false;
       if (this.bounds.width > 0 && this.bounds.height > 0) {
@@ -515,11 +524,7 @@ class Node {
             this.style.borderWidth ?? 0, this.style.borderColor, viewport);
           combinedBorder = true;
         } else paintServerRoundedRect(encoder, this.bounds, 0, background, 0, undefined, viewport);
-        if (this.style.backgroundImage) {
-          const image = imageGeometry(this.bounds, this.style.backgroundImage);
-          encoder.image(this.style.backgroundImage.textureId, normalizedRect(image.destination, viewport),
-            image.uv, this.style.backgroundImage.tint);
-        }
+        paintImage(encoder, this.bounds, this.style.backgroundImage, 0, viewport);
       }
       paintDiagonalStripes(encoder, this.bounds, this.style.backgroundPattern, viewport);
       if (!combinedBorder) paintServerRoundedRect(encoder, this.bounds, 0, undefined,
@@ -733,6 +738,19 @@ function imageGeometry(bounds: Rect, image: ImagePaint): {
   }
   const visible = sourceAspect / destinationAspect;
   return { destination: bounds, uv: { ...uv, top: (1 - visible) / 2, bottom: (1 + visible) / 2 } };
+}
+
+function paintImage(encoder: FrameEncoder, bounds: Rect, image: ImagePaint | undefined,
+  cornerRadius: number, viewport: Size): void {
+  if (!image || bounds.width <= 0 || bounds.height <= 0) return;
+  const geometry = imageGeometry(bounds, image);
+  if (cornerRadius > 0 || image.sampling === "nearest") {
+    encoder.imageSurface(image.textureId, normalizedRect(geometry.destination, viewport), geometry.uv,
+      image.tint, cornerRadius, image.sampling ?? "linear");
+  } else {
+    encoder.image(image.textureId, normalizedRect(geometry.destination, viewport),
+      geometry.uv, image.tint);
+  }
 }
 
 function paintDiagonalStripes(encoder: FrameEncoder, r: Rect,

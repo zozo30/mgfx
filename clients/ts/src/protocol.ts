@@ -60,6 +60,7 @@ export enum ServerCapability {
   Circles = 1 << 18,
   DiagonalPatterns = 1 << 19,
   LinearGradients = 1 << 20,
+  ImageSurfaces = 1 << 21,
 }
 export interface ServerHello {
   readonly version: number;
@@ -566,6 +567,23 @@ export class FrameEncoder {
       tint.red, tint.green, tint.blue, tint.alpha]
       .forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
     this.command(6, payload);
+  }
+
+  imageSurface(textureId: number, destination: ClipRect, uv: ClipRect = {
+    left: 0, top: 0, right: 1, bottom: 1,
+  }, tint: Color = { red: 1, green: 1, blue: 1, alpha: 1 }, cornerRadius = 0,
+  sampling: "linear" | "nearest" = "linear"): void {
+    const values = [destination.left, destination.top, destination.right, destination.bottom,
+      uv.left, uv.top, uv.right, uv.bottom, tint.red, tint.green, tint.blue, tint.alpha,
+      cornerRadius, 0];
+    if (!Number.isSafeInteger(textureId) || textureId <= 0 || textureId > 0xffff_ffff ||
+        values.some((value) => !Number.isFinite(value)) || cornerRadius < 0 || cornerRadius > 8192)
+      throw new RangeError("Image surface values are outside supported bounds");
+    const payload = Buffer.alloc(64);
+    payload.writeUInt32LE(textureId, 0);
+    payload.writeUInt32LE(sampling === "nearest" ? 1 : 0, 4);
+    values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
+    this.command(19, payload);
   }
 
   path(pathId: number, destination: ClipRect,

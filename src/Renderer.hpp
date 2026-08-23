@@ -34,6 +34,7 @@ private:
     NS::SharedPtr<MTL::CommandQueue> commandQueue_;
     NS::SharedPtr<MTL::RenderPipelineState> pipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> imagePipelineState_;
+    NS::SharedPtr<MTL::RenderPipelineState> imageSurfacePipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> shadowPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> radialPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> roundedRectPipelineState_;

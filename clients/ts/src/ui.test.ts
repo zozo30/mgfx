@@ -340,6 +340,26 @@ test("linear gradients lower to one constant-size server command", () => {
   assert.equal(frame.readFloatLE(44), 0); // Horizontal direction.
 });
 
+test("rounded images lower to the server image-surface shader", () => {
+  class RoundedImage extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 100, height: 60 }, cornerRadius: 12,
+        backgroundImage: { textureId: 3, sampling: "nearest" } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new RoundedImage());
+  host.layout({ width: 100, height: 60 });
+  const encoder = new FrameEncoder();
+  host.paint(encoder, { width: 100, height: 60 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 19);
+  assert.equal(frame.readUInt32LE(28), 1);
+  assert.equal(frame.readFloatLE(80), 12);
+});
+
 test("diagonal patterns lower to one constant-size server command", () => {
   class PatternComponent extends Component {
     build(): Element {

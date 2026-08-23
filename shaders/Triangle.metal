@@ -48,6 +48,48 @@ fragment float4 imageFragmentMain(ImageVertexOut in [[stage_in]],
     return float4(sampled.rgb * in.tint.rgb * in.tint.a, sampled.a * in.tint.a);
 }
 
+struct ImageSurfaceVertex {
+    packed_float2 position;
+    packed_float2 uv;
+    packed_float2 local;
+    packed_float2 size;
+    float cornerRadius;
+    float sampling;
+    packed_float4 tint;
+};
+
+struct ImageSurfaceVertexOut {
+    float4 position [[position]];
+    float2 uv;
+    float2 local;
+    float2 size;
+    float cornerRadius;
+    float sampling;
+    float4 tint;
+};
+
+vertex ImageSurfaceVertexOut imageSurfaceVertexMain(
+    const device ImageSurfaceVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const ImageSurfaceVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.uv, value.local, value.size,
+            value.cornerRadius, value.sampling, value.tint};
+}
+
+fragment float4 imageSurfaceFragmentMain(ImageSurfaceVertexOut in [[stage_in]],
+                                         texture2d<float> image [[texture(0)]]) {
+    constexpr sampler linearSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    constexpr sampler nearestSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    const float4 sampled = in.sampling > 0.5
+        ? image.sample(nearestSampler, in.uv) : image.sample(linearSampler, in.uv);
+    const float2 halfSize = in.size * 0.5;
+    const float radius = min(in.cornerRadius, min(halfSize.x, halfSize.y));
+    const float2 q = abs(in.local - halfSize) - halfSize + radius;
+    const float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    const float coverage = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
+    const float alpha = sampled.a * in.tint.a * coverage;
+    return float4(sampled.rgb * in.tint.rgb * in.tint.a * coverage, alpha);
+}
+
 struct ShadowVertex {
     packed_float2 position;
     packed_float2 local;

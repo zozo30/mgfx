@@ -232,6 +232,19 @@ void CommandEncoder::drawImage(const ImageCommand& image) {
     }
 }
 
+void CommandEncoder::drawImageSurface(const ImageSurfaceCommand& image) {
+    beginCommand(Opcode::drawImageSurface, 64);
+    appendU32(bytes_, image.textureId);
+    appendU32(bytes_, image.sampling == ImageSampling::nearest ? 1U : 0U);
+    for (float value : {image.destination.left, image.destination.top,
+                        image.destination.right, image.destination.bottom,
+                        image.uv.left, image.uv.top, image.uv.right, image.uv.bottom,
+                        image.tint.red, image.tint.green, image.tint.blue, image.tint.alpha,
+                        image.cornerRadius, 0.0F}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawPath(const PathCommand& path) {
     beginCommand(Opcode::drawPath, 128);
     appendU32(bytes_, path.pathId);
@@ -487,6 +500,22 @@ bool decodeImage(const CommandView& command, ImageCommand& image) {
                 readFloat(command.payload + 32), readFloat(command.payload + 36)};
     image.tint = {readFloat(command.payload + 40), readFloat(command.payload + 44),
                   readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    return image.textureId != 0;
+}
+
+bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image) {
+    if (command.opcode != Opcode::drawImageSurface || command.payloadSize != 64 ||
+        readU32(command.payload + 4) > 1U || readFloat(command.payload + 60) != 0.0F) return false;
+    image.textureId = readU32(command.payload);
+    image.sampling = readU32(command.payload + 4) == 1U
+        ? ImageSampling::nearest : ImageSampling::linear;
+    image.destination = {readFloat(command.payload + 8), readFloat(command.payload + 12),
+                         readFloat(command.payload + 16), readFloat(command.payload + 20)};
+    image.uv = {readFloat(command.payload + 24), readFloat(command.payload + 28),
+                readFloat(command.payload + 32), readFloat(command.payload + 36)};
+    image.tint = {readFloat(command.payload + 40), readFloat(command.payload + 44),
+                  readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    image.cornerRadius = readFloat(command.payload + 56);
     return image.textureId != 0;
 }
 

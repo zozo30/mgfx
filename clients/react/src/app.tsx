@@ -95,7 +95,8 @@ function ImagePreview({ sourceSize }: {
       </Stack>
       <Image textureId={1} sourceWidth={sourceSize.width} sourceHeight={sourceSize.height}
         fit="contain" style={{ preferredSize: { height: 102 }, flexGrow: 1,
-          background: rgba(0.015, 0.02, 0.03) }} />
+          background: rgba(0.015, 0.02, 0.03), cornerRadius: 16,
+          borderWidth: 2, borderColor: rgba(0.2, 0.3, 0.45) }} />
     </Row>
   );
 }
@@ -198,7 +199,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
           <Image textureId={1} sourceWidth={headerImageSize.width}
             sourceHeight={headerImageSize.height} fit="cover"
             style={{ preferredSize: { width: 52, height: 52 },
-            borderWidth: 2, borderColor: rgba(0.75, 0.92, 1) }} />
+            cornerRadius: 12, borderWidth: 2, borderColor: rgba(0.75, 0.92, 1) }} />
           <DotGrid time={animationTime} />
         </Row>
       </Row>
