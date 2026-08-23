@@ -1184,13 +1184,28 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 first += count;
             }
         } else if (command.opcode == gfx::Opcode::drawPath ||
-                   command.opcode == gfx::Opcode::drawDashedPath) {
+                   command.opcode == gfx::Opcode::drawDashedPath ||
+                   command.opcode == gfx::Opcode::drawExtendedPath) {
             gfx::PathCommand path{};
+            const auto finiteGradient = [](const gfx::PathGradient& gradient) {
+                return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
+                    std::isfinite(gradient.endX) && std::isfinite(gradient.endY) &&
+                    std::isfinite(gradient.startColor.red) &&
+                    std::isfinite(gradient.startColor.green) &&
+                    std::isfinite(gradient.startColor.blue) &&
+                    std::isfinite(gradient.startColor.alpha) &&
+                    std::isfinite(gradient.endColor.red) &&
+                    std::isfinite(gradient.endColor.green) &&
+                    std::isfinite(gradient.endColor.blue) &&
+                    std::isfinite(gradient.endColor.alpha);
+            };
             if (!gfx::decodePath(command, path) || !std::isfinite(path.strokeWidth) ||
                 !std::isfinite(path.tolerance) || path.strokeWidth < 0.0F ||
                 !std::isfinite(path.dashLength) || !std::isfinite(path.gapLength) ||
                 !std::isfinite(path.dashOffset) || path.dashLength < 0.0F ||
                 path.gapLength < 0.0F ||
+                (path.fillGradient && !finiteGradient(path.gradient)) ||
+                (path.strokeGradient && !finiteGradient(path.strokeGradientPaint)) ||
                 path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
                 path.viewBox.height <= 0.0F) {
                 throw std::runtime_error("Malformed path command");
@@ -1274,7 +1289,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (path.fill) drawPathTriangles(cached->triangles.fill, path.fillColor,
                                              path.fillGradient ? &path.gradient : nullptr);
-            if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor, nullptr);
+            if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor,
+                path.strokeGradient ? &path.strokeGradientPaint : nullptr);
         } else if (command.opcode == gfx::Opcode::drawText) {
             gfx::TextCommand text{};
             if (!gfx::decodeText(command, text) || !std::isfinite(text.left) ||

@@ -35,8 +35,9 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
   const capabilities = 0xffff_ffffn | ExtendedServerCapability.CapabilityWords64 |
     ExtendedServerCapability.ResourceStatusEvents | ExtendedServerCapability.LinearGradientCircles |
     ExtendedServerCapability.GridPatterns | ExtendedServerCapability.DashedPathStrokes;
-  payload.writeBigUInt64LE(capabilities);
-  assert.equal(decodeServerCapabilities(payload), capabilities);
+  const allCapabilities = capabilities | ExtendedServerCapability.GradientPathStrokes;
+  payload.writeBigUInt64LE(allCapabilities);
+  assert.equal(decodeServerCapabilities(payload), allCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
 });
 
@@ -417,18 +418,22 @@ test("canonical paths upload once and frames reference server-side vector geomet
         startColor: { red: 0, green: 0.4, blue: 0.8, alpha: 1 },
         endColor: { red: 0.8, green: 0.2, blue: 1, alpha: 1 } },
       lineCap: "round", lineJoin: "round",
+      strokeGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 24 },
+        startColor: { red: 1, green: 0.2, blue: 0.1, alpha: 1 },
+        endColor: { red: 1, green: 0.9, blue: 0.2, alpha: 1 } },
       dash: { length: 7, gap: 4, offset: -2 },
     });
   frame.endFrame();
   const bytes = frame.finish();
-  assert.equal(bytes.readUInt16LE(16), 27);
-  assert.equal(bytes.readUInt32LE(20), 144);
+  assert.equal(bytes.readUInt16LE(16), 28);
+  assert.equal(bytes.readUInt32LE(20), 192);
   assert.equal(bytes.readUInt32LE(24), 12);
-  assert.equal(bytes.readUInt8(28), 7);
+  assert.equal(bytes.readUInt8(28), 15);
   assert.equal(bytes.readFloatLE(24 + 124), 1);
-  assert.equal(bytes.readFloatLE(24 + 128), 7);
-  assert.equal(bytes.readFloatLE(24 + 132), 4);
-  assert.equal(bytes.readFloatLE(24 + 136), -2);
+  assert.equal(bytes.readFloatLE(24 + 128 + 8), 24);
+  assert.equal(bytes.readFloatLE(24 + 176), 7);
+  assert.equal(bytes.readFloatLE(24 + 180), 4);
+  assert.equal(bytes.readFloatLE(24 + 184), -2);
 });
 
 test("indexed meshes upload once and frames reference their resource", () => {

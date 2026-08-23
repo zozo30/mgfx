@@ -82,7 +82,9 @@ int main() {
                       {-0.8F, 0.8F, -0.4F, 0.4F}, {0.0F, 0.0F, 24.0F, 24.0F},
                       {0.0F, 0.0F, 0.0F, 0.0F}, {1.0F, 0.5F, 0.1F, 1.0F}, true,
                       {0.0F, 0.0F, 24.0F, 0.0F,
-                       {0.0F, 0.4F, 0.8F, 1.0F}, {0.8F, 0.2F, 1.0F, 1.0F}},
+                       {0.0F, 0.4F, 0.8F, 1.0F}, {0.8F, 0.2F, 1.0F, 1.0F}}, true,
+                      {0.0F, 0.0F, 24.0F, 24.0F,
+                       {1.0F, 0.2F, 0.1F, 1.0F}, {1.0F, 0.9F, 0.2F, 1.0F}},
                       7.0F, 4.0F, -2.0F});
     encoder.drawText({gfx::FontFamily::systemRounded, gfx::FontWeight::semibold,
                       gfx::FontStyle::italic,
@@ -234,6 +236,8 @@ int main() {
         path.lineCap != gfx::LineCap::round || !nearlyEqual(path.strokeWidth, 2.0F) ||
         !nearlyEqual(path.viewBox.width, 24.0F) || !nearlyEqual(path.strokeColor.green, 0.5F) ||
         !path.fillGradient || !nearlyEqual(path.gradient.endColor.blue, 1.0F) ||
+        !path.strokeGradient ||
+        !nearlyEqual(path.strokeGradientPaint.endColor.green, 0.9F) ||
         !nearlyEqual(path.dashLength, 7.0F) || !nearlyEqual(path.gapLength, 4.0F) ||
         !nearlyEqual(path.dashOffset, -2.0F) ||
         !decoder.next(command)) {

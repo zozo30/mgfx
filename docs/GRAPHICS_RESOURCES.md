@@ -70,6 +70,8 @@ features that the vector path does not yet support.
 The current `DrawPath` paint supports a two-stop source-space linear gradient.
 Gradient endpoints and colors are deliberately excluded from the tessellation
 cache key, allowing paint animation without rebuilding path geometry.
+`DrawExtendedPath` adds an independent two-stop stroke gradient, optionally
+combined with dashing, while preserving that paint-independent geometry cache.
 
 `DrawDashedPath` extends the same paint with dash length, gap, and signed phase.
 The server splits flattened contours at exact arc-length boundaries before using

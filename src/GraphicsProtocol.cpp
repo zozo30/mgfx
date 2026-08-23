@@ -336,11 +336,14 @@ void CommandEncoder::drawMesh(const MeshCommand& mesh) {
 
 void CommandEncoder::drawPath(const PathCommand& path) {
     const bool dashed = path.dashLength > 0.0F && path.gapLength > 0.0F;
-    beginCommand(dashed ? Opcode::drawDashedPath : Opcode::drawPath, dashed ? 144 : 128);
+    const bool extended = path.strokeGradient;
+    beginCommand(extended ? Opcode::drawExtendedPath : dashed ? Opcode::drawDashedPath : Opcode::drawPath,
+                 extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     appendU32(bytes_, path.pathId);
     bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
                                                (path.stroke ? 2U : 0U) |
-                                               (path.fillGradient ? 4U : 0U)));
+                                               (path.fillGradient ? 4U : 0U) |
+                                               (path.strokeGradient ? 8U : 0U)));
     bytes_.push_back(static_cast<std::uint8_t>(path.fillRule));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineCap));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineJoin));
@@ -363,6 +366,18 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                         path.gradient.endColor.red, path.gradient.endColor.green,
                         path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
         appendFloat(bytes_, value);
+    }
+    if (extended) {
+        for (float value : {path.strokeGradientPaint.startX, path.strokeGradientPaint.startY,
+                            path.strokeGradientPaint.endX, path.strokeGradientPaint.endY,
+                            path.strokeGradientPaint.startColor.red,
+                            path.strokeGradientPaint.startColor.green,
+                            path.strokeGradientPaint.startColor.blue,
+                            path.strokeGradientPaint.startColor.alpha,
+                            path.strokeGradientPaint.endColor.red,
+                            path.strokeGradientPaint.endColor.green,
+                            path.strokeGradientPaint.endColor.blue,
+                            path.strokeGradientPaint.endColor.alpha}) appendFloat(bytes_, value);
     }
     if (dashed) {
         appendFloat(bytes_, path.dashLength);
@@ -769,9 +784,11 @@ bool decodeMesh(const CommandView& command, MeshCommand& mesh) {
 
 bool decodePath(const CommandView& command, PathCommand& path) {
     const bool dashed = command.opcode == Opcode::drawDashedPath;
-    if ((!dashed && command.opcode != Opcode::drawPath) ||
-        command.payloadSize != (dashed ? 144U : 128U) ||
-        command.payload[4] > 7 ||
+    const bool extended = command.opcode == Opcode::drawExtendedPath;
+    const bool extendedDashed = extended && command.payloadSize == 192U;
+    if ((!dashed && !extended && command.opcode != Opcode::drawPath) ||
+        command.payloadSize != (extended ? (extendedDashed ? 192U : 176U) : dashed ? 144U : 128U) ||
+        command.payload[4] > 15 ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::round) ||
         command.payload[7] > static_cast<std::uint8_t>(LineJoin::round)) return false;
@@ -779,6 +796,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     path.fill = (command.payload[4] & 1U) != 0;
     path.stroke = (command.payload[4] & 2U) != 0;
     path.fillGradient = (command.payload[4] & 4U) != 0;
+    path.strokeGradient = (command.payload[4] & 8U) != 0;
     path.fillRule = static_cast<FillRule>(command.payload[5]);
     path.lineCap = static_cast<LineCap>(command.payload[6]);
     path.lineJoin = static_cast<LineJoin>(command.payload[7]);
@@ -798,13 +816,25 @@ bool decodePath(const CommandView& command, PathCommand& path) {
                       readFloat(command.payload + 104), readFloat(command.payload + 108)},
                      {readFloat(command.payload + 112), readFloat(command.payload + 116),
                       readFloat(command.payload + 120), readFloat(command.payload + 124)}};
-    path.dashLength = dashed ? readFloat(command.payload + 128) : 0.0F;
-    path.gapLength = dashed ? readFloat(command.payload + 132) : 0.0F;
-    path.dashOffset = dashed ? readFloat(command.payload + 136) : 0.0F;
-    if (dashed && readU32(command.payload + 140) != 0U) return false;
+    if (extended) {
+        path.strokeGradientPaint = {readFloat(command.payload + 128), readFloat(command.payload + 132),
+            readFloat(command.payload + 136), readFloat(command.payload + 140),
+            {readFloat(command.payload + 144), readFloat(command.payload + 148),
+             readFloat(command.payload + 152), readFloat(command.payload + 156)},
+            {readFloat(command.payload + 160), readFloat(command.payload + 164),
+             readFloat(command.payload + 168), readFloat(command.payload + 172)}};
+    }
+    const std::size_t dashOffset = extended ? 176U : 128U;
+    const bool hasDash = dashed || extendedDashed;
+    path.dashLength = hasDash ? readFloat(command.payload + dashOffset) : 0.0F;
+    path.gapLength = hasDash ? readFloat(command.payload + dashOffset + 4) : 0.0F;
+    path.dashOffset = hasDash ? readFloat(command.payload + dashOffset + 8) : 0.0F;
+    if (hasDash && readU32(command.payload + dashOffset + 12) != 0U) return false;
     return path.pathId != 0 && (path.fill || path.stroke) &&
            (!path.fillGradient || path.fill) &&
-           (!dashed || (path.stroke && path.dashLength > 0.0F && path.gapLength > 0.0F));
+           (!extended || path.strokeGradient) &&
+           (!path.strokeGradient || (extended && path.stroke)) &&
+           (!hasDash || (path.stroke && path.dashLength > 0.0F && path.gapLength > 0.0F));
 }
 
 bool decodeText(const CommandView& command, TextCommand& text) {

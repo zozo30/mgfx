@@ -38,6 +38,7 @@ enum class Opcode : std::uint16_t {
     drawLinearGradientCircle = 25,
     drawGridPattern = 26,
     drawDashedPath = 27,
+    drawExtendedPath = 28,
 };
 
 enum class Primitive : std::uint8_t {
@@ -255,6 +256,8 @@ struct PathCommand {
     Color strokeColor;
     bool fillGradient = false;
     PathGradient gradient{};
+    bool strokeGradient = false;
+    PathGradient strokeGradientPaint{};
     float dashLength = 0.0F;
     float gapLength = 0.0F;
     float dashOffset = 0.0F;

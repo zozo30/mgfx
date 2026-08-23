@@ -84,6 +84,7 @@ export const ExtendedServerCapability = {
   LinearGradientCircles: 1n << 34n,
   GridPatterns: 1n << 35n,
   DashedPathStrokes: 1n << 36n,
+  GradientPathStrokes: 1n << 37n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -236,6 +237,12 @@ export interface PathPaint {
     readonly endColor: Color;
   };
   readonly stroke?: Color;
+  readonly strokeGradient?: {
+    readonly start: { readonly x: number; readonly y: number };
+    readonly end: { readonly x: number; readonly y: number };
+    readonly startColor: Color;
+    readonly endColor: Color;
+  };
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
@@ -735,13 +742,15 @@ export class FrameEncoder {
     viewBox: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
     paint: PathPaint): void {
     if (!Number.isSafeInteger(pathId) || pathId <= 0 || pathId > 0xffff_ffff ||
-        (!paint.fill && !paint.fillGradient && !paint.stroke))
+        (!paint.fill && !paint.fillGradient && !paint.stroke && !paint.strokeGradient))
       throw new RangeError("Path draw requires an ID and paint");
     const dashed = paint.dash !== undefined;
-    const payload = Buffer.alloc(dashed ? 144 : 128);
+    const extended = paint.strokeGradient !== undefined;
+    const payload = Buffer.alloc(extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     payload.writeUInt32LE(pathId, 0);
     payload.writeUInt8((paint.fill || paint.fillGradient ? 1 : 0) |
-      (paint.stroke ? 2 : 0) | (paint.fillGradient ? 4 : 0), 4);
+      (paint.stroke || paint.strokeGradient ? 2 : 0) | (paint.fillGradient ? 4 : 0) |
+      (paint.strokeGradient ? 8 : 0), 4);
     payload.writeUInt8(paint.fillRule === "evenodd" ? 1 : 0, 5);
     payload.writeUInt8(paint.lineCap === "round" ? 1 : 0, 6);
     payload.writeUInt8(paint.lineJoin === "round" ? 1 : 0, 7);
@@ -764,14 +773,27 @@ export class FrameEncoder {
         if (!Number.isFinite(value)) throw new RangeError("Path draw values must be finite");
         payload.writeFloatLE(value, 16 + index * 4);
       });
+    if (paint.strokeGradient) {
+      [paint.strokeGradient.start.x, paint.strokeGradient.start.y,
+        paint.strokeGradient.end.x, paint.strokeGradient.end.y,
+        paint.strokeGradient.startColor.red, paint.strokeGradient.startColor.green,
+        paint.strokeGradient.startColor.blue, paint.strokeGradient.startColor.alpha,
+        paint.strokeGradient.endColor.red, paint.strokeGradient.endColor.green,
+        paint.strokeGradient.endColor.blue, paint.strokeGradient.endColor.alpha]
+        .forEach((value, index) => {
+          if (!Number.isFinite(value)) throw new RangeError("Path stroke gradient values must be finite");
+          payload.writeFloatLE(value, 128 + index * 4);
+        });
+    }
     if (paint.dash) {
       const values = [paint.dash.length, paint.dash.gap, paint.dash.offset ?? 0];
-      if (!paint.stroke || values.some((value) => !Number.isFinite(value)) ||
+      if ((!paint.stroke && !paint.strokeGradient) || values.some((value) => !Number.isFinite(value)) ||
           paint.dash.length <= 0 || paint.dash.gap <= 0)
         throw new RangeError("Dashed path requires a stroke and positive finite dash lengths");
-      values.forEach((value, index) => payload.writeFloatLE(value, 128 + index * 4));
+      const dashOffset = extended ? 176 : 128;
+      values.forEach((value, index) => payload.writeFloatLE(value, dashOffset + index * 4));
     }
-    this.command(dashed ? 27 : 7, payload);
+    this.command(extended ? 28 : dashed ? 27 : 7, payload);
   }
 
   richText(runs: readonly RichTextRun[], left: number, top: number, fontSize: number): void {

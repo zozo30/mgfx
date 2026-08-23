@@ -8,6 +8,7 @@ export interface SvgVectorLayer {
   readonly fill?: Color;
   readonly fillGradient?: LinearGradientPaint;
   readonly stroke?: Color;
+  readonly strokeGradient?: LinearGradientPaint;
   readonly strokeWidth: number;
   readonly fillRule: "nonzero" | "evenodd";
   readonly lineCap: "butt" | "round";
@@ -32,6 +33,7 @@ interface PaintState {
   readonly fill?: Color;
   readonly fillGradientId?: string;
   readonly stroke?: Color;
+  readonly strokeGradientId?: string;
   readonly strokeWidth: number;
   readonly opacity: number;
   readonly fillOpacity: number;
@@ -98,15 +100,19 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     const path = applyMatrix(rawPath, state.transform);
     const fill = state.fill ? multiplyAlpha(state.fill, state.opacity * state.fillOpacity) : undefined;
     const fillGradient = state.fillGradientId
-      ? resolveGradient(gradients, state.fillGradientId, path, state, viewBox) : undefined;
+      ? resolveGradient(gradients, state.fillGradientId, path, state, viewBox, state.fillOpacity) : undefined;
     const stroke = state.stroke ? multiplyAlpha(state.stroke, state.opacity * state.strokeOpacity) : undefined;
+    const strokeGradient = state.strokeGradientId
+      ? resolveGradient(gradients, state.strokeGradientId, path, state, viewBox,
+        state.strokeOpacity) : undefined;
     if ((!fill || fill.alpha <= 0) && !fillGradient &&
-        (!stroke || stroke.alpha <= 0 || state.strokeWidth <= 0)) continue;
+        ((!stroke || stroke.alpha <= 0) && !strokeGradient || state.strokeWidth <= 0)) continue;
     layers.push({ path, ...(fill ? { fill } : {}), ...(fillGradient ? { fillGradient } : {}),
-      ...(stroke ? { stroke } : {}),
+      ...(stroke ? { stroke } : {}), ...(strokeGradient ? { strokeGradient } : {}),
       strokeWidth: state.strokeWidth * matrixScale(state.transform), fillRule: state.fillRule,
       lineCap: state.lineCap, lineJoin: state.lineJoin,
-      ...(stroke && state.dash ? { dash: scaleDash(state.dash, matrixScale(state.transform)) } : {}) });
+      ...((stroke || strokeGradient) && state.dash
+        ? { dash: scaleDash(state.dash, matrixScale(state.transform)) } : {}) });
     if (layers.length > 1024) throw new RangeError("SVG exceeds 1024 vector layers");
   }
   if (layers.length === 0) throw new Error("SVG has no supported vector layers");
@@ -137,7 +143,11 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   const fill = attributes.fill === undefined ? parent.fill : gradientId ? undefined :
     parseColor(attributes.fill, currentColor);
   const fillGradientId = attributes.fill === undefined ? parent.fillGradientId : gradientId;
-  const stroke = attributes.stroke === undefined ? parent.stroke : parseColor(attributes.stroke, currentColor);
+  const strokeGradientId = attributes.stroke?.trim().match(/^url\(\s*#([^\s)]+)\s*\)$/i)?.[1];
+  const stroke = attributes.stroke === undefined ? parent.stroke : strokeGradientId ? undefined :
+    parseColor(attributes.stroke, currentColor);
+  const inheritedStrokeGradientId = attributes.stroke === undefined
+    ? parent.strokeGradientId : strokeGradientId;
   const strokeWidth = numberAttribute(attributes["stroke-width"], parent.strokeWidth);
   const opacity = clamp01(parent.opacity * numberAttribute(attributes.opacity, 1));
   const fillOpacity = clamp01(numberAttribute(attributes["fill-opacity"], parent.fillOpacity));
@@ -154,7 +164,9 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   const inheritedDash = dash && attributes["stroke-dashoffset"] !== undefined
     ? { ...dash, offset: finiteNumber(attributes["stroke-dashoffset"], 0) } : dash;
   return { ...(fill ? { fill } : {}), ...(fillGradientId ? { fillGradientId } : {}),
-    ...(stroke ? { stroke } : {}), strokeWidth, opacity, fillOpacity, strokeOpacity,
+    ...(stroke ? { stroke } : {}),
+    ...(inheritedStrokeGradientId ? { strokeGradientId: inheritedStrokeGradientId } : {}),
+    strokeWidth, opacity, fillOpacity, strokeOpacity,
     fillRule, lineCap, lineJoin, currentColor, ...(inheritedDash ? { dash: inheritedDash } : {}),
     transform: multiply(parent.transform, parseTransform(attributes.transform)) };
 }
@@ -200,7 +212,7 @@ function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<
 }
 
 function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,
-  path: string, state: PaintState, viewBox: Rect): LinearGradientPaint {
+  path: string, state: PaintState, viewBox: Rect, paintOpacity: number): LinearGradientPaint {
   const definition = definitions.get(id);
   if (!definition) throw new Error(`SVG linear gradient #${id} is not defined or does not have two stops`);
   let start: { x: number; y: number }, end: { x: number; y: number };
@@ -223,8 +235,8 @@ function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, i
       y: bounds.minY + normalizedEnd.y * (bounds.maxY - bounds.minY) };
   }
   return { start, end,
-    startColor: multiplyAlpha(definition.startColor, state.opacity * state.fillOpacity),
-    endColor: multiplyAlpha(definition.endColor, state.opacity * state.fillOpacity) };
+    startColor: multiplyAlpha(definition.startColor, state.opacity * paintOpacity),
+    endColor: multiplyAlpha(definition.endColor, state.opacity * paintOpacity) };
 }
 
 function transformPoint(matrix: Matrix, point: { readonly x: number; readonly y: number }) {

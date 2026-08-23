@@ -37,13 +37,16 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, sampli
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;
 
-export function Path({ data, color, gradient, strokeColor, strokeWidth = 0, viewBox, tolerance,
+export function Path({ data, color, gradient, strokeColor, strokeGradient, strokeWidth = 0, viewBox, tolerance,
   fillRule, lineCap = "round", lineJoin = "round", dash, style }: {
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
     readonly startColor: Color; readonly endColor: Color };
   readonly strokeColor?: Color;
+  readonly strokeGradient?: { readonly start: { readonly x: number; readonly y: number };
+    readonly end: { readonly x: number; readonly y: number };
+    readonly startColor: Color; readonly endColor: Color };
   readonly strokeWidth?: number; readonly viewBox?: { x: number; y: number;
     width: number; height: number }; readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round";
@@ -54,6 +57,7 @@ export function Path({ data, color, gradient, strokeColor, strokeWidth = 0, view
   const path: PathData = { resourceId: resource.resourceId, segments: resource.segments,
     viewBox: viewBox ?? resource.bounds, fit: "contain",
     ...(color ? { fill: color } : {}), ...(gradient ? { fillGradient: gradient } : {}),
+    ...(strokeGradient ? { strokeGradient } : {}),
     ...(strokeColor && strokeWidth > 0
       ? { stroke: strokeColor, strokeWidth } : {}),
     ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),
@@ -73,6 +77,8 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
       {...(layer.fill ? { color: layer.fill } : {})}
       {...(layer.fillGradient ? { gradient: layer.fillGradient } : {})}
       {...(layer.stroke ? { strokeColor: layer.stroke, strokeWidth: layer.strokeWidth } : {})}
+      {...(layer.strokeGradient
+        ? { strokeGradient: layer.strokeGradient, strokeWidth: layer.strokeWidth } : {})}
       {...(layer.dash ? { dash: layer.dash } : {})}
       fillRule={layer.fillRule} lineCap={layer.lineCap} lineJoin={layer.lineJoin}
       tolerance={tolerance} style={{ position: "absolute", inset: all(0) }} />)}

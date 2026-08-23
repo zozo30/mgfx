@@ -366,7 +366,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::resourceStatusEvents |
             mgfx::ipc::ServerCapability::linearGradientCircles |
             mgfx::ipc::ServerCapability::gridPatterns |
-            mgfx::ipc::ServerCapability::dashedPathStrokes;
+            mgfx::ipc::ServerCapability::dashedPathStrokes |
+            mgfx::ipc::ServerCapability::gradientPathStrokes;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

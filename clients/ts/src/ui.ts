@@ -248,6 +248,10 @@ export interface PathData {
     readonly startColor: Color; readonly endColor: Color;
   };
   readonly stroke?: Color;
+  readonly strokeGradient?: {
+    readonly start: Point; readonly end: Point;
+    readonly startColor: Color; readonly endColor: Color;
+  };
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
@@ -790,7 +794,7 @@ function paintServerRoundedRect(encoder: FrameEncoder, bounds: Rect, cornerRadiu
 
 function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefined,
   viewport: Size): void {
-  if (!path || (!path.fill && !path.fillGradient && !path.stroke) ||
+  if (!path || (!path.fill && !path.fillGradient && !path.stroke && !path.strokeGradient) ||
       path.viewBox.width <= 0 || path.viewBox.height <= 0) return;
   let destination = bounds;
   if (path.fit === "contain") {
@@ -808,6 +812,7 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
     ...(path.fill ? { fill: path.fill } : {}),
     ...(path.fillGradient ? { fillGradient: path.fillGradient } : {}),
     ...(path.stroke ? { stroke: path.stroke } : {}),
+    ...(path.strokeGradient ? { strokeGradient: path.strokeGradient } : {}),
     ...(path.strokeWidth !== undefined ? { strokeWidth: path.strokeWidth } : {}),
     ...(path.tolerance !== undefined ? { tolerance: path.tolerance } : {}),
     ...(path.fillRule ? { fillRule: path.fillRule } : {}),

@@ -62,3 +62,16 @@ test("SVG vector lowering reports unresolved gradient paint", () => {
     `<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z" fill="url(#missing)"/></svg>`),
   /gradient #missing/);
 });
+
+test("SVG documents lower linear-gradient dashed strokes without client geometry", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 40 20" fill="none">
+    <defs><linearGradient id="edge"><stop offset="0" stop-color="#ff8000"/>
+      <stop offset="1" stop-color="#ffe050"/></linearGradient></defs>
+    <path d="M2 10H38" stroke="url(#edge)" stroke-width="2"
+      stroke-dasharray="5 3" stroke-dashoffset="-1"/>
+  </svg>`);
+  assert.deepEqual(document.layers[0]?.strokeGradient?.start, { x: 2, y: 10 });
+  assert.deepEqual(document.layers[0]?.strokeGradient?.end, { x: 38, y: 10 });
+  assert.deepEqual(document.layers[0]?.dash, { length: 5, gap: 3, offset: -1 });
+  assert.equal(document.layers[0]?.stroke, undefined);
+});
