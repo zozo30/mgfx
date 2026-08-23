@@ -4,6 +4,7 @@ import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style
   type RichTextSpan, type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
 import { canonicalPath } from "./vector-path.js";
+import { parseSvgVectorDocument } from "./svg-document.js";
 import { useAnimationTime } from "./animation.js";
 
 export interface LayoutProps {
@@ -57,6 +58,22 @@ export function Path({ data, color, gradient, strokeColor, strokeWidth = 0, view
     ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),
     lineCap, lineJoin };
   return <mgfx-path path={path} style={style ?? {}} />;
+}
+
+export function Svg({ source, color, tolerance = 0.15, style }: {
+  readonly source: string; readonly color?: Color; readonly tolerance?: number;
+  readonly style?: Style;
+}) {
+  const currentColor = color ?? rgba(1, 1, 1);
+  const document = useMemo(() => parseSvgVectorDocument(source, currentColor),
+    [source, currentColor.red, currentColor.green, currentColor.blue, currentColor.alpha]);
+  return <Stack style={style ?? {}}>{document.layers.map((layer, index) =>
+    <Path key={`svg-layer-${index}`} data={layer.path} viewBox={document.viewBox}
+      {...(layer.fill ? { color: layer.fill } : {})}
+      {...(layer.stroke ? { strokeColor: layer.stroke, strokeWidth: layer.strokeWidth } : {})}
+      fillRule={layer.fillRule} lineCap={layer.lineCap} lineJoin={layer.lineJoin}
+      tolerance={tolerance} style={{ position: "absolute", inset: all(0) }} />)}
+  </Stack>;
 }
 
 export function Text({ value, style }: {

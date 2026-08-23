@@ -49,6 +49,13 @@ flattens curves and tessellates fills/strokes into cached geometry shared by
 Metal, Vulkan, or DirectX backends, avoiding duplicated tessellators in every
 language client without embedding a complete SVG engine in the server.
 
+React `<Svg>` implements the selective document path: a bounded parser reads the
+root view box, inherited fill/stroke/opacity state, nested groups, primitive
+shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
+becomes a stable path resource with its own compact paint command. Executable or
+external content is rejected, while gradients, masks, text, and embedded images
+deliberately continue through the high-quality raster fallback.
+
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the
 ID plus destination and view box, so resizing and animation do not retransmit
@@ -242,8 +249,8 @@ color glyph atlases remain available for small text and emoji.
    tessellation with geometry caching. Stroke contours are triangulated as one
    outline, so translucent segment joins do not darken from overlapping quads.
    Direct `<Mesh>` remains available.
-   Persistent colored mesh resources are also implemented. Next add selective
-   lowering of complete `<Svg>` documents.
+   Persistent colored mesh resources and selective lowering of complete `<Svg>`
+   documents are also implemented.
 4. **Partially implemented:** compact Unicode `DrawText` and `DrawRichText`, native
    shaping, persistent font uploads, cached glyph-outline geometry, exact
    asynchronous advance metrics, and frontend-owned multiline rich-text wrapping.

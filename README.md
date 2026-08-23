@@ -46,6 +46,14 @@ SVG currently uses a client-side high-quality raster fallback, including vector
 paths, gradients, masks, transforms, and system-font text; Metal still receives
 only the same portable texture resource and `DrawImage` command.
 
+React also exposes a selective vector `<Svg>` path for complete inline documents.
+It lowers paths, lines, polylines, polygons, rectangles, circles, and ellipses;
+inherits fill/stroke presentation attributes through nested groups; applies affine
+group transforms in source coordinates; and uploads every canonical layer once.
+Frames then contain only `DrawPath` references at the component's current layout
+size. Documents using gradients, masks, text, embedded images, or external content
+continue through the bounded raster fallback instead of partially misrendering.
+
 React can also submit indexed normalized `Mesh` geometry directly. Positions,
 per-vertex colors, and indices upload once as a connection-scoped mesh resource;
 frames carry only `DrawMesh`, its destination, and source view box. The server

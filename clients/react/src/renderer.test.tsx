@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Button, Mesh, Path, RichText, Text, TextField } from "./components.js";
+import { Button, Mesh, Path, RichText, Svg, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -62,6 +62,24 @@ test("React Path uploads canonical curves once and emits DrawPath instead of tri
   surface.resize({ width: 120, height: 100 });
   assert.equal(uploads, 1);
   assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 7);
+});
+
+test("React Svg composes a complete document from persistent server paths", () => {
+  let uploads = 0;
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; }, undefined, {
+    createPath: () => { uploads += 1; },
+  });
+  surface.render(<Svg source={`<svg viewBox="0 0 40 24" fill="none" stroke="currentColor">
+    <rect x="1" y="1" width="38" height="22" rx="4"/>
+    <circle cx="12" cy="12" r="6" fill="#22cc88" stroke="none"/>
+  </svg>`} color={{ red: 0.3, green: 0.8, blue: 1, alpha: 1 }}
+    style={{ preferredSize: { width: 200, height: 120 } }} />);
+  surface.resize({ width: 200, height: 120 });
+  assert.equal(uploads, 2);
+  assert.ok(frame);
+  assert.equal(frame.readUInt32LE(12), 4);
   assert.equal(frame.readUInt16LE(40), 7);
 });
 

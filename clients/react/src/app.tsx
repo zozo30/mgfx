@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Circle, Column, Image, Path, RichText, Row, Stack, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Circle, Column, Image, Path, RichText, Row, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -143,6 +143,31 @@ function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
   );
 }
 
+const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
+  <g transform="translate(4 4)">
+    <rect x="1" y="1" width="150" height="62" rx="12" fill="#07111f"
+      stroke="currentColor" stroke-width="2"/>
+    <circle cx="34" cy="32" r="17" fill="#16c784" stroke="#b9ffe0" stroke-width="3"/>
+    <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
+    <polyline points="78,42 89,24 99,42 110,24 121,42 131,24"
+      stroke="#ff8a1e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>`;
+
+function SvgDocumentPreview({ time }: { readonly time: number }) {
+  const pulse = (Math.sin(time / 480) + 1) / 2;
+  return <Row style={{ preferredSize: { height: 112 }, padding: all(12), gap: 18,
+    background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
+    <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
+      <Text value="SVG DOCUMENT → PATHS" style={{ fontSize: 22, fontWeight: "bold",
+        color: rgba(0.82, 0.86, 0.94) }} />
+    </Stack>
+    <Svg source={vectorDocument} color={rgba(0.30 + pulse * 0.3, 0.78, 1)}
+      style={{ preferredSize: { width: 320, height: 88 }, flexGrow: 1,
+        transform: { scaleX: 0.98 + pulse * 0.02, scaleY: 0.98 + pulse * 0.02 } }} />
+  </Row>;
+}
+
 interface AppProps {
   readonly animationClock: AnimationClock;
   readonly chromeMetrics: WindowChromeMetrics;
@@ -227,7 +252,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
       <DiagonalPattern time={animationTime} />
       <ImagePreview sourceSize={headerImageSize} />
       <ServerVectorPath time={animationTime} />
-      <IconGallery icons={vectorIcons} time={animationTime} />
+      <SvgDocumentPreview time={animationTime} />
       <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
         <Stack style={{ preferredSize: { height: 48 }, padding: all(14), cornerRadius: 10,
           background: rgba(0.30, 0.32, 0.42), flexGrow: 1 }}>

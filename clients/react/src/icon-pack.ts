@@ -10,18 +10,18 @@ export async function loadLucideIcons(names: readonly string[]): Promise<VectorI
       import.meta.url));
     const source = await readFile(location, "utf8");
     const paths = [...source.matchAll(/<(path|line|polyline|polygon|rect|circle|ellipse)\b([^>]*)\/?\s*>/g)]
-      .map((match) => primitivePath(match[1]!, attributes(match[2]!))).filter(Boolean);
+      .map((match) => svgPrimitivePath(match[1]!, svgAttributes(match[2]!))).filter(Boolean);
     if (paths.length === 0) throw new Error(`Lucide icon ${name} contains no paths`);
     return { name, path: paths.join(" ") };
   }));
 }
 
-function attributes(source: string): Readonly<Record<string, string>> {
-  return Object.fromEntries([...source.matchAll(/([\w:-]+)="([^"]*)"/g)]
-    .map((match) => [match[1]!, match[2]!]));
+export function svgAttributes(source: string): Readonly<Record<string, string>> {
+  return Object.fromEntries([...source.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)]
+    .map((match) => [match[1]!, match[2] ?? match[3] ?? ""]));
 }
 
-function primitivePath(tag: string, attr: Readonly<Record<string, string>>): string {
+export function svgPrimitivePath(tag: string, attr: Readonly<Record<string, string>>): string {
   const number = (name: string, fallback = 0) => Number(attr[name] ?? fallback);
   switch (tag) {
   case "path": return attr.d ?? "";
