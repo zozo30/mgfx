@@ -193,6 +193,11 @@ Animated diagonal fills now use one constant-size `DrawDiagonalPattern` record.
 Stripe width, gap, phase, direction, and color are evaluated per fragment, so
 large patterned areas no longer expand the Unix-socket frame with stripe quads.
 
+Filled/ring dot grids similarly use one `DrawDotGrid` record containing dimensions,
+a 32-bit fill mask, optional active cell, geometry, and colors. Metal evaluates every
+antialiased dot from the destination rectangle; the animated 4×4 title icon therefore
+replaces sixteen React circle nodes and sixteen per-frame draw commands.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,

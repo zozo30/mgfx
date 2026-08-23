@@ -30,6 +30,7 @@ enum class Opcode : std::uint16_t {
     drawDiagonalPattern = 17,
     drawLinearGradient = 18,
     drawImageSurface = 19,
+    drawDotGrid = 20,
 };
 
 enum class Primitive : std::uint8_t {
@@ -145,6 +146,20 @@ struct LinearGradientCommand {
     Color endColor;
 };
 
+struct DotGridCommand {
+    ClipRect destination;
+    std::uint32_t rows;
+    std::uint32_t columns;
+    std::uint32_t filledMask;
+    std::int32_t activeIndex;
+    float inset;
+    float radius;
+    float borderWidth;
+    Color fillColor;
+    Color ringColor;
+    Color highlightColor;
+};
+
 enum class FillRule : std::uint8_t { nonzero = 0, evenodd = 1 };
 enum class LineCap : std::uint8_t { butt = 0, round = 1 };
 enum class LineJoin : std::uint8_t { bevel = 0, round = 1 };
@@ -218,6 +233,7 @@ public:
     void drawCircle(const CircleCommand& circle);
     void drawDiagonalPattern(const DiagonalPatternCommand& pattern);
     void drawLinearGradient(const LinearGradientCommand& gradient);
+    void drawDotGrid(const DotGridCommand& grid);
 
     std::vector<std::uint8_t> finish();
 
@@ -260,5 +276,6 @@ bool decodeRoundedRect(const CommandView& command, RoundedRectCommand& rectangle
 bool decodeCircle(const CommandView& command, CircleCommand& circle);
 bool decodeDiagonalPattern(const CommandView& command, DiagonalPatternCommand& pattern);
 bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gradient);
+bool decodeDotGrid(const CommandView& command, DotGridCommand& grid);
 
 } // namespace gfx

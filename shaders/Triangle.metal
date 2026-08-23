@@ -345,3 +345,68 @@ fragment float4 patternFragmentMain(PatternVertexOut in [[stage_in]]) {
     const float alpha = in.color.a * coverage;
     return float4(in.color.rgb * alpha, alpha);
 }
+
+struct DotGridVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    uint rows;
+    uint columns;
+    uint filledMask;
+    uint activeIndex;
+    float inset;
+    float radius;
+    float borderWidth;
+    packed_float4 fillColor;
+    packed_float4 ringColor;
+    packed_float4 highlightColor;
+};
+
+struct DotGridVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    uint rows [[flat]];
+    uint columns [[flat]];
+    uint filledMask [[flat]];
+    uint activeIndex [[flat]];
+    float inset;
+    float radius;
+    float borderWidth;
+    float4 fillColor;
+    float4 ringColor;
+    float4 highlightColor;
+};
+
+vertex DotGridVertexOut dotGridVertexMain(const device DotGridVertex* vertices [[buffer(0)]],
+                                          uint vertexId [[vertex_id]]) {
+    const DotGridVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size,
+            value.rows, value.columns, value.filledMask, value.activeIndex,
+            value.inset, value.radius, value.borderWidth,
+            value.fillColor, value.ringColor, value.highlightColor};
+}
+
+fragment float4 dotGridFragmentMain(DotGridVertexOut in [[stage_in]]) {
+    const float2 available = in.size - in.inset * 2.0;
+    const float2 cellSize = available / float2(in.columns, in.rows);
+    const float2 relative = in.local - in.inset;
+    if (any(relative < 0.0) || any(relative >= available)) return 0.0;
+    const uint2 cell = uint2(floor(relative / cellSize));
+    const uint index = cell.y * in.columns + cell.x;
+    const float2 center = in.inset + (float2(cell) + 0.5) * cellSize;
+    const float edge = distance(in.local, center) - in.radius;
+    const float aa = max(fwidth(edge), 0.75);
+    const float outerCoverage = 1.0 - smoothstep(0.0, aa, edge);
+    const bool active = index == in.activeIndex;
+    const bool filled = active || ((in.filledMask & (1u << index)) != 0u);
+    float coverage = outerCoverage;
+    float4 color = active ? in.highlightColor : (filled ? in.fillColor : in.ringColor);
+    if (!filled) {
+        const float innerEdge = distance(in.local, center) - max(0.0, in.radius - in.borderWidth);
+        const float innerCoverage = 1.0 - smoothstep(0.0, aa, innerEdge);
+        coverage = max(0.0, outerCoverage - innerCoverage);
+    }
+    const float alpha = color.a * coverage;
+    return float4(color.rgb * alpha, alpha);
+}

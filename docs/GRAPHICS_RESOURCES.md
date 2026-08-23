@@ -161,6 +161,11 @@ direction, and color. The fragment shader derives a periodic antialiased mask;
 wire size stays constant as the patterned area grows. Support is advertised by
 `diagonalPatterns`.
 
+`DrawDotGrid` carries a destination, up to 32 cells, a fill bitmask, an optional
+active cell, dot geometry, and fill/ring/highlight colors. The fragment shader derives
+cell centers and antialiased disk or ring coverage, so grid density does not multiply
+display-list commands. Support is advertised by `dotGrids`.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

@@ -61,6 +61,7 @@ export enum ServerCapability {
   DiagonalPatterns = 1 << 19,
   LinearGradients = 1 << 20,
   ImageSurfaces = 1 << 21,
+  DotGrids = 1 << 22,
 }
 export interface ServerHello {
   readonly version: number;
@@ -155,6 +156,12 @@ export interface LinearGradientPaint {
   readonly destination: ClipRect; readonly cornerRadius: number;
   readonly direction: "horizontal" | "vertical" | "diagonal";
   readonly startColor: Color; readonly endColor: Color;
+}
+export interface DotGridPaint {
+  readonly destination: ClipRect; readonly rows: number; readonly columns: number;
+  readonly filledMask: number; readonly activeIndex: number;
+  readonly inset: number; readonly radius: number; readonly borderWidth: number;
+  readonly fillColor: Color; readonly ringColor: Color; readonly highlightColor: Color;
 }
 
 export type PathSegment =
@@ -748,6 +755,36 @@ export class FrameEncoder {
     const payload = Buffer.alloc(56);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(18, payload);
+  }
+
+  dotGrid(value: DotGridPaint): void {
+    const cellCount = value.rows * value.columns;
+    const floats = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.inset, value.radius, value.borderWidth,
+      value.fillColor.red, value.fillColor.green, value.fillColor.blue, value.fillColor.alpha,
+      value.ringColor.red, value.ringColor.green, value.ringColor.blue, value.ringColor.alpha,
+      value.highlightColor.red, value.highlightColor.green,
+      value.highlightColor.blue, value.highlightColor.alpha];
+    if (!Number.isInteger(value.rows) || !Number.isInteger(value.columns) || value.rows <= 0 ||
+        value.columns <= 0 || cellCount > 32 || !Number.isInteger(value.filledMask) ||
+        value.filledMask < 0 || value.filledMask > 0xffff_ffff ||
+        !Number.isInteger(value.activeIndex) || value.activeIndex < -1 ||
+        value.activeIndex >= cellCount || floats.some((item) => !Number.isFinite(item)) ||
+        value.inset < 0 || value.radius <= 0 || value.radius > 1024 ||
+        value.borderWidth < 0 || value.borderWidth > 1024)
+      throw new RangeError("Dot-grid values are outside supported bounds");
+    const payload = Buffer.alloc(96);
+    [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom].forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    payload.writeUInt32LE(value.rows, 16); payload.writeUInt32LE(value.columns, 20);
+    payload.writeUInt32LE(value.filledMask, 24); payload.writeInt32LE(value.activeIndex, 28);
+    [value.inset, value.radius, value.borderWidth, 0,
+      value.fillColor.red, value.fillColor.green, value.fillColor.blue, value.fillColor.alpha,
+      value.ringColor.red, value.ringColor.green, value.ringColor.blue, value.ringColor.alpha,
+      value.highlightColor.red, value.highlightColor.green,
+      value.highlightColor.blue, value.highlightColor.alpha]
+      .forEach((item, index) => payload.writeFloatLE(item, 32 + index * 4));
+    this.command(20, payload);
   }
 
   finish(): Buffer {

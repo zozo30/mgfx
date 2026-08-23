@@ -381,6 +381,27 @@ test("diagonal patterns lower to one constant-size server command", () => {
   assert.equal(frame.readUInt16LE(80), 17);
 });
 
+test("dot grids lower to one constant-size server command", () => {
+  class GridComponent extends Component {
+    build(): Element {
+      const ink = { red: 0.4, green: 0.9, blue: 0.6, alpha: 1 };
+      return box({ preferredSize: { width: 52, height: 52 },
+        backgroundDotGrid: { rows: 4, columns: 4, filledMask: 0xa142,
+          activeIndex: 3, fillColor: ink, ringColor: ink } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new GridComponent());
+  host.layout({ width: 52, height: 52 });
+  const encoder = new FrameEncoder();
+  host.paint(encoder, { width: 52, height: 52 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 20);
+  assert.equal(frame.readUInt32LE(20), 96);
+});
+
 test("indexed normalized meshes lower to backend-neutral colored triangles", () => {
   class MeshComponent extends Component {
     build(): Element {

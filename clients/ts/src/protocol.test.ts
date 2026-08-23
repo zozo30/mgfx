@@ -282,6 +282,27 @@ test("rounded image surfaces encode radius and sampling without client geometry"
     { left: 0, top: 1, right: 1, bottom: 0 }, undefined, undefined, 0));
 });
 
+test("dot grids encode all cells as one fixed pattern command", () => {
+  const frame = new FrameEncoder();
+  frame.dotGrid({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
+    rows: 4, columns: 4, filledMask: 0xa142, activeIndex: 7,
+    inset: 6, radius: 4, borderWidth: 2,
+    fillColor: { red: 0.4, green: 0.9, blue: 0.6, alpha: 1 },
+    ringColor: { red: 0.4, green: 0.9, blue: 0.6, alpha: 0.8 },
+    highlightColor: { red: 0.8, green: 1, blue: 0.9, alpha: 1 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 20);
+  assert.equal(bytes.readUInt32LE(20), 96);
+  assert.equal(bytes.readUInt32LE(48), 0xa142);
+  assert.equal(bytes.readInt32LE(52), 7);
+  assert.throws(() => frame.dotGrid({ destination: { left: 0, top: 1, right: 1, bottom: 0 },
+    rows: 6, columns: 6, filledMask: 0, activeIndex: -1, inset: 0, radius: 2,
+    borderWidth: 1, fillColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+    ringColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+    highlightColor: { red: 1, green: 1, blue: 1, alpha: 1 } }));
+});
+
 test("canonical paths upload once and frames reference server-side vector geometry", () => {
   const upload = encodePathCreate(12, [
     { verb: "move", x: 2, y: 12 },

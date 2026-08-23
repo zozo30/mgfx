@@ -220,6 +220,23 @@ void CommandEncoder::drawLinearGradient(const LinearGradientCommand& gradient) {
     }
 }
 
+void CommandEncoder::drawDotGrid(const DotGridCommand& grid) {
+    beginCommand(Opcode::drawDotGrid, 96);
+    for (float value : {grid.destination.left, grid.destination.top,
+                        grid.destination.right, grid.destination.bottom}) appendFloat(bytes_, value);
+    appendU32(bytes_, grid.rows);
+    appendU32(bytes_, grid.columns);
+    appendU32(bytes_, grid.filledMask);
+    appendU32(bytes_, static_cast<std::uint32_t>(grid.activeIndex));
+    for (float value : {grid.inset, grid.radius, grid.borderWidth, 0.0F,
+                        grid.fillColor.red, grid.fillColor.green,
+                        grid.fillColor.blue, grid.fillColor.alpha,
+                        grid.ringColor.red, grid.ringColor.green,
+                        grid.ringColor.blue, grid.ringColor.alpha,
+                        grid.highlightColor.red, grid.highlightColor.green,
+                        grid.highlightColor.blue, grid.highlightColor.alpha}) appendFloat(bytes_, value);
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -487,6 +504,27 @@ bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gra
                            readFloat(command.payload + 32), readFloat(command.payload + 36)};
     gradient.endColor = {readFloat(command.payload + 40), readFloat(command.payload + 44),
                          readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    return true;
+}
+
+bool decodeDotGrid(const CommandView& command, DotGridCommand& grid) {
+    if (command.opcode != Opcode::drawDotGrid || command.payloadSize != 96 ||
+        readFloat(command.payload + 44) != 0.0F) return false;
+    grid.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                        readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    grid.rows = readU32(command.payload + 16);
+    grid.columns = readU32(command.payload + 20);
+    grid.filledMask = readU32(command.payload + 24);
+    grid.activeIndex = static_cast<std::int32_t>(readU32(command.payload + 28));
+    grid.inset = readFloat(command.payload + 32);
+    grid.radius = readFloat(command.payload + 36);
+    grid.borderWidth = readFloat(command.payload + 40);
+    grid.fillColor = {readFloat(command.payload + 48), readFloat(command.payload + 52),
+                      readFloat(command.payload + 56), readFloat(command.payload + 60)};
+    grid.ringColor = {readFloat(command.payload + 64), readFloat(command.payload + 68),
+                      readFloat(command.payload + 72), readFloat(command.payload + 76)};
+    grid.highlightColor = {readFloat(command.payload + 80), readFloat(command.payload + 84),
+                           readFloat(command.payload + 88), readFloat(command.payload + 92)};
     return true;
 }
 

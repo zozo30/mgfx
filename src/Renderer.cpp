@@ -98,6 +98,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("linearGradientVertexMain")));
     auto linearGradientFragmentFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("linearGradientFragmentMain")));
+    auto dotGridVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("dotGridVertexMain")));
+    auto dotGridFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("dotGridFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !imageSurfaceVertexFunction || !imageSurfaceFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
@@ -105,7 +107,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         !roundedRectVertexFunction || !roundedRectFragmentFunction ||
         !circleVertexFunction || !circleFragmentFunction ||
         !patternVertexFunction || !patternFragmentFunction ||
-        !linearGradientVertexFunction || !linearGradientFragmentFunction) {
+        !linearGradientVertexFunction || !linearGradientFragmentFunction ||
+        !dotGridVertexFunction || !dotGridFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -259,6 +262,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(linearGradientDescriptor.get(), &error));
     if (!linearGradientPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the linear-gradient pipeline", error));
+    }
+
+    auto dotGridDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    dotGridDescriptor->setVertexFunction(dotGridVertexFunction.get());
+    dotGridDescriptor->setFragmentFunction(dotGridFragmentFunction.get());
+    dotGridDescriptor->setRasterSampleCount(sampleCount);
+    auto* dotGridColor = dotGridDescriptor->colorAttachments()->object(0);
+    dotGridColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    dotGridColor->setBlendingEnabled(true);
+    dotGridColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    dotGridColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    dotGridColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    dotGridColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    dotGridPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(dotGridDescriptor.get(), &error));
+    if (!dotGridPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the dot-grid pipeline", error));
     }
 }
 
@@ -779,6 +799,66 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(linearGradientPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawDotGrid) {
+            gfx::DotGridCommand grid{};
+            if (!gfx::decodeDotGrid(command, grid) || grid.rows == 0 || grid.columns == 0 ||
+                grid.rows > 32 || grid.columns > 32 || grid.rows * grid.columns > 32 ||
+                grid.activeIndex < -1 ||
+                grid.activeIndex >= static_cast<std::int32_t>(grid.rows * grid.columns) ||
+                !std::isfinite(grid.inset) || !std::isfinite(grid.radius) ||
+                !std::isfinite(grid.borderWidth) || grid.inset < 0.0F || grid.radius <= 0.0F ||
+                grid.radius > 1024.0F || grid.borderWidth < 0.0F || grid.borderWidth > 1024.0F) {
+                throw std::runtime_error("Malformed dot-grid command");
+            }
+            if (clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (grid.destination.right - grid.destination.left) * drawableWidth * 0.5F,
+                (grid.destination.top - grid.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= grid.inset * 2.0F || size[1] <= grid.inset * 2.0F) continue;
+            struct DotGridVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                std::uint32_t rows;
+                std::uint32_t columns;
+                std::uint32_t filledMask;
+                std::uint32_t activeIndex;
+                float inset;
+                float radius;
+                float borderWidth;
+                std::array<float, 4> fillColor;
+                std::array<float, 4> ringColor;
+                std::array<float, 4> highlightColor;
+            };
+            const float opacity = opacityStack.back();
+            const auto color = [opacity](gfx::Color value) {
+                return std::array<float, 4>{value.red, value.green, value.blue,
+                                            value.alpha * opacity};
+            };
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return DotGridVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, grid.rows, grid.columns, grid.filledMask,
+                    static_cast<std::uint32_t>(grid.activeIndex), grid.inset, grid.radius,
+                    grid.borderWidth, color(grid.fillColor), color(grid.ringColor),
+                    color(grid.highlightColor)};
+            };
+            const DotGridVertex vertices[] = {
+                vertex(grid.destination.left, grid.destination.top, 0.0F, 0.0F),
+                vertex(grid.destination.left, grid.destination.bottom, 0.0F, size[1]),
+                vertex(grid.destination.right, grid.destination.bottom, size[0], size[1]),
+                vertex(grid.destination.left, grid.destination.top, 0.0F, 0.0F),
+                vertex(grid.destination.right, grid.destination.bottom, size[0], size[1]),
+                vertex(grid.destination.right, grid.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(dotGridPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

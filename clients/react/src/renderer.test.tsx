@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
 import { Button, Path, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
-import { DotGrid } from "./app.js";
+import { DiagonalPattern, DotGrid } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
 import { AnimationProvider } from "./animation.js";
 
@@ -274,4 +274,24 @@ test("dot-grid animation timestamps produce visibly different frames", () => {
   const first = Buffer.from(frame);
   surface.render(<DotGrid time={280} />);
   assert.notDeepEqual(frame, first);
+});
+
+test("diagonal pattern animation advances from left to right", () => {
+  let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  const surface = new ReactSurface((value) => { frame = value; });
+  const patternOffset = (): number => {
+    let offset = 16;
+    while (offset < frame.length) {
+      const opcode = frame.readUInt16LE(offset);
+      const payloadSize = frame.readUInt32LE(offset + 4);
+      if (opcode === 17) return frame.readFloatLE(offset + 8 + 24);
+      offset += 8 + payloadSize;
+    }
+    throw new Error("DrawDiagonalPattern command not found");
+  };
+  surface.render(<DiagonalPattern time={0} />);
+  surface.resize({ width: 1200, height: 92 });
+  const first = patternOffset();
+  surface.render(<DiagonalPattern time={180} />);
+  assert.ok(patternOffset() < first);
 });

@@ -54,6 +54,10 @@ int main() {
                               {-0.6F, 0.6F, 0.6F, -0.6F},
                               {0.1F, 0.2F, 0.9F, 0.8F},
                               {0.8F, 1.0F, 0.7F, 0.9F}, 14.0F});
+    encoder.drawDotGrid({{-0.3F, 0.3F, 0.3F, -0.3F}, 4, 4, 0xA142U, 7,
+                         6.0F, 4.0F, 2.0F,
+                         {0.4F, 0.9F, 0.6F, 1.0F}, {0.4F, 0.9F, 0.6F, 0.8F},
+                         {0.8F, 1.0F, 0.9F, 1.0F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -149,6 +153,13 @@ int main() {
         !nearlyEqual(imageSurface.uv.left, 0.1F) ||
         !nearlyEqual(imageSurface.cornerRadius, 14.0F) || !decoder.next(command)) {
         return fail("Image-surface decoding failed");
+    }
+    gfx::DotGridCommand grid{};
+    if (!gfx::decodeDotGrid(command, grid) || grid.rows != 4 || grid.columns != 4 ||
+        grid.filledMask != 0xA142U || grid.activeIndex != 7 ||
+        !nearlyEqual(grid.radius, 4.0F) ||
+        !nearlyEqual(grid.highlightColor.green, 1.0F) || !decoder.next(command)) {
+        return fail("Dot-grid decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

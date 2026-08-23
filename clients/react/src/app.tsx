@@ -12,25 +12,14 @@ export function DotGrid({ time }: { readonly time: number }) {
   const activeDot = Math.floor(time / 140) % 16;
   const pattern = [false, true, false, true, false, false, true, false,
     true, false, false, false, false, true, false, true];
+  const filledMask = pattern.reduce((mask, filled, index) =>
+    filled ? mask | (1 << index) : mask, 0) >>> 0;
   return (
-    <Column style={{ preferredSize: { width: 52, height: 52 }, padding: all(5), gap: 3,
+    <Box style={{ preferredSize: { width: 52, height: 52 },
       background: rgba(0.04, 0.12, 0.09), borderWidth: 3, borderColor: ink,
-      mainAxisAlignment: "center", crossAxisAlignment: "stretch", clip: true }}>
-      {Array.from({ length: 4 }, (_, rowIndex) => (
-        <Row key={`dot-row-${rowIndex}`}
-          style={{ mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
-          {Array.from({ length: 4 }, (_, columnIndex) => {
-            const filled = pattern[rowIndex * 4 + columnIndex]!;
-            const highlighted = rowIndex * 4 + columnIndex === activeDot;
-            return <Circle key={`dot-${rowIndex}-${columnIndex}`} style={{
-              preferredSize: { width: 8, height: 8 },
-              background: highlighted ? highlight : filled ? ink : rgba(0, 0, 0, 0),
-              borderWidth: highlighted || filled ? 0 : 2, borderColor: ink,
-            }} />;
-          })}
-        </Row>
-      ))}
-    </Column>
+      backgroundDotGrid: { rows: 4, columns: 4, filledMask, activeIndex: activeDot,
+        inset: 7, radius: 4, borderWidth: 2, fillColor: ink,
+        ringColor: ink, highlightColor: highlight } }} />
   );
 }
 
@@ -76,7 +65,7 @@ export function DiagonalPattern({ time }: { readonly time: number }) {
         },
         backgroundPattern: {
           color: rgba(1, 0.56, 0.10), stripeWidth: 9, gap: 10,
-          direction: "forward", offset: time / 18,
+          direction: "forward", offset: -time / 18,
         },
         borderWidth: 2, borderColor: rgba(0.72, 0.76, 0.82) }} />
     </Row>
