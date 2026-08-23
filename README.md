@@ -94,6 +94,10 @@ that stroke uses radial paint.
 Arbitrary cached paths also accept two- through eight-stop conic fill or stroke
 paint. Their source-space center and rotation are fragment parameters, so a
 rotating angular gradient never re-uploads or retessellates its path.
+Persistent RGBA textures can likewise paint cached path fills or strokes. Metal
+maps source-space tile coordinates to a UV crop with optional X/Y repetition,
+tint, and nearest or linear sampling, giving images and rasterized SVG assets
+true vector clipping without client-generated mask geometry.
 The same gradient paint is available for strokes, so changing gradient colors
 does not invalidate tessellation. Two-value dashed strokes use the compact
 `DrawDashedPath` extension, while longer rhythms use `DrawDashArrayPath`: dash

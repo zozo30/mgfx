@@ -1,5 +1,6 @@
 import { FrameEncoder, Key, TextDecoration,
   type ClipRect, type Color, type PathConicGradientPaint, type PathRadialGradientPaint,
+  type PathTexturePaint,
   type PathSegment, type Vertex } from "./protocol.js";
 
 export interface Point { readonly x: number; readonly y: number }
@@ -252,6 +253,7 @@ export interface PathData {
   };
   readonly fillRadialGradient?: PathRadialGradientPaint;
   readonly fillConicGradient?: PathConicGradientPaint;
+  readonly fillTexture?: PathTexturePaint;
   readonly stroke?: Color;
   readonly strokeGradient?: {
     readonly start: Point; readonly end: Point;
@@ -261,6 +263,7 @@ export interface PathData {
   };
   readonly strokeRadialGradient?: PathRadialGradientPaint;
   readonly strokeConicGradient?: PathConicGradientPaint;
+  readonly strokeTexture?: PathTexturePaint;
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
@@ -806,8 +809,8 @@ function paintServerRoundedRect(encoder: FrameEncoder, bounds: Rect, cornerRadiu
 function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefined,
   viewport: Size): void {
   if (!path || (!path.fill && !path.fillGradient && !path.fillRadialGradient &&
-      !path.fillConicGradient && !path.stroke && !path.strokeGradient &&
-      !path.strokeRadialGradient && !path.strokeConicGradient) ||
+      !path.fillConicGradient && !path.fillTexture && !path.stroke && !path.strokeGradient &&
+      !path.strokeRadialGradient && !path.strokeConicGradient && !path.strokeTexture) ||
       path.viewBox.width <= 0 || path.viewBox.height <= 0) return;
   let destination = bounds;
   if (path.fit === "contain") {
@@ -826,10 +829,12 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
     ...(path.fillGradient ? { fillGradient: path.fillGradient } : {}),
     ...(path.fillRadialGradient ? { fillRadialGradient: path.fillRadialGradient } : {}),
     ...(path.fillConicGradient ? { fillConicGradient: path.fillConicGradient } : {}),
+    ...(path.fillTexture ? { fillTexture: path.fillTexture } : {}),
     ...(path.stroke ? { stroke: path.stroke } : {}),
     ...(path.strokeGradient ? { strokeGradient: path.strokeGradient } : {}),
     ...(path.strokeRadialGradient ? { strokeRadialGradient: path.strokeRadialGradient } : {}),
     ...(path.strokeConicGradient ? { strokeConicGradient: path.strokeConicGradient } : {}),
+    ...(path.strokeTexture ? { strokeTexture: path.strokeTexture } : {}),
     ...(path.strokeWidth !== undefined ? { strokeWidth: path.strokeWidth } : {}),
     ...(path.tolerance !== undefined ? { tolerance: path.tolerance } : {}),
     ...(path.fillRule ? { fillRule: path.fillRule } : {}),

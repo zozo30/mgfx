@@ -48,7 +48,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.TwoCircleRadialPathGradients |
     ExtendedServerCapability.RadialPathGradientStrokes |
     ExtendedServerCapability.StyledRadialPathPaint |
-    ExtendedServerCapability.ConicPathGradients;
+    ExtendedServerCapability.ConicPathGradients |
+    ExtendedServerCapability.TexturePathPaint;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -547,6 +548,34 @@ test("conic path paint rotates bounded stops over server-owned dashed geometry",
   assert.equal(bytes.readUInt8(24 + 150), 3);
   assert.deepEqual([0, 1].map((index) => bytes.readFloatLE(24 + 152 + index * 4)), [6, 3]);
   assert.equal(bytes.readFloatLE(24 + 160 + 20), 0.5);
+});
+
+test("texture path paint samples a persistent image over cached dashed geometry", () => {
+  const frame = new FrameEncoder();
+  frame.path(9, { left: 0, top: 1, right: 1, bottom: 0 },
+    { x: 0, y: 0, width: 40, height: 20 }, {
+      fill: { red: 0.02, green: 0.04, blue: 0.08, alpha: 1 }, strokeWidth: 3,
+      dash: { values: [5, 3, 2, 3], offset: -1 }, strokeTexture: {
+        textureId: 7, sourceRect: { x: 2, y: 3, width: 12, height: 8 },
+        uv: { left: 0.1, top: 0.2, right: 0.8, bottom: 0.9 },
+        tint: { red: 0.8, green: 1, blue: 0.9, alpha: 0.75 },
+        sampling: "nearest", repeatX: true, repeatY: false,
+      },
+    });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 38);
+  assert.equal(bytes.readUInt32LE(20), 216);
+  assert.equal(bytes.readUInt8(28), 3);
+  assert.equal(bytes.readUInt32LE(24 + 128), 7);
+  assert.equal(bytes.readUInt8(24 + 132), 1);
+  assert.equal(bytes.readUInt8(24 + 133), 1);
+  assert.equal(bytes.readUInt8(24 + 134), 0);
+  assert.equal(bytes.readUInt8(24 + 135), 1);
+  assert.equal(bytes.readFloatLE(24 + 144), 12);
+  assert.equal(bytes.readFloatLE(24 + 180), 0.75);
+  assert.equal(bytes.readFloatLE(24 + 188), -1);
+  assert.equal(bytes.readUInt16LE(24 + 192), 4);
 });
 
 test("multi-stop radial path paint remains one bounded native command", () => {

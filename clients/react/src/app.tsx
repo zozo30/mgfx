@@ -92,6 +92,12 @@ function ImagePreview({ sourceSize }: {
         fit="contain" style={{ preferredSize: { height: 102 }, flexGrow: 1,
           background: rgba(0.015, 0.02, 0.03), cornerRadius: 16,
           borderWidth: 2, borderColor: rgba(0.2, 0.3, 0.45) }} />
+      <Path data="M50 2L62 18L82 18L82 38L98 50L82 62L82 82L62 82L50 98L38 82L18 82L18 62L2 50L18 38L18 18L38 18Z M50 32A18 18 0 1 1 49.9 32Z"
+        viewBox={{ x: 0, y: 0, width: 100, height: 100 }} fillRule="evenodd"
+        texture={{ textureId: 1, sourceRect: { x: 0, y: 0, width: 34, height: 34 },
+          repeatX: true, repeatY: true, tint: rgba(0.8, 1, 0.9, 0.95) }}
+        strokeColor={rgba(0.34, 0.92, 0.72)} strokeWidth={2}
+        style={{ preferredSize: { width: 102, height: 102 } }} />
     </Row>
   );
 }

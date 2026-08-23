@@ -98,6 +98,7 @@ export const ExtendedServerCapability = {
   RadialPathGradientStrokes: 1n << 48n,
   StyledRadialPathPaint: 1n << 49n,
   ConicPathGradients: 1n << 50n,
+  TexturePathPaint: 1n << 51n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -267,15 +268,28 @@ export interface PathConicGradientPaint {
   readonly stops: readonly { readonly offset: number; readonly color: Color }[];
 }
 
+export interface PathTexturePaint {
+  readonly textureId: number;
+  readonly sourceRect: { readonly x: number; readonly y: number;
+    readonly width: number; readonly height: number };
+  readonly uv?: ClipRect;
+  readonly tint?: Color;
+  readonly sampling?: "linear" | "nearest";
+  readonly repeatX?: boolean;
+  readonly repeatY?: boolean;
+}
+
 export interface PathPaint {
   readonly fill?: Color;
   readonly fillGradient?: PathGradientPaint;
   readonly fillRadialGradient?: PathRadialGradientPaint;
   readonly fillConicGradient?: PathConicGradientPaint;
+  readonly fillTexture?: PathTexturePaint;
   readonly stroke?: Color;
   readonly strokeGradient?: PathGradientPaint;
   readonly strokeRadialGradient?: PathRadialGradientPaint;
   readonly strokeConicGradient?: PathConicGradientPaint;
+  readonly strokeTexture?: PathTexturePaint;
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
@@ -778,8 +792,9 @@ export class FrameEncoder {
     paint: PathPaint): void {
     if (!Number.isSafeInteger(pathId) || pathId <= 0 || pathId > 0xffff_ffff ||
         (!paint.fill && !paint.fillGradient && !paint.fillRadialGradient && !paint.fillConicGradient &&
+          !paint.fillTexture &&
           !paint.stroke && !paint.strokeGradient && !paint.strokeRadialGradient &&
-          !paint.strokeConicGradient))
+          !paint.strokeConicGradient && !paint.strokeTexture))
       throw new RangeError("Path draw requires an ID and paint");
     const dashArray = paint.dash !== undefined && "values" in paint.dash;
     const dashed = paint.dash !== undefined && !dashArray;
@@ -791,6 +806,9 @@ export class FrameEncoder {
       throw new RangeError("One path command can carry only one conic paint");
     const conicPaint = paint.fillConicGradient ?? paint.strokeConicGradient;
     const conicGradient = conicPaint !== undefined;
+    if (paint.fillTexture && paint.strokeTexture)
+      throw new RangeError("One path command can carry only one texture paint");
+    const texturePaint = paint.fillTexture ?? paint.strokeTexture;
     const radialPaint = paint.fillRadialGradient ?? paint.strokeRadialGradient;
     const radialGradient = radialPaint !== undefined;
     const radialStops = radialPaint?.stops ?? [];
@@ -829,11 +847,24 @@ export class FrameEncoder {
         (paint.fillConicGradient && (paint.fillGradient || paint.fillRadialGradient ||
           paint.strokeGradient)) ||
         (paint.strokeConicGradient && (paint.strokeGradient || paint.strokeRadialGradient)) ||
-        (conicGradient && radialGradient))
+        (conicGradient && radialGradient) ||
+        (paint.fillTexture && (paint.fillGradient || paint.strokeGradient)) ||
+        (paint.strokeTexture && paint.strokeGradient) ||
+        (texturePaint && (radialGradient || conicGradient)))
       throw new RangeError("Path command cannot combine multiple gradient models");
     if (conicGradient && (!Number.isFinite(conicPaint.center.x) ||
         !Number.isFinite(conicPaint.center.y) || !Number.isFinite(conicPaint.rotation ?? 0)))
       throw new RangeError("Conic path center and rotation must be finite");
+    const textureUv = texturePaint?.uv ?? { left: 0, top: 0, right: 1, bottom: 1 };
+    const textureTint = texturePaint?.tint ?? { red: 1, green: 1, blue: 1, alpha: 1 };
+    if (texturePaint && (!Number.isSafeInteger(texturePaint.textureId) ||
+        texturePaint.textureId <= 0 || texturePaint.textureId > 0xffff_ffff ||
+        texturePaint.sourceRect.width <= 0 || texturePaint.sourceRect.height <= 0 ||
+        [texturePaint.sourceRect.x, texturePaint.sourceRect.y, texturePaint.sourceRect.width,
+          texturePaint.sourceRect.height, textureUv.left, textureUv.top, textureUv.right,
+          textureUv.bottom, textureTint.red, textureTint.green, textureTint.blue, textureTint.alpha]
+          .some((value) => !Number.isFinite(value))))
+      throw new RangeError("Path texture values are outside supported bounds");
     if (styled && (!Number.isFinite(paint.miterLimit) || paint.miterLimit < 1 || paint.miterLimit > 1000))
       throw new RangeError("Path miter limit must be between 1 and 1000");
     if (dashArray && (paint.dash.values.length < 2 || paint.dash.values.length > 32 ||
@@ -848,9 +879,10 @@ export class FrameEncoder {
     const multiDash = paint.dash === undefined ? [] : "values" in paint.dash
       ? paint.dash.values : [paint.dash.length, paint.dash.gap];
     if (paint.dash && !paint.stroke && !paint.strokeGradient && !paint.strokeRadialGradient &&
-        !paint.strokeConicGradient)
+        !paint.strokeConicGradient && !paint.strokeTexture)
       throw new RangeError("Dashed path requires stroke paint");
-    const payload = Buffer.alloc(conicGradient
+    const payload = Buffer.alloc(texturePaint
+      ? 200 + multiDash.length * 4 : conicGradient
       ? 152 + multiDash.length * 4 + conicPaint.stops.length * 20 : styledRadialGradient
       ? 184 + multiDash.length * 4 + encodedRadialStops.length * 20 :
       twoCircleRadialGradient ? 176 + encodedRadialStops.length * 20 :
@@ -861,9 +893,9 @@ export class FrameEncoder {
       styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     payload.writeUInt32LE(pathId, 0);
     payload.writeUInt8((paint.fill || paint.fillGradient || paint.fillRadialGradient ||
-        paint.fillConicGradient ? 1 : 0) |
+        paint.fillConicGradient || paint.fillTexture ? 1 : 0) |
       (paint.stroke || paint.strokeGradient || paint.strokeRadialGradient ||
-        paint.strokeConicGradient ? 2 : 0) |
+        paint.strokeConicGradient || paint.strokeTexture ? 2 : 0) |
       (paint.fillGradient ? 4 : 0) | (paint.strokeGradient ? 8 : 0) |
       (paint.fillRadialGradient ? 16 : 0) | (paint.strokeRadialGradient ? 32 : 0) |
       (paint.fillConicGradient ? 64 : 0) | (paint.strokeConicGradient ? 128 : 0), 4);
@@ -889,6 +921,23 @@ export class FrameEncoder {
         if (!Number.isFinite(value)) throw new RangeError("Path draw values must be finite");
         payload.writeFloatLE(value, 16 + index * 4);
       });
+    if (texturePaint) {
+      payload.writeUInt32LE(texturePaint.textureId, 128);
+      payload.writeUInt8(texturePaint.sampling === "nearest" ? 1 : 0, 132);
+      payload.writeUInt8(texturePaint.repeatX ? 1 : 0, 133);
+      payload.writeUInt8(texturePaint.repeatY ? 1 : 0, 134);
+      payload.writeUInt8(paint.strokeTexture ? 1 : 0, 135);
+      [texturePaint.sourceRect.x, texturePaint.sourceRect.y,
+        texturePaint.sourceRect.width, texturePaint.sourceRect.height,
+        textureUv.left, textureUv.top, textureUv.right, textureUv.bottom,
+        textureTint.red, textureTint.green, textureTint.blue, textureTint.alpha,
+        paint.miterLimit ?? 4, paint.dash?.offset ?? 0]
+        .forEach((value, index) => payload.writeFloatLE(value, 136 + index * 4));
+      payload.writeUInt16LE(multiDash.length, 192);
+      multiDash.forEach((value, index) => payload.writeFloatLE(value, 200 + index * 4));
+      this.command(38, payload);
+      return;
+    }
     if (conicPaint) {
       [conicPaint.center.x, conicPaint.center.y, conicPaint.rotation ?? 0,
         paint.miterLimit ?? 4, paint.dash?.offset ?? 0]

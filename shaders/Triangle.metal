@@ -103,6 +103,33 @@ fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]],
     return float4(color.rgb * color.a, color.a);
 }
 
+struct PathTextureUniforms {
+    packed_float2 origin;
+    packed_float2 size;
+    packed_float2 uvOrigin;
+    packed_float2 uvSize;
+    packed_float4 tint;
+    uint sampling;
+    uint repeatX;
+    uint repeatY;
+    uint reserved;
+};
+
+fragment float4 pathTextureFragmentMain(RadialPathVertexOut in [[stage_in]],
+                                        constant PathTextureUniforms& paint [[buffer(0)]],
+                                        texture2d<float> image [[texture(0)]]) {
+    constexpr sampler linearSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+    constexpr sampler nearestSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float2 tile = (in.source - paint.origin) / paint.size;
+    tile.x = paint.repeatX != 0 ? fract(tile.x) : clamp(tile.x, 0.0, 1.0);
+    tile.y = paint.repeatY != 0 ? fract(tile.y) : clamp(tile.y, 0.0, 1.0);
+    const float2 uv = paint.uvOrigin + tile * paint.uvSize;
+    const float4 sampled = paint.sampling != 0
+        ? image.sample(nearestSampler, uv) : image.sample(linearSampler, uv);
+    return float4(sampled.rgb * paint.tint.rgb * paint.tint.a,
+                  sampled.a * paint.tint.a);
+}
+
 struct ImageVertex {
     packed_float2 position;
     packed_float2 uv;

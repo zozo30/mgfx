@@ -243,6 +243,12 @@ paint path; dash arrays, signed phase, caps, joins, and miter limits stay in the
 server tessellator. Animating rotation changes paint only. Support is advertised
 by `conicPathGradients`.
 
+`DrawTexturePath` binds an existing texture resource as paint for a cached path
+fill or stroke. A source-space tile rectangle maps to a normalized UV crop;
+independent X/Y repetition, tint, and nearest/linear sampling remain fragment
+parameters. Dashed textured strokes still use the server's geometry cache and
+tessellator. Support is advertised by `texturePathPaint`.
+
 ## Linear gradients
 
 `DrawLinearGradient` carries one destination, rounded-corner radius, a portable

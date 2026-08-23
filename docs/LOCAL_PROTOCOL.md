@@ -120,6 +120,7 @@ Two-circle radial path gradients with nonzero focal radius are advertised by `1 
 Radial gradient paint on path strokes is advertised by `1 << 48`.
 Styled and dashed radial path paint is advertised by `1 << 49`.
 Multi-stop conic paint on persistent paths is advertised by `1 << 50`.
+Texture paint on persistent path fills and strokes is advertised by `1 << 51`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -319,3 +320,12 @@ Dash lengths start at byte 152 and stops follow them. Payload size is
 `152 + dashCount * 4 + stopCount * 20`; dash count is zero or an even 2–32 and
 stop count is 2–8. Path flag bit 6 selects conic fill and bit 7 selects conic
 stroke. Capability bit 50 is required.
+
+MGFX opcode `38` (`DrawTexturePath`) starts with the 128-byte `DrawPath` base,
+then nonzero `u32 textureId`, `u8 sampling` (linear `0`, nearest `1`), `u8 repeatX`,
+`u8 repeatY`, and `u8 target` (fill `0`, stroke `1`). Four source-tile `f32`
+values (`x`, `y`, `width`, `height`), four normalized UV `f32` values, four tint
+`f32` values, `f32 miterLimit`, `f32 dashOffset`, `u16 dashCount`, reserved zero
+`u16`, and reserved zero `u32` complete the 200-byte header. Even dash lengths
+follow. Payload size is `200 + dashCount * 4`; dash count is zero or an even
+2–32. Capability bit 51 is required.

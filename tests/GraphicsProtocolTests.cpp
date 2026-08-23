@@ -141,6 +141,23 @@ int main() {
         {1.0F, {0.1F, 0.8F, 1.0F, 1.0F}},
     }};
     encoder.drawPath(conicPath);
+    gfx::PathCommand texturePath{};
+    texturePath.pathId = 12;
+    texturePath.fill = true;
+    texturePath.fillColor = {0.02F, 0.04F, 0.08F, 1.0F};
+    texturePath.stroke = true;
+    texturePath.strokeTexture = true;
+    texturePath.strokeWidth = 3.0F;
+    texturePath.tolerance = 0.25F;
+    texturePath.destination = {-0.4F, 0.4F, 0.4F, -0.4F};
+    texturePath.viewBox = {0.0F, 0.0F, 24.0F, 24.0F};
+    texturePath.miterLimit = 5.0F;
+    texturePath.dashOffset = -1.0F;
+    texturePath.dashPattern = {5.0F, 3.0F, 2.0F, 3.0F};
+    texturePath.texturePaint = {7, gfx::ImageSampling::nearest, true, false,
+        {2.0F, 3.0F, 12.0F, 8.0F}, {0.1F, 0.2F, 0.8F, 0.9F},
+        {0.8F, 1.0F, 0.9F, 0.75F}};
+    encoder.drawPath(texturePath);
     gfx::PathCommand multiRadialPath = radialPath;
     multiRadialPath.radialGradient.stops = {
         {0.0F, {1.0F, 1.0F, 1.0F, 1.0F}},
@@ -360,6 +377,19 @@ int main() {
         conicPathDecoded.dashPattern != std::vector<float>({6.0F, 3.0F}) ||
         !decoder.next(command)) {
         return fail("Conic path decoding failed");
+    }
+    gfx::PathCommand texturePathDecoded{};
+    if (!gfx::decodePath(command, texturePathDecoded) ||
+        !texturePathDecoded.fill || !texturePathDecoded.stroke ||
+        !texturePathDecoded.strokeTexture || texturePathDecoded.fillTexture ||
+        texturePathDecoded.texturePaint.textureId != 7U ||
+        texturePathDecoded.texturePaint.sampling != gfx::ImageSampling::nearest ||
+        !texturePathDecoded.texturePaint.repeatX || texturePathDecoded.texturePaint.repeatY ||
+        !nearlyEqual(texturePathDecoded.texturePaint.sourceRect.width, 12.0F) ||
+        !nearlyEqual(texturePathDecoded.texturePaint.tint.alpha, 0.75F) ||
+        texturePathDecoded.dashPattern != std::vector<float>({5.0F, 3.0F, 2.0F, 3.0F}) ||
+        !decoder.next(command)) {
+        return fail("Texture path decoding failed");
     }
     gfx::PathCommand multiRadialPathDecoded{};
     if (!gfx::decodePath(command, multiRadialPathDecoded) ||

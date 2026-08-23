@@ -82,6 +82,22 @@ test("React Path lowers animated conic paint without generating client geometry"
   assert.equal(frame.readFloatLE(40 + 8 + 136), 0.5);
 });
 
+test("React Path lowers persistent textures as native vector paint", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; }, undefined, {
+    createPath: () => {},
+  });
+  surface.render(<Path data="M2 2H22V22H2Z" viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+    texture={{ textureId: 7, sourceRect: { x: 0, y: 0, width: 8, height: 8 },
+      repeatX: true, repeatY: true, sampling: "nearest" }}
+    style={{ preferredSize: { width: 100, height: 100 } }} />);
+  surface.resize({ width: 100, height: 100 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 38);
+  assert.equal(frame.readUInt32LE(40 + 8 + 128), 7);
+  assert.equal(frame.readUInt8(40 + 8 + 133), 1);
+});
+
 test("React Svg composes a complete document from persistent server paths", () => {
   let uploads = 0;
   let frame: Buffer | undefined;

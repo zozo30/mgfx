@@ -81,6 +81,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("radialPathVertexMain")));
     auto radialPathFragmentFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("radialPathFragmentMain")));
+    auto pathTextureFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("pathTextureFragmentMain")));
     auto imageVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageVertexMain")));
     auto imageFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageFragmentMain")));
     auto imageSurfaceVertexFunction = NS::TransferPtr(
@@ -118,7 +120,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto conicGradientFragmentFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("conicGradientFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !radialPathVertexFunction ||
-        !radialPathFragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
+        !radialPathFragmentFunction || !pathTextureFragmentFunction ||
+        !imageVertexFunction || !imageFragmentFunction ||
         !imageSurfaceVertexFunction || !imageSurfaceFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
         !radialVertexFunction || !radialFragmentFunction ||
@@ -166,6 +169,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(radialPathDescriptor.get(), &error));
     if (!radialPathPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create radial path pipeline", error));
+    }
+
+    auto pathTextureDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    pathTextureDescriptor->setVertexFunction(radialPathVertexFunction.get());
+    pathTextureDescriptor->setFragmentFunction(pathTextureFragmentFunction.get());
+    pathTextureDescriptor->setRasterSampleCount(sampleCount);
+    auto* pathTextureColor = pathTextureDescriptor->colorAttachments()->object(0);
+    pathTextureColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    pathTextureColor->setBlendingEnabled(true);
+    pathTextureColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    pathTextureColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    pathTextureColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    pathTextureColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    pathTexturePipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(pathTextureDescriptor.get(), &error));
+    if (!pathTexturePipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create path texture pipeline", error));
     }
 
     auto imageDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -1216,7 +1236,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                    command.opcode == gfx::Opcode::drawFocalRadialPath ||
                    command.opcode == gfx::Opcode::drawTwoCircleRadialPath ||
                    command.opcode == gfx::Opcode::drawStyledRadialPath ||
-                   command.opcode == gfx::Opcode::drawConicPath) {
+                   command.opcode == gfx::Opcode::drawConicPath ||
+                   command.opcode == gfx::Opcode::drawTexturePath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1294,6 +1315,22 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                 !std::isfinite(stop.color.blue) ||
                                 !std::isfinite(stop.color.alpha);
                         }))) ||
+                ((path.fillTexture || path.strokeTexture) &&
+                   (path.texturePaint.textureId == 0U ||
+                    !std::isfinite(path.texturePaint.sourceRect.x) ||
+                    !std::isfinite(path.texturePaint.sourceRect.y) ||
+                    !std::isfinite(path.texturePaint.sourceRect.width) ||
+                    !std::isfinite(path.texturePaint.sourceRect.height) ||
+                    path.texturePaint.sourceRect.width <= 0.0F ||
+                    path.texturePaint.sourceRect.height <= 0.0F ||
+                    !std::isfinite(path.texturePaint.uv.left) ||
+                    !std::isfinite(path.texturePaint.uv.top) ||
+                    !std::isfinite(path.texturePaint.uv.right) ||
+                    !std::isfinite(path.texturePaint.uv.bottom) ||
+                    !std::isfinite(path.texturePaint.tint.red) ||
+                    !std::isfinite(path.texturePaint.tint.green) ||
+                    !std::isfinite(path.texturePaint.tint.blue) ||
+                    !std::isfinite(path.texturePaint.tint.alpha))) ||
                 path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
                 path.viewBox.height <= 0.0F) {
                 throw std::runtime_error("Malformed path command");
@@ -1330,8 +1367,62 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                                gfx::Color color,
                                                const gfx::PathGradient* gradient,
                                                const gfx::PathCommand::RadialGradient* radial,
-                                               const gfx::PathCommand::ConicGradient* conic) {
+                                               const gfx::PathCommand::ConicGradient* conic,
+                                               const gfx::PathCommand::TexturePaint* texture) {
                 if (points.empty()) return;
+                if (texture != nullptr) {
+                    const auto foundTexture = textures_.find(texture->textureId);
+                    if (foundTexture == textures_.end()) return;
+                    if (encoder == nullptr) {
+                        encoder = commandBuffer->renderCommandEncoder(renderPass);
+                        applyClip();
+                    }
+                    encoder->setRenderPipelineState(pathTexturePipelineState_.get());
+                    struct PathTextureUniforms {
+                        std::array<float, 2> origin, size, uvOrigin, uvSize;
+                        std::array<float, 4> tint;
+                        std::uint32_t sampling, repeatX, repeatY, reserved;
+                    };
+                    const float opacity = opacityStack.back();
+                    const PathTextureUniforms uniforms{
+                        {texture->sourceRect.x, texture->sourceRect.y},
+                        {texture->sourceRect.width, texture->sourceRect.height},
+                        {texture->uv.left, texture->uv.top},
+                        {texture->uv.right - texture->uv.left,
+                         texture->uv.bottom - texture->uv.top},
+                        {texture->tint.red, texture->tint.green, texture->tint.blue,
+                         texture->tint.alpha * opacity},
+                        texture->sampling == gfx::ImageSampling::nearest ? 1U : 0U,
+                        texture->repeatX ? 1U : 0U, texture->repeatY ? 1U : 0U, 0U};
+                    encoder->setFragmentBytes(&uniforms, sizeof(uniforms), 0);
+                    encoder->setFragmentTexture(foundTexture->second.get(), 0);
+                    struct PathTextureVertex {
+                        std::array<float, 2> position, source;
+                    };
+                    constexpr std::size_t maxVertices =
+                        (4096 / sizeof(PathTextureVertex) / 3) * 3;
+                    for (std::size_t first = 0; first < points.size();) {
+                        const std::size_t count = std::min(maxVertices, points.size() - first);
+                        std::vector<PathTextureVertex> vertices; vertices.reserve(count);
+                        for (std::size_t index = 0; index < count; ++index) {
+                            const gfx::PathPoint& point = points[first + index];
+                            const float x = path.destination.left +
+                                (point[0] - path.viewBox.x) / path.viewBox.width *
+                                (path.destination.right - path.destination.left);
+                            const float y = path.destination.top +
+                                (point[1] - path.viewBox.y) / path.viewBox.height *
+                                (path.destination.bottom - path.destination.top);
+                            vertices.push_back({transformPoint(currentTransform(), {x, y}), point});
+                        }
+                        encoder->setVertexBytes(vertices.data(),
+                            vertices.size() * sizeof(PathTextureVertex), 0);
+                        encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                            static_cast<NS::UInteger>(0),
+                            static_cast<NS::UInteger>(vertices.size()));
+                        first += count;
+                    }
+                    return;
+                }
                 if (radial != nullptr || conic != nullptr) {
                     if (encoder == nullptr) {
                         encoder = commandBuffer->renderCommandEncoder(renderPass);
@@ -1577,11 +1668,13 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             if (path.fill) drawPathTriangles(cached->triangles.fill, path.fillColor,
                 path.fillGradient ? &path.gradient : nullptr,
                 path.fillRadialGradient ? &path.radialGradient : nullptr,
-                path.fillConicGradient ? &path.conicGradient : nullptr);
+                path.fillConicGradient ? &path.conicGradient : nullptr,
+                path.fillTexture ? &path.texturePaint : nullptr);
             if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor,
                 path.strokeGradient ? &path.strokeGradientPaint : nullptr,
                 path.strokeRadialGradient ? &path.radialGradient : nullptr,
-                path.strokeConicGradient ? &path.conicGradient : nullptr);
+                path.strokeConicGradient ? &path.conicGradient : nullptr,
+                path.strokeTexture ? &path.texturePaint : nullptr);
         } else if (command.opcode == gfx::Opcode::drawText) {
             gfx::TextCommand text{};
             if (!gfx::decodeText(command, text) || !std::isfinite(text.left) ||

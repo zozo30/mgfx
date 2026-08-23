@@ -143,6 +143,10 @@ Direct React `Path` components also accept `conicGradient` and
 `strokeConicGradient`. Two through eight angular stops, a source-space center,
 and a radian rotation lower to one native path command; rotation animation does
 not invalidate the persistent path geometry.
+`texture` and `strokeTexture` bind an uploaded texture as vector paint. Their
+source-space tile rectangle, UV crop, repeat flags, sampling mode, and tint lower
+to one native path command; Metal samples only inside the server-tessellated
+fill or stroke geometry.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

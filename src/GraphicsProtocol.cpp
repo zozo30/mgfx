@@ -345,6 +345,7 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         path.strokeGradientPaint.spread != PathGradient::Spread::pad;
     const bool radialGradient = path.fillRadialGradient || path.strokeRadialGradient;
     const bool conicGradient = path.fillConicGradient || path.strokeConicGradient;
+    const bool texturePaint = path.fillTexture || path.strokeTexture;
     const bool styledRadialGradient = radialGradient && (dashed || dashArray || styled);
     const bool twoCircleRadialGradient = radialGradient && path.radialGradient.hasFocalPoint &&
         path.radialGradient.focalRadius > 0.0F;
@@ -371,9 +372,10 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         184 + multiDashCount * 4 + radialStopCount * 20);
     const std::uint32_t conicSize = static_cast<std::uint32_t>(
         152 + multiDashCount * 4 + conicStopCount * 20);
-    beginCommand(conicGradient ? Opcode::drawConicPath : styledRadialGradient ? Opcode::drawStyledRadialPath : twoCircleRadialGradient ? Opcode::drawTwoCircleRadialPath : focalRadialGradient ? Opcode::drawFocalRadialPath : multiRadialGradient ? Opcode::drawMultiRadialPath : radialGradient ? Opcode::drawRadialPath : multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
+    const std::uint32_t textureSize = static_cast<std::uint32_t>(200 + multiDashCount * 4);
+    beginCommand(texturePaint ? Opcode::drawTexturePath : conicGradient ? Opcode::drawConicPath : styledRadialGradient ? Opcode::drawStyledRadialPath : twoCircleRadialGradient ? Opcode::drawTwoCircleRadialPath : focalRadialGradient ? Opcode::drawFocalRadialPath : multiRadialGradient ? Opcode::drawMultiRadialPath : radialGradient ? Opcode::drawRadialPath : multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
                          : dashed ? Opcode::drawDashedPath : Opcode::drawPath,
-                 conicGradient ? conicSize : styledRadialGradient ? styledRadialSize : twoCircleRadialGradient ? twoCircleRadialSize : focalRadialGradient ? focalRadialSize : multiRadialGradient ? multiRadialSize : radialGradient ? 184U : multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
+                 texturePaint ? textureSize : conicGradient ? conicSize : styledRadialGradient ? styledRadialSize : twoCircleRadialGradient ? twoCircleRadialSize : focalRadialGradient ? focalRadialSize : multiRadialGradient ? multiRadialSize : radialGradient ? 184U : multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
                  styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     appendU32(bytes_, path.pathId);
     bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
@@ -407,7 +409,29 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                         path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
         appendFloat(bytes_, value);
     }
-    if (conicGradient) {
+    if (texturePaint) {
+        appendU32(bytes_, path.texturePaint.textureId);
+        bytes_.push_back(static_cast<std::uint8_t>(path.texturePaint.sampling));
+        bytes_.push_back(path.texturePaint.repeatX ? 1U : 0U);
+        bytes_.push_back(path.texturePaint.repeatY ? 1U : 0U);
+        bytes_.push_back(path.strokeTexture ? 1U : 0U);
+        for (float value : {path.texturePaint.sourceRect.x, path.texturePaint.sourceRect.y,
+                            path.texturePaint.sourceRect.width, path.texturePaint.sourceRect.height,
+                            path.texturePaint.uv.left, path.texturePaint.uv.top,
+                            path.texturePaint.uv.right, path.texturePaint.uv.bottom,
+                            path.texturePaint.tint.red, path.texturePaint.tint.green,
+                            path.texturePaint.tint.blue, path.texturePaint.tint.alpha,
+                            path.miterLimit, path.dashOffset}) appendFloat(bytes_, value);
+        appendU16(bytes_, static_cast<std::uint16_t>(multiDashCount));
+        appendU16(bytes_, 0);
+        appendU32(bytes_, 0);
+        if (dashArray) {
+            for (float value : path.dashPattern) appendFloat(bytes_, value);
+        } else if (dashed) {
+            appendFloat(bytes_, path.dashLength);
+            appendFloat(bytes_, path.gapLength);
+        }
+    } else if (conicGradient) {
         for (float value : {path.conicGradient.centerX, path.conicGradient.centerY,
                             path.conicGradient.rotation, path.miterLimit, path.dashOffset})
             appendFloat(bytes_, value);
@@ -508,7 +532,7 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                             path.strokeGradientPaint.endColor.blue,
                             path.strokeGradientPaint.endColor.alpha}) appendFloat(bytes_, value);
     }
-    if (radialGradient || conicGradient) {
+    if (radialGradient || conicGradient || texturePaint) {
         return;
     } else if (multiGradient) {
         appendFloat(bytes_, path.miterLimit);
@@ -963,6 +987,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const bool twoCircleRadialGradient = command.opcode == Opcode::drawTwoCircleRadialPath;
     const bool styledRadialGradient = command.opcode == Opcode::drawStyledRadialPath;
     const bool conicGradient = command.opcode == Opcode::drawConicPath;
+    const bool texturePaint = command.opcode == Opcode::drawTexturePath;
     const bool anyRadialGradient = radialGradient || multiRadialGradient ||
         focalRadialGradient || twoCircleRadialGradient || styledRadialGradient;
     const bool extendedDashed = extended && command.payloadSize == 192U;
@@ -1031,9 +1056,18 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         (conicDashCount == 0U || (conicDashCount >= 2U && conicDashCount % 2U == 0U)) &&
         command.payload[151] == 0U &&
         command.payloadSize == 152U + conicDashCount * 4U + conicStopCount * 20U;
+    const std::uint16_t textureDashCount = texturePaint && command.payloadSize >= 200U
+        ? readU16(command.payload + 192) : 0U;
+    const bool validTextureSize = texturePaint && textureDashCount <= 32U &&
+        (textureDashCount == 0U || (textureDashCount >= 2U && textureDashCount % 2U == 0U)) &&
+        command.payload[132] <= 1U && command.payload[133] <= 1U &&
+        command.payload[134] <= 1U && command.payload[135] <= 1U &&
+        readU16(command.payload + 194) == 0U && readU32(command.payload + 196) == 0U &&
+        command.payloadSize == 200U + textureDashCount * 4U;
     if ((!dashed && !extended && !styled && !dashArray && !multiGradient &&
-         !anyRadialGradient && !conicGradient && command.opcode != Opcode::drawPath) ||
-        (!dashArray && !multiGradient && !anyRadialGradient && !conicGradient &&
+         !anyRadialGradient && !conicGradient && !texturePaint &&
+         command.opcode != Opcode::drawPath) ||
+        (!dashArray && !multiGradient && !anyRadialGradient && !conicGradient && !texturePaint &&
          command.payloadSize != (styled ? 208U : extended ? (extendedDashed ? 192U : 176U)
                                                         : dashed ? 144U : 128U)) ||
         (dashArray && !validDashArraySize) ||
@@ -1044,7 +1078,9 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         (twoCircleRadialGradient && !validTwoCircleRadialSize) ||
         (styledRadialGradient && !validStyledRadialSize) ||
         (conicGradient && !validConicSize) ||
-        command.payload[4] > (conicGradient ? 255U : anyRadialGradient ? 63U : 15U) ||
+        (texturePaint && !validTextureSize) ||
+        command.payload[4] > (conicGradient ? 255U : anyRadialGradient ? 63U :
+                              texturePaint ? 3U : 15U) ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::square) ||
         command.payload[7] > static_cast<std::uint8_t>(LineJoin::miter)) return false;
@@ -1172,6 +1208,33 @@ bool decodePath(const CommandView& command, PathCommand& path) {
             path.conicGradient.stops.push_back(stop);
         }
     }
+    if (texturePaint) {
+        path.texturePaint.textureId = readU32(command.payload + 128);
+        path.texturePaint.sampling = static_cast<ImageSampling>(command.payload[132]);
+        path.texturePaint.repeatX = command.payload[133] != 0U;
+        path.texturePaint.repeatY = command.payload[134] != 0U;
+        path.fillTexture = command.payload[135] == 0U;
+        path.strokeTexture = command.payload[135] == 1U;
+        path.texturePaint.sourceRect = {readFloat(command.payload + 136),
+            readFloat(command.payload + 140), readFloat(command.payload + 144),
+            readFloat(command.payload + 148)};
+        path.texturePaint.uv = {readFloat(command.payload + 152), readFloat(command.payload + 156),
+            readFloat(command.payload + 160), readFloat(command.payload + 164)};
+        path.texturePaint.tint = {readFloat(command.payload + 168),
+            readFloat(command.payload + 172), readFloat(command.payload + 176),
+            readFloat(command.payload + 180)};
+        path.miterLimit = readFloat(command.payload + 184);
+        path.dashOffset = readFloat(command.payload + 188);
+        if (path.texturePaint.textureId == 0U || !std::isfinite(path.miterLimit) ||
+            path.miterLimit < 1.0F || path.miterLimit > 1000.0F ||
+            !std::isfinite(path.dashOffset)) return false;
+        path.dashPattern.reserve(textureDashCount);
+        for (std::uint16_t index = 0; index < textureDashCount; ++index) {
+            const float length = readFloat(command.payload + 200U + index * 4U);
+            if (!std::isfinite(length) || length <= 0.0F) return false;
+            path.dashPattern.push_back(length);
+        }
+    }
     const std::size_t dashOffset = (extended || styled) ? 176U : 128U;
     const bool styledDash = styled && (readFloat(command.payload + dashOffset) != 0.0F ||
         readFloat(command.payload + dashOffset + 4) != 0.0F ||
@@ -1179,10 +1242,10 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const bool hasDash = dashed || extendedDashed || styledDash;
     path.dashLength = hasDash ? readFloat(command.payload + dashOffset) : 0.0F;
     path.gapLength = hasDash ? readFloat(command.payload + dashOffset + 4) : 0.0F;
-    if (!styledRadialGradient && !conicGradient)
+    if (!styledRadialGradient && !conicGradient && !texturePaint)
         path.dashOffset = hasDash ? readFloat(command.payload + dashOffset + 8) : 0.0F;
     if ((hasDash || styled) && readU32(command.payload + dashOffset + 12) != 0U) return false;
-    if (!styledRadialGradient && !conicGradient)
+    if (!styledRadialGradient && !conicGradient && !texturePaint)
         path.miterLimit = styled ? readFloat(command.payload + 192) : 4.0F;
     if (styled && (!std::isfinite(path.miterLimit) || path.miterLimit < 1.0F ||
         path.miterLimit > 1000.0F ||
@@ -1244,11 +1307,14 @@ bool decodePath(const CommandView& command, PathCommand& path) {
            (!path.strokeConicGradient || (conicGradient && path.stroke && !path.strokeGradient &&
                                           !path.strokeRadialGradient)) &&
            (!conicGradient || path.fillConicGradient || path.strokeConicGradient) &&
+           (!texturePaint || ((path.fillTexture && path.fill) ||
+                              (path.strokeTexture && path.stroke))) &&
            (!extended || path.strokeGradient) &&
            (!path.strokeGradient || ((extended || styled || dashArray || multiGradient) && path.stroke)) &&
            (!(dashArray || (multiGradient && multiDashCount > 0U) ||
               (styledRadialGradient && styledRadialDashCount > 0U)) || path.stroke) &&
            (!(conicGradient && conicDashCount > 0U) || path.stroke) &&
+           (!(texturePaint && textureDashCount > 0U) || path.stroke) &&
            (!multiGradient || ((fillStopCount == 0U || path.fillGradient) &&
                                (strokeStopCount == 0U || path.strokeGradient))) &&
            (!hasDash || (path.stroke && path.dashLength > 0.0F && path.gapLength > 0.0F));
