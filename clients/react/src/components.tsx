@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Key, KeyModifier, type Color } from "@mgfx/demo-client/protocol";
 import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style,
-  type TextStyle } from "@mgfx/demo-client/ui";
+  type RichTextSpan, type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
 import { canonicalPath } from "./vector-path.js";
 import { useAnimationTime } from "./animation.js";
@@ -64,6 +64,14 @@ export function Text({ value, style }: {
   readonly style?: TextStyle;
 }) {
   return <mgfx-text value={value} textStyle={{ fontFamily: "system", fontSize: 22, ...style }} />;
+}
+
+export function RichText({ spans, style }: {
+  readonly spans: readonly RichTextSpan[];
+  readonly style?: TextStyle;
+}) {
+  return <mgfx-rich-text richTextSpans={spans}
+    textStyle={{ fontFamily: "system", fontSize: 22, ...style }} />;
 }
 
 export interface ButtonProps {

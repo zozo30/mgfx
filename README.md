@@ -301,6 +301,12 @@ nonzero ID. CoreText validates and shapes the font server-side; the client never
 converts glyphs to geometry. Resource versions prevent stale cached outlines
 after replacement, and fonts are released on destroy or disconnect.
 
+React `<RichText>` accepts declarative spans with independent color, family,
+weight, italic, tracking, decoration, and custom font ID. The client lowers the
+whole line to one `DrawRichText` command; Metal-side CoreText shaping advances
+the pen between runs and batches their colored glyph geometry. Exact per-run
+measurements still feed retained layout asynchronously.
+
 ## Requirements
 
 - macOS

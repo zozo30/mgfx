@@ -96,6 +96,7 @@ native letter spacing by `1 << 27`.
 Native font-metric underline and line-through are advertised by `1 << 28`.
 Portable serif and rounded system families are advertised by `1 << 29`.
 Persistent client font resources are advertised by `1 << 30`.
+Compact rich-text runs are advertised by `1 << 31`.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.
@@ -189,3 +190,8 @@ top-left position and font height, optional persistent font ID, straight RGBA
 color, and validated UTF-8.
 The backend shapes Unicode and caches tessellated glyph outlines; strings no
 longer expand into a triangle command for every pixel-font cell.
+
+MGFX opcode `24` (`DrawRichText`) carries one position and size plus up to 256
+UTF-8 runs. Each run independently selects family, weight, style, tracking,
+decoration, optional font resource, and color. The backend shapes runs in order
+and advances the shared pen from native metrics.

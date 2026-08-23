@@ -366,6 +366,38 @@ void CommandEncoder::drawText(const TextCommand& text) {
     bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
 }
 
+void CommandEncoder::drawRichText(const RichTextCommand& text) {
+    constexpr std::size_t headerSize = 16;
+    constexpr std::size_t runHeaderSize = 32;
+    std::size_t payloadSize = headerSize;
+    for (const RichTextRun& run : text.runs) {
+        if (run.text.empty() || run.text.size() > 65536 ||
+            payloadSize > std::numeric_limits<std::uint32_t>::max() - runHeaderSize - run.text.size()) {
+            throw std::length_error("Rich text command is empty or too large");
+        }
+        payloadSize += runHeaderSize + run.text.size();
+    }
+    if (text.runs.empty() || text.runs.size() > 256) {
+        throw std::length_error("Rich text requires 1 through 256 runs");
+    }
+    beginCommand(Opcode::drawRichText, static_cast<std::uint32_t>(payloadSize));
+    appendFloat(bytes_, text.left); appendFloat(bytes_, text.top); appendFloat(bytes_, text.fontSize);
+    appendU32(bytes_, static_cast<std::uint32_t>(text.runs.size()));
+    for (const RichTextRun& run : text.runs) {
+        bytes_.push_back(static_cast<std::uint8_t>(run.family));
+        bytes_.push_back(static_cast<std::uint8_t>(run.weight));
+        bytes_.push_back(static_cast<std::uint8_t>(run.style));
+        bytes_.push_back(run.decoration);
+        appendFloat(bytes_, run.letterSpacing);
+        appendU32(bytes_, run.fontResourceId);
+        for (float value : {run.color.red, run.color.green, run.color.blue, run.color.alpha}) {
+            appendFloat(bytes_, value);
+        }
+        appendU32(bytes_, static_cast<std::uint32_t>(run.text.size()));
+        bytes_.insert(bytes_.end(), run.text.begin(), run.text.end());
+    }
+}
+
 std::vector<std::uint8_t> CommandEncoder::finish() {
     if (bytes_.size() > std::numeric_limits<std::uint32_t>::max()) {
         throw std::length_error("Graphics command stream exceeds 4 GiB");
@@ -730,6 +762,47 @@ bool decodeText(const CommandView& command, TextCommand& text) {
     return (extension != 3 || text.fontResourceId != 0) &&
            std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10.0F &&
            text.text.find('\0') == std::string::npos;
+}
+
+bool decodeRichText(const CommandView& command, RichTextCommand& text) {
+    constexpr std::size_t headerSize = 16, runHeaderSize = 32;
+    if (command.opcode != Opcode::drawRichText || command.payloadSize <= headerSize) return false;
+    text.left = readFloat(command.payload);
+    text.top = readFloat(command.payload + 4);
+    text.fontSize = readFloat(command.payload + 8);
+    const std::uint32_t count = readU32(command.payload + 12);
+    if (count == 0 || count > 256 || !std::isfinite(text.left) || !std::isfinite(text.top) ||
+        !std::isfinite(text.fontSize) || text.fontSize <= 0.0F) return false;
+    text.runs.clear(); text.runs.reserve(count);
+    std::size_t offset = headerSize;
+    for (std::uint32_t index = 0; index < count; ++index) {
+        if (offset > command.payloadSize || command.payloadSize - offset < runHeaderSize) return false;
+        const std::uint8_t* bytes = command.payload + offset;
+        RichTextRun run{};
+        if (bytes[0] > static_cast<std::uint8_t>(FontFamily::systemRounded) ||
+            bytes[1] > static_cast<std::uint8_t>(FontWeight::semibold) ||
+            bytes[2] > static_cast<std::uint8_t>(FontStyle::italic) ||
+            bytes[3] > (underlineText | strikeThroughText)) return false;
+        run.family = static_cast<FontFamily>(bytes[0]);
+        run.weight = static_cast<FontWeight>(bytes[1]);
+        run.style = static_cast<FontStyle>(bytes[2]);
+        run.decoration = bytes[3];
+        run.letterSpacing = readFloat(bytes + 4);
+        run.fontResourceId = readU32(bytes + 8);
+        run.color = {readFloat(bytes + 12), readFloat(bytes + 16),
+                     readFloat(bytes + 20), readFloat(bytes + 24)};
+        const std::uint32_t length = readU32(bytes + 28);
+        offset += runHeaderSize;
+        if (length == 0 || length > 65536 || length > command.payloadSize - offset ||
+            !std::isfinite(run.color.red) || !std::isfinite(run.color.green) ||
+            !std::isfinite(run.color.blue) || !std::isfinite(run.color.alpha) ||
+            !std::isfinite(run.letterSpacing) || std::fabs(run.letterSpacing) > 10.0F) return false;
+        run.text.assign(reinterpret_cast<const char*>(command.payload + offset), length);
+        if (run.text.find('\0') != std::string::npos) return false;
+        offset += length;
+        text.runs.push_back(std::move(run));
+    }
+    return offset == command.payloadSize;
 }
 
 } // namespace gfx

@@ -74,6 +74,7 @@ export enum ServerCapability {
   TextDecorations = 1 << 28,
   PortableFontFamilies = 1 << 29,
   FontResources = 1 << 30,
+  RichTextRuns = 1 << 31,
 }
 export interface ServerHello {
   readonly version: number;
@@ -218,6 +219,16 @@ export type FontFamily = "system" | "monospace" | "serif" | "rounded";
 export type FontWeight = "regular" | "medium" | "semibold" | "bold";
 export type FontStyle = "regular" | "italic";
 export enum TextDecoration { None = 0, Underline = 1, LineThrough = 2 }
+export interface RichTextRun {
+  readonly text: string;
+  readonly color: Color;
+  readonly family?: FontFamily;
+  readonly weight?: FontWeight;
+  readonly style?: FontStyle;
+  readonly letterSpacing?: number;
+  readonly decoration?: TextDecoration;
+  readonly fontResourceId?: number;
+}
 const fontWeightCode = (weight: FontWeight): number =>
   weight === "bold" ? 1 : weight === "medium" ? 2 : weight === "semibold" ? 3 : 0;
 const fontFamilyCode = (family: FontFamily): number =>
@@ -709,6 +720,45 @@ export class FrameEncoder {
         payload.writeFloatLE(value, 16 + index * 4);
       });
     this.command(7, payload);
+  }
+
+  richText(runs: readonly RichTextRun[], left: number, top: number, fontSize: number): void {
+    if (runs.length === 0 || runs.length > 256)
+      throw new RangeError("Rich text requires 1 through 256 runs");
+    const encoded = runs.map((run) => Buffer.from(run.text, "utf8"));
+    const payload = Buffer.alloc(16 + encoded.reduce((size, text) => size + 32 + text.length, 0));
+    [left, top, fontSize].forEach((value, index) => {
+      if (!Number.isFinite(value) || (index === 2 && value <= 0))
+        throw new RangeError("Rich text position and size must be finite and size positive");
+      payload.writeFloatLE(value, index * 4);
+    });
+    payload.writeUInt32LE(runs.length, 12);
+    let offset = 16;
+    runs.forEach((run, index) => {
+      const text = encoded[index]!;
+      if (text.length === 0 || text.length > 65536 || text.includes(0))
+        throw new RangeError("Rich text runs require 1 through 65536 non-NUL UTF-8 bytes");
+      const spacing = run.letterSpacing ?? 0;
+      const decoration = run.decoration ?? TextDecoration.None;
+      const fontId = run.fontResourceId ?? 0;
+      const colors = [run.color.red, run.color.green, run.color.blue, run.color.alpha];
+      if (!Number.isFinite(spacing) || Math.abs(spacing) > 10 || decoration < 0 || decoration > 3 ||
+          !Number.isInteger(fontId) || fontId < 0 || fontId > 0xffff_ffff ||
+          colors.some((value) => !Number.isFinite(value)))
+        throw new RangeError("Invalid rich text run style");
+      payload.writeUInt8(fontFamilyCode(run.family ?? "system"), offset);
+      payload.writeUInt8(fontWeightCode(run.weight ?? "regular"), offset + 1);
+      payload.writeUInt8(run.style === "italic" ? 1 : 0, offset + 2);
+      payload.writeUInt8(decoration, offset + 3);
+      payload.writeFloatLE(spacing, offset + 4);
+      payload.writeUInt32LE(fontId, offset + 8);
+      colors
+        .forEach((value, colorIndex) => payload.writeFloatLE(value, offset + 12 + colorIndex * 4));
+      payload.writeUInt32LE(text.length, offset + 28);
+      text.copy(payload, offset + 32);
+      offset += 32 + text.length;
+    });
+    this.command(24, payload);
   }
 
   systemText(text: string, left: number, top: number, fontSize: number,

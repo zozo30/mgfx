@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Button, Mesh, Path, Text, TextField } from "./components.js";
+import { Button, Mesh, Path, RichText, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -30,6 +30,20 @@ test("React Text defaults to native server shaping", () => {
   surface.resize({ width: 240, height: 40 });
   assert.ok(frame);
   assert.equal(frame.readUInt16LE(40), 8);
+});
+
+test("React RichText lowers styled spans to one native command", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<RichText style={{ fontSize: 24 }} spans={[
+    { value: "Rich ", style: { fontWeight: "bold", color: { red: 1, green: 0, blue: 0, alpha: 1 } } },
+    { value: "text", style: { fontFamily: "serif", fontStyle: "italic",
+      color: { red: 0, green: 1, blue: 1, alpha: 1 } } },
+  ]} />);
+  surface.resize({ width: 300, height: 60 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 24);
+  assert.equal(frame.readUInt32LE(60), 2);
 });
 
 test("React Path uploads canonical curves once and emits DrawPath instead of triangles", () => {

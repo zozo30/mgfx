@@ -82,6 +82,12 @@ int main() {
                       77,
                       -0.8F, 0.7F, 0.08F,
                       {0.7F, 0.9F, 1.0F, 1.0F}, "Hello — Ω"});
+    encoder.drawRichText({-0.7F, 0.5F, 0.07F, {
+        {gfx::FontFamily::systemSans, gfx::FontWeight::bold, gfx::FontStyle::regular,
+         0.0F, gfx::noTextDecoration, 0, {1.0F, 0.4F, 0.2F, 1.0F}, "Rich "},
+        {gfx::FontFamily::systemSerif, gfx::FontWeight::regular, gfx::FontStyle::italic,
+         0.04F, gfx::underlineText, 77, {0.3F, 0.9F, 1.0F, 1.0F}, "text"},
+    }});
     encoder.endFrame();
     const std::vector<std::uint8_t> bytes = encoder.finish();
 
@@ -213,7 +219,14 @@ int main() {
         !nearlyEqual(text.letterSpacing, 0.08F) ||
         text.decoration != (gfx::underlineText | gfx::strikeThroughText) ||
         text.fontResourceId != 77 ||
-        text.text != "Hello — Ω" || !nearlyEqual(text.fontSize, 0.08F) ||
+        text.text != "Hello — Ω" || !nearlyEqual(text.fontSize, 0.08F) || !decoder.next(command)) {
+        return fail("Text decoding failed");
+    }
+    gfx::RichTextCommand rich{};
+    if (!gfx::decodeRichText(command, rich) || rich.runs.size() != 2 ||
+        rich.runs[0].text != "Rich " || rich.runs[0].weight != gfx::FontWeight::bold ||
+        rich.runs[1].text != "text" || rich.runs[1].family != gfx::FontFamily::systemSerif ||
+        rich.runs[1].decoration != gfx::underlineText || rich.runs[1].fontResourceId != 77 ||
         !decoder.next(command) || command.opcode != gfx::Opcode::endFrame ||
         decoder.next(command) || !decoder.valid()) {
         return fail("End-of-frame decoding failed");

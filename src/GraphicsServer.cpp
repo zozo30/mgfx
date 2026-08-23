@@ -346,7 +346,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::textLetterSpacing |
             mgfx::ipc::ServerCapability::textDecorations |
             mgfx::ipc::ServerCapability::portableFontFamilies |
-            mgfx::ipc::ServerCapability::fontResources;
+            mgfx::ipc::ServerCapability::fontResources |
+            mgfx::ipc::ServerCapability::richTextRuns;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

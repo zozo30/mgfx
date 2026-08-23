@@ -413,6 +413,27 @@ test("font files upload once as bounded persistent resources", () => {
   assert.deepEqual(font.subarray(4), Buffer.from([0, 1, 0, 0, 4, 8, 15, 16, 23, 42]));
 });
 
+test("rich text packs styled UTF-8 runs into one display-list command", () => {
+  const frame = new FrameEncoder();
+  frame.richText([
+    { text: "Rich ", color: { red: 1, green: 0.4, blue: 0.2, alpha: 1 }, weight: "bold" },
+    { text: "Ω", color: { red: 0.2, green: 0.9, blue: 1, alpha: 1 }, family: "serif",
+      style: "italic", decoration: TextDecoration.Underline, fontResourceId: 42 },
+  ], -0.7, 0.5, 0.08);
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 24);
+  assert.equal(bytes.readUInt32LE(36), 2);
+  assert.equal(bytes.readUInt8(40), 0);
+  assert.equal(bytes.readUInt8(41), 1);
+  assert.equal(bytes.subarray(72, 77).toString(), "Rich ");
+  const second = 77;
+  assert.equal(bytes.readUInt8(second), 2);
+  assert.equal(bytes.readUInt8(second + 2), 1);
+  assert.equal(bytes.readUInt8(second + 3), TextDecoration.Underline);
+  assert.equal(bytes.readUInt32LE(second + 8), 42);
+});
+
 test("native text metrics correlate asynchronous measurement replies", async () => {
   const sent: Array<{ payload: Buffer; sequence: number }> = [];
   const metrics = new TextMetricsClient((payload, sequence) => sent.push({ payload, sequence }));

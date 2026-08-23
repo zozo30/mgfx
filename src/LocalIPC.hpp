@@ -87,6 +87,7 @@ enum ServerCapability : std::uint32_t {
     textDecorations = 1U << 28U,
     portableFontFamilies = 1U << 29U,
     fontResources = 1U << 30U,
+    richTextRuns = 1U << 31U,
 };
 
 enum class TextFamily : std::uint8_t {

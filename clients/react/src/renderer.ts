@@ -5,14 +5,14 @@ import { FrameEncoder, type FontFamily, type FontStyle, type FontWeight, type Ke
   type MeshUploadVertex, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
   box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
-  nativeTextAdvance, nativeTextMetricRuns, row, scrollView, stack, text,
-  type Element, type Point, type Size, type Style, type TextStyle,
+  nativeTextAdvance, nativeTextMetricRuns, richText, row, scrollView, stack, text,
+  type Element, type Point, type RichTextSpan, type Size, type Style, type TextStyle,
   mesh, path as vectorPath, type MeshData, type PathData,
 } from "@mgfx/demo-client/ui";
 import { NativeWindowProvider, type NativeWindowCommands } from "./native-window.js";
 
 export type HostType = "mgfx-box" | "mgfx-row" | "mgfx-column" | "mgfx-stack" |
-  "mgfx-circle" | "mgfx-text" | "mgfx-scroll" | "mgfx-mesh" | "mgfx-path";
+  "mgfx-circle" | "mgfx-text" | "mgfx-rich-text" | "mgfx-scroll" | "mgfx-mesh" | "mgfx-path";
 
 export interface HostProps {
   readonly children?: ReactNode; readonly style?: Style; readonly value?: string;
@@ -25,6 +25,7 @@ export interface HostProps {
   readonly onTextInput?: (value: string) => void;
   readonly mesh?: MeshData;
   readonly path?: PathData;
+  readonly richTextSpans?: readonly RichTextSpan[];
 }
 
 interface HostNode { kind: "host"; id: number; type: HostType; props: HostProps; children: HostChild[]; hidden: boolean }
@@ -144,6 +145,9 @@ function toElement(child: HostChild): Element[] {
     element = text(child.props.value ?? raw, child.props.textStyle ?? {}, key);
     break;
   }
+  case "mgfx-rich-text":
+    element = richText(child.props.richTextSpans ?? [], child.props.textStyle ?? {}, key);
+    break;
   case "mgfx-scroll": element = scrollView(children[0] ?? box(), child.props.offsetY ?? 0,
     style, key, child.props.onScroll); break;
   default: element = children.length === 0 ? box(style, key) : stack(children, style, key);
@@ -289,6 +293,33 @@ export class ReactSurface {
                 }
               }).catch(() => {});
             }
+          }
+        }
+      }
+      if (child.type === "mgfx-rich-text") {
+        const base = child.props.textStyle ?? {};
+        for (const span of child.props.richTextSpans ?? []) {
+          const textStyle = { ...base, ...span.style, fontSize: base.fontSize ?? 16 };
+          const family = textStyle.fontFamily;
+          if (!family || family === "pixel") continue;
+          const weight = textStyle.fontWeight ?? "regular";
+          const style = textStyle.fontStyle ?? "regular";
+          const fontSize = textStyle.fontSize ?? 16;
+          const spacing = (textStyle.letterSpacing ?? 0) / fontSize;
+          const fontId = textStyle.fontResourceId ?? 0;
+          for (const run of nativeTextMetricRuns(span.value, textStyle)) {
+            if (nativeTextAdvance(family, run, weight, style, spacing, fontId) !== undefined) continue;
+            const key = `${family}\0${fontId}\0${weight}\0${style}\0${spacing}\0${run}`;
+            if (this.requestedTextMetrics.has(key) || !this.resourceCommands?.measureText) continue;
+            this.requestedTextMetrics.add(key);
+            void this.resourceCommands.measureText(family, run, weight, style, spacing, fontId)
+              .then((advance) => {
+                cacheNativeTextAdvance(family, run, advance, weight, style, spacing, fontId);
+                if (!this.metricRelayoutScheduled) {
+                  this.metricRelayoutScheduled = true;
+                  queueMicrotask(() => { this.metricRelayoutScheduled = false; this.submit(); });
+                }
+              }).catch(() => {});
           }
         }
       }

@@ -34,6 +34,7 @@ enum class Opcode : std::uint16_t {
     drawWaveDots = 21,
     drawMesh = 22,
     drawConicGradient = 23,
+    drawRichText = 24,
 };
 
 enum class Primitive : std::uint8_t {
@@ -261,6 +262,24 @@ struct TextCommand {
     std::string text;
 };
 
+struct RichTextRun {
+    FontFamily family;
+    FontWeight weight;
+    FontStyle style;
+    float letterSpacing;
+    std::uint8_t decoration;
+    std::uint32_t fontResourceId;
+    Color color;
+    std::string text;
+};
+
+struct RichTextCommand {
+    float left;
+    float top;
+    float fontSize;
+    std::vector<RichTextRun> runs;
+};
+
 class CommandEncoder final {
 public:
     CommandEncoder();
@@ -275,6 +294,7 @@ public:
     void drawMesh(const MeshCommand& mesh);
     void drawPath(const PathCommand& path);
     void drawText(const TextCommand& text);
+    void drawRichText(const RichTextCommand& text);
     void pushTransform(AffineTransform transform);
     void popTransform();
     void pushOpacity(float opacity);
@@ -323,6 +343,7 @@ bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image);
 bool decodeMesh(const CommandView& command, MeshCommand& mesh);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);
+bool decodeRichText(const CommandView& command, RichTextCommand& text);
 bool decodePushTransform(const CommandView& command, AffineTransform& transform);
 bool decodePushOpacity(const CommandView& command, float& opacity);
 bool decodeShadow(const CommandView& command, ShadowCommand& shadow);

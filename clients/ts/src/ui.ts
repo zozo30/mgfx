@@ -91,6 +91,7 @@ export interface TextStyle {
   wrap?: boolean;
   textAlign?: "start" | "center" | "end";
 }
+export interface RichTextSpan { readonly value: string; readonly style?: TextStyle }
 
 const nativeTextAdvances = new Map<string, number>();
 const nativeTextKey = (family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">, value: string,
@@ -195,7 +196,7 @@ export interface PathData {
   readonly lineCap?: "butt" | "round";
   readonly lineJoin?: "bevel" | "round";
 }
-export type ElementType = "box" | "row" | "column" | "stack" | "text" | "scroll" | "circle" | "mesh" | "path";
+export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richText" | "scroll" | "circle" | "mesh" | "path";
 export interface Element {
   type: ElementType; key: string; style: Style; children: readonly Element[];
   onClick?: () => void; onHoverChange?: (hovered: boolean) => void;
@@ -207,6 +208,7 @@ export interface Element {
   onKeyDown?: (key: Key, modifiers: number) => void; onTextInput?: (text: string) => void;
   mesh?: MeshData;
   path?: PathData;
+  richTextSpans?: readonly RichTextSpan[];
 }
 
 const make = (type: ElementType, children: readonly Element[], style: Style, key: string): Element =>
@@ -222,6 +224,8 @@ export const column = (children: readonly Element[], style: Style = {}, key = ""
 export const stack = (children: readonly Element[], style: Style = {}, key = ""): Element => make("stack", children, style, key);
 export const text = (value: string, textStyle: TextStyle = {}, key = ""): Element =>
   ({ type: "text", children: [], style: {}, key, value, textStyle });
+export const richText = (spans: readonly RichTextSpan[], textStyle: TextStyle = {}, key = ""): Element =>
+  ({ type: "richText", children: [], style: {}, key, textStyle, richTextSpans: spans });
 export const scrollView = (child: Element, offsetY: number, style: Style = {}, key = "",
   onScroll?: (deltaX: number, deltaY: number) => void): Element => ({
     type: "scroll", children: [child], style: { ...style, clip: true }, key, scrollOffsetY: offsetY,
@@ -384,6 +388,7 @@ class Node {
   onTextInput: ((text: string) => void) | undefined;
   mesh: MeshData | undefined = undefined;
   path: PathData | undefined = undefined;
+  richTextSpans: readonly RichTextSpan[] = [];
   measured: Size = { width: 0, height: 0 };
   bounds: Rect = { x: 0, y: 0, width: 0, height: 0 };
   private parent: Node | undefined;
@@ -403,6 +408,7 @@ class Node {
     this.textStyle = element.textStyle ?? {};
     this.mesh = element.mesh;
     this.path = element.path;
+    this.richTextSpans = element.richTextSpans ?? [];
     const old = this.children, used = old.map(() => false);
     this.children = element.children.map((child, index) => {
       let found = child.key === "" && old[index]?.matches(child) ? index : -1;
@@ -424,6 +430,12 @@ class Node {
       width = Math.max(0, ...lines.map((line) => line.width));
       const lineHeight = this.textStyle.lineHeight ?? fontSize * 1.2;
       height = fontSize + Math.max(0, lines.length - 1) * lineHeight;
+    }
+    if (this.type === "richText" && this.richTextSpans.length > 0) {
+      const fontSize = this.textStyle.fontSize ?? 16;
+      width = this.richTextSpans.reduce((sum, span) =>
+        sum + textRunWidth(span.value, { ...this.textStyle, ...span.style, fontSize }, fontSize), 0);
+      height = fontSize;
     }
     let flowCount = 0;
     for (const child of this.children) {
@@ -583,6 +595,8 @@ class Node {
         this.style.borderWidth ?? 0, this.style.borderColor, viewport);
     }
     if (this.type === "text") paintText(encoder, this.bounds, this.value, this.textStyle, viewport);
+    if (this.type === "richText")
+      paintRichText(encoder, this.bounds, this.richTextSpans, this.textStyle, viewport);
     for (const child of this.paintOrder()) child.paint(encoder, viewport);
     if (this.style.clip) encoder.popClip();
     if (this.style.transform) encoder.popTransform();
@@ -939,4 +953,30 @@ function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: Te
       }, color, viewport));
     })));
   if (vertices.length) encoder.triangles(vertices);
+}
+
+function paintRichText(encoder: FrameEncoder, bounds: Rect, spans: readonly RichTextSpan[],
+  base: TextStyle, viewport: Size): void {
+  if (spans.length === 0) return;
+  const fontSize = base.fontSize ?? 16;
+  const visible = spans.filter((span) => span.value.length > 0);
+  if (visible.length === 0) return;
+  encoder.richText(visible.map((span) => {
+    const style = { ...base, ...span.style, fontSize };
+    const decoration = style.textDecoration === "underline" ? TextDecoration.Underline
+      : style.textDecoration === "line-through" ? TextDecoration.LineThrough
+      : style.textDecoration === "underline line-through"
+        ? TextDecoration.Underline | TextDecoration.LineThrough : TextDecoration.None;
+    return {
+      text: span.value,
+      color: style.color ?? { red: 1, green: 1, blue: 1, alpha: 1 },
+      family: !style.fontFamily || style.fontFamily === "pixel" ? "system" as const : style.fontFamily,
+      ...(style.fontWeight ? { weight: style.fontWeight } : {}),
+      ...(style.fontStyle ? { style: style.fontStyle } : {}),
+      letterSpacing: (style.letterSpacing ?? 0) / fontSize,
+      decoration,
+      ...(style.fontResourceId === undefined ? {} : { fontResourceId: style.fontResourceId }),
+    };
+  }), bounds.x / viewport.width * 2 - 1, 1 - bounds.y / viewport.height * 2,
+  fontSize / viewport.height * 2);
 }

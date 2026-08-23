@@ -1233,6 +1233,63 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                         static_cast<NS::UInteger>(vertices.size()));
                 first += count;
             }
+        } else if (command.opcode == gfx::Opcode::drawRichText) {
+            gfx::RichTextCommand rich{};
+            if (!gfx::decodeRichText(command, rich)) {
+                throw std::runtime_error("Malformed rich text command");
+            }
+            if (clipEmpty()) continue;
+            const float aspect = static_cast<float>(drawable->texture()->height()) /
+                                 static_cast<float>(drawable->texture()->width());
+            std::vector<gfx::Vertex> vertices;
+            float cursor = 0.0F;
+            for (const gfx::RichTextRun& run : rich.runs) {
+                std::string key{static_cast<char>(run.family), static_cast<char>(run.weight),
+                                static_cast<char>(run.style)};
+                key.append(reinterpret_cast<const char*>(&run.letterSpacing), sizeof(run.letterSpacing));
+                key.push_back(static_cast<char>(run.decoration));
+                key.append(reinterpret_cast<const char*>(&run.fontResourceId), sizeof(run.fontResourceId));
+                const std::uint64_t version = gfx::fontResourceVersion(run.fontResourceId);
+                key.append(reinterpret_cast<const char*>(&version), sizeof(version));
+                key += run.text;
+                auto [found, inserted] = textCache_.try_emplace(key);
+                gfx::ShapedText& shaped = found->second;
+                if (inserted) {
+                    shaped = gfx::shapeSystemText(run.text, run.family, run.weight, run.style,
+                                                  run.letterSpacing, run.fontResourceId);
+                    const auto decorate = [&](float position, float thickness) {
+                        const float half = std::max(thickness, 0.04F) * 0.5F;
+                        shaped.triangles.insert(shaped.triangles.end(), {
+                            {0.0F, position - half}, {0.0F, position + half},
+                            {shaped.advance, position + half}, {0.0F, position - half},
+                            {shaped.advance, position + half}, {shaped.advance, position - half}});
+                    };
+                    if ((run.decoration & gfx::underlineText) != 0)
+                        decorate(shaped.underlinePosition, shaped.underlineThickness);
+                    if ((run.decoration & gfx::strikeThroughText) != 0)
+                        decorate(shaped.strikeThroughPosition, shaped.strikeThroughThickness);
+                }
+                const std::array<float, 4> color = {run.color.red, run.color.green, run.color.blue,
+                                                     run.color.alpha * opacityStack.back()};
+                vertices.reserve(vertices.size() + shaped.triangles.size());
+                for (const gfx::PathPoint& point : shaped.triangles) {
+                    vertices.push_back({transformPoint(currentTransform(),
+                        {rich.left + (cursor + point[0]) * rich.fontSize * aspect,
+                         rich.top - point[1] * rich.fontSize}), color});
+                }
+                cursor += shaped.advance;
+            }
+            if (vertices.empty()) continue;
+            if (encoder == nullptr) { encoder = commandBuffer->renderCommandEncoder(renderPass); applyClip(); }
+            encoder->setRenderPipelineState(pipelineState_.get());
+            constexpr std::size_t richMaxVertices = (4096 / sizeof(gfx::Vertex) / 3) * 3;
+            for (std::size_t first = 0; first < vertices.size(); first += richMaxVertices) {
+                const std::size_t count = std::min(richMaxVertices, vertices.size() - first);
+                encoder->setVertexBytes(vertices.data() + first, count * sizeof(gfx::Vertex), 0);
+                encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                        static_cast<NS::UInteger>(0),
+                                        static_cast<NS::UInteger>(count));
+            }
         } else if (command.opcode == gfx::Opcode::popClip) {
             if (command.payloadSize != 0 || clipStack.empty()) {
                 throw std::runtime_error("Malformed or unbalanced pop-clip command");

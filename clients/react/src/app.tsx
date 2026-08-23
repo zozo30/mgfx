@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Column, Image, Path, Row, Stack, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Column, Image, Path, RichText, Row, Stack, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -254,7 +254,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
   );
 }
 
-function GraphicsRoute({ chromeMetrics, vectorIcons }: AppProps) {
+function GraphicsRoute({ chromeMetrics, vectorIcons, customFontResourceId }: AppProps) {
   const router = useRouter();
   const animationTime = useAnimationTime();
   const draggableHeight = Math.max(82, chromeMetrics.titleBarHeight + 26);
@@ -291,9 +291,15 @@ function GraphicsRoute({ chromeMetrics, vectorIcons }: AppProps) {
           <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,
             background: rgba(0.055, 0.07, 0.11), borderWidth: 1,
             borderColor: rgba(0.22, 0.30, 0.46) }}>
-            <Text value="HISTORY ROUTER" style={{ fontSize: 26, fontWeight: "bold",
-              textDecoration: "underline",
-              color: rgba(0.62, 0.88, 1) }} />
+            <RichText style={{ fontSize: 26 }} spans={[
+              { value: "RICH ", style: { fontWeight: "bold", color: rgba(0.62, 0.88, 1) } },
+              { value: "TEXT ", style: { fontFamily: "serif", fontStyle: "italic",
+                color: rgba(0.95, 0.62, 0.35) } },
+              { value: "RUNS", style: { fontFamily: "system", fontWeight: "semibold",
+                textDecoration: "underline", color: rgba(0.42, 0.92, 0.68),
+                ...(customFontResourceId === undefined ? {} :
+                  { fontResourceId: customFontResourceId }) } },
+            ]} />
             <Text value="THIS SCREEN REPLACED THE ACTIVE REACT SUBTREE"
               style={{ fontSize: 22, color: rgba(0.68, 0.72, 0.82) }} />
             <Text value={`ROUTE ${router.route}  BACK ${router.canGoBack ? "READY" : "EMPTY"}`}

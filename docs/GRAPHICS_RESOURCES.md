@@ -81,6 +81,11 @@ constructs a Core Graphics font, then CoreText owns shaping and outlines exactly
 as it does for system families. Replacement increments a resource version used
 by the geometry cache, while disconnect and `FontDestroy` release native data.
 
+`DrawRichText` keeps a styled line in one display-list command. Its run table
+contains compact style records and UTF-8 slices; the graphics server shapes each
+slice, advances one native pen, and batches the resulting colored glyph geometry.
+React exposes the same model through declarative `<RichText spans={...}>`.
+
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is
 part of shaping, measurement, and geometry cache identity.
@@ -222,9 +227,9 @@ color glyph atlases remain available for small text and emoji.
    Direct `<Mesh>` remains available.
    Persistent colored mesh resources are also implemented. Next add selective
    lowering of complete `<Svg>` documents.
-4. **Partially implemented:** compact Unicode `DrawText`, native shaping,
-   persistent font uploads, cached glyph-outline geometry, and exact asynchronous
-   advance metrics. Next add multiline rich-text runs and atlas caching.
+4. **Partially implemented:** compact Unicode `DrawText` and `DrawRichText`, native
+   shaping, persistent font uploads, cached glyph-outline geometry, and exact
+   asynchronous advance metrics. Next add multiline rich-text wrapping and atlas caching.
 5. Add cache budgets, device-loss recreation, and resource tracing tools.
 
 None of these stages changes window, layout, event, or component ownership: the
