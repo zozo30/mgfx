@@ -135,6 +135,9 @@ through DirectWrite or a HarfBuzz/FreeType service.
 The level-4 text extension adds start/middle/end anchor and top/alphabetic baseline
 enums. Backends apply cached native advance and ascent, which lets inline SVG text
 retain baseline placement while still sending only UTF-8 and semantic font style.
+The client conjugates an SVG text matrix through the document-to-normalized mapping
+and brackets `DrawText` with the existing transform stack, preserving rotation,
+skew, reflection, and nonuniform scale without altering cached glyph geometry.
 
 Family codes select semantic system sans, fixed-pitch, serif, or rounded
 designs. They deliberately do not expose platform font names, so identical

@@ -72,10 +72,11 @@ specificity/source order, and inline styles follow their normal cascade order;
 at-rules, descendant selectors, `!important`, and unsupported properties are rejected.
 Plain SVG `<text>` elements lower to compact server-shaped `DrawText` commands
 with inherited/CSS font family, size, weight, style, tracking, solid fill,
-`text-anchor`, entities, opacity, uniform transforms, and rectangular clipping.
+`text-anchor`, entities, opacity, affine transforms, and rectangular clipping.
 CoreText applies the alphabetic baseline from its native ascent metric; clients
-never generate glyph triangles. Spans, text strokes/gradients, and affine text
-placement remain explicit fallbacks.
+never generate glyph triangles. SVG rotation, skew, and nonuniform scale conjugate
+into the normalized display-list transform stack around the text command. Spans
+and text strokes or gradients remain explicit fallbacks.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.

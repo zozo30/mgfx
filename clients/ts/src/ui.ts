@@ -280,6 +280,8 @@ export interface VectorTextData {
   readonly family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">;
   readonly weight?: TextStyle["fontWeight"]; readonly fontStyle?: TextStyle["fontStyle"];
   readonly letterSpacing?: number; readonly anchor?: "start" | "middle" | "end";
+  readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
+    readonly d: number; readonly e: number; readonly f: number };
 }
 export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richText" |
   "vectorText" | "scroll" | "circle" | "mesh" | "path";
@@ -904,12 +906,29 @@ function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextDa
       right: (clip.x + clip.width) / viewport.width,
       bottom: (clip.y + clip.height) / viewport.height });
   }
+  if (text.sourceTransform) {
+    const matrix = text.sourceTransform;
+    const sourceScaleX = destination.width / text.viewBox.width / viewport.width * 2;
+    const sourceScaleY = -destination.height / text.viewBox.height / viewport.height * 2;
+    const sourceTranslateX = destination.x / viewport.width * 2 - 1 -
+      text.viewBox.x * sourceScaleX;
+    const sourceTranslateY = 1 - destination.y / viewport.height * 2 -
+      text.viewBox.y * sourceScaleY;
+    const m21 = sourceScaleX * matrix.c / sourceScaleY;
+    const m12 = sourceScaleY * matrix.b / sourceScaleX;
+    encoder.pushTransform({ m11: matrix.a, m12, m21, m22: matrix.d,
+      translateX: sourceScaleX * matrix.e + sourceTranslateX -
+        matrix.a * sourceTranslateX - m21 * sourceTranslateY,
+      translateY: sourceScaleY * matrix.f + sourceTranslateY -
+        m12 * sourceTranslateX - matrix.d * sourceTranslateY });
+  }
   const x = destination.x + (text.x - text.viewBox.x) / text.viewBox.width * destination.width;
   const y = destination.y + (text.y - text.viewBox.y) / text.viewBox.height * destination.height;
   const fontSize = text.fontSize / text.viewBox.height * destination.height;
   encoder.systemText(text.value, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
     fontSize / viewport.height * 2, text.color, text.family, text.weight, text.fontStyle,
     text.letterSpacing ?? 0, TextDecoration.None, 0, text.anchor ?? "start", "alphabetic");
+  if (text.sourceTransform) encoder.popTransform();
   if (text.sourceClip) encoder.popClip();
 }
 

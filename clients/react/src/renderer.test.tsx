@@ -158,14 +158,21 @@ test("React Svg emits server-shaped text with SVG anchor and alphabetic baseline
   const surface = new ReactSurface((value) => { frame = value; });
   surface.render(<Svg source={`<svg viewBox="0 0 100 50">
     <text x="50" y="30" text-anchor="middle" font-size="12" font-family="rounded"
+      transform="rotate(-8 50 30)"
       font-weight="600" fill="#4cc9ff">Native Ω</text></svg>`}
     style={{ preferredSize: { width: 200, height: 100 } }} />);
   surface.resize({ width: 200, height: 100 });
-  assert.equal(frame.readUInt32LE(12), 3);
-  assert.equal(frame.readUInt16LE(40), 8);
-  assert.equal(frame.readUInt8(40 + 8 + 3), 4);
-  assert.equal(frame.readUInt8(40 + 8 + 44), 1);
-  assert.equal(frame.readUInt8(40 + 8 + 45), 1);
+  assert.equal(frame.readUInt32LE(12), 5);
+  const commands: { opcode: number; offset: number }[] = [];
+  for (let offset = 16; offset < frame.length;) {
+    commands.push({ opcode: frame.readUInt16LE(offset), offset });
+    offset += 8 + frame.readUInt32LE(offset + 4);
+  }
+  assert.deepEqual(commands.map(({ opcode }) => opcode), [1, 9, 8, 10, 3]);
+  const textOffset = commands[2]!.offset + 8;
+  assert.equal(frame.readUInt8(textOffset + 3), 4);
+  assert.equal(frame.readUInt8(textOffset + 44), 1);
+  assert.equal(frame.readUInt8(textOffset + 45), 1);
 });
 
 test("React Mesh uploads indexed geometry once and draws its resource ID", () => {

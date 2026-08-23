@@ -13,7 +13,8 @@ export interface SvgVectorLayer {
     readonly family: "system" | "monospace" | "serif" | "rounded";
     readonly weight?: "regular" | "medium" | "semibold" | "bold";
     readonly fontStyle?: "regular" | "italic";
-    readonly letterSpacing?: number; readonly anchor?: "start" | "middle" | "end" };
+    readonly letterSpacing?: number; readonly anchor?: "start" | "middle" | "end";
+    readonly sourceTransform?: Matrix };
   readonly clip?: Rect;
   readonly fill?: Color;
   readonly fillGradient?: LinearGradientPaint;
@@ -310,17 +311,15 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       if (state.stroke && state.stroke.alpha > 0 && state.strokeWidth > 0)
         throw new Error("SVG text stroke is not supported natively");
       if (!state.fill || state.fill.alpha <= 0) continue;
-      if (Math.abs(state.transform.b) > 1e-9 || Math.abs(state.transform.c) > 1e-9 ||
-          Math.abs(Math.abs(state.transform.a) - Math.abs(state.transform.d)) > 1e-9)
-        throw new Error("Rotated, skewed, or nonuniform SVG text requires affine text placement");
-      const position = transformPoint(state.transform,
-        { x: finiteNumber(attributes.x, 0), y: finiteNumber(attributes.y, 0) });
       layers.push({ ...(state.clip ? { clip: state.clip } : {}), text: { value,
-        x: position.x, y: position.y, fontSize: state.fontSize * Math.abs(state.transform.a),
+        x: finiteNumber(attributes.x, 0), y: finiteNumber(attributes.y, 0), fontSize: state.fontSize,
         color: multiplyAlpha(state.fill, state.opacity * state.fillOpacity),
         family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
         ...(state.letterSpacing !== 0 ? { letterSpacing: state.letterSpacing / state.fontSize } : {}),
-        ...(state.textAnchor !== "start" ? { anchor: state.textAnchor } : {}) },
+        ...(state.textAnchor !== "start" ? { anchor: state.textAnchor } : {}),
+        ...(state.transform.a !== 1 || state.transform.b !== 0 || state.transform.c !== 0 ||
+          state.transform.d !== 1 || state.transform.e !== 0 || state.transform.f !== 0
+          ? { sourceTransform: state.transform } : {}) },
         strokeWidth: 0, fillRule: state.fillRule, lineCap: state.lineCap,
         lineJoin: state.lineJoin });
       continue;

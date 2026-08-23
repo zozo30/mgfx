@@ -153,8 +153,9 @@ visibility, gradient-stop styling, and local clip references remain native;
 external at-rules and unsupported selectors or declarations fail explicitly.
 Plain `<text>` elements use the native system-text command with SVG x/y baseline,
 start/middle/end anchor, solid fill/opacity, portable family, weight, italic,
-tracking, uniform transforms, entities, and rectangular clips. `<tspan>`, text
-stroke/gradient, and rotated, skewed, or nonuniform text remain bounded fallbacks.
+tracking, affine transforms, entities, and rectangular clips. Source-space
+rotation, skew, and nonuniform scale become balanced display-list transforms
+around the shaped text. `<tspan>` and text stroke/gradient remain bounded fallbacks.
 Direct React `Path` components also accept `conicGradient` and
 `strokeConicGradient`. Two through eight angular stops, a source-space center,
 and a radian rotation lower to one native path command; rotation animation does

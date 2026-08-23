@@ -193,7 +193,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
     <use class="signal" href="#signalGlyph" x="78" y="24" width="53" height="18"
       preserveAspectRatio="xMidYMid slice"/>
-    <text class="native-label" x="104" y="59">NATIVE SVG TEXT</text>
+    <text class="native-label" x="104" y="59" transform="rotate(-4 104 59)">NATIVE SVG TEXT</text>
     </g>
   </g>
 </svg>`;

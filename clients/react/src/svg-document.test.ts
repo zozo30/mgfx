@@ -166,21 +166,28 @@ test("SVG text lowers native typography, baseline position, entities, transforms
   </svg>`);
   assert.equal(document.layers.length, 1);
   assert.deepEqual(document.layers[0]?.text, {
-    value: "MGFX & Ω", x: 22, y: 28, fontSize: 10,
+    value: "MGFX & Ω", x: 20, y: 25, fontSize: 10,
     color: { red: 0.2980392156862745, green: 0.788235294117647, blue: 1, alpha: 1 },
     family: "rounded", weight: "bold", fontStyle: "italic", letterSpacing: 0.05,
     anchor: "middle",
+    sourceTransform: { a: 1, b: 0, c: 0, d: 1, e: 2, f: 3 },
   });
 });
 
-test("SVG text rejects unsupported spans, strokes, and affine placement", () => {
+test("SVG text rejects unsupported spans, strokes, and entities", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text><tspan>nested</tspan></text></svg>`), /rich text lowering/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text stroke="red">outlined</text></svg>`), /stroke is not supported/);
   assert.throws(() => parseSvgVectorDocument(
-    `<svg viewBox="0 0 40 20"><text transform="rotate(10)">rotated</text></svg>`),
-  /requires affine text placement/);
+    `<svg viewBox="0 0 40 20"><text>bad &unknown;</text></svg>`), /Unsupported SVG text entity/);
+});
+
+test("SVG text preserves rotation, skew, and nonuniform scaling as affine display state", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 80 40"><text x="20" y="25"
+    font-size="10" transform="matrix(1.2 0.3 0.2 0.8 4 5)">Affine</text></svg>`);
+  assert.deepEqual(document.layers[0]?.text?.sourceTransform,
+    { a: 1.2, b: 0.3, c: 0.2, d: 0.8, e: 4, f: 5 });
 });
 
 test("SVG local use rejects unresolved and cyclic references", () => {
