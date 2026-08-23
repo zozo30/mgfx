@@ -167,8 +167,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     </linearGradient>
     <linearGradient id="signal" href="#signalPalette" gradientUnits="userSpaceOnUse"
       x1="78" y1="24" x2="131" y2="42"/>
-    <symbol id="signalGlyph" viewBox="0 0 53 18">
-      <polyline points="0,18 11,0 21,18 32,0 43,18 53,0"/>
+    <symbol id="signalGlyph" viewBox="0 0 53 24">
+      <polyline points="0,21 11,3 21,21 32,3 43,21 53,3"/>
     </symbol>
           <radialGradient id="orb" r="25%" fx="38%" fy="35%" fr="6%" spreadMethod="reflect">
             <stop offset="0" stop-color="#d8fff0"/>
@@ -182,6 +182,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       stroke-dasharray="5 3" stroke-dashoffset="1"/>
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
     <use href="#signalGlyph" x="78" y="24" width="53" height="18"
+      preserveAspectRatio="xMidYMid slice"
       stroke="url(#signal)" stroke-width="4" stroke-dasharray="7 4 2 4" stroke-dashoffset="2"
       stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="6"/>
   </g>

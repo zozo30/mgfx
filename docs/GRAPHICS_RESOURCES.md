@@ -70,8 +70,9 @@ Local `<use>` references to primitive, group, or symbol definitions expand befor
 canonicalization. Each instance retains its own paint and transform while the
 definition itself remains non-rendering; external, missing, duplicate, cyclic,
 or expansion-bomb references are rejected. Symbol `viewBox` coordinates map to
-numeric instance dimensions with aligned `meet` or nonuniform `none` scaling.
-`slice` remains rejected until the display list can attach a clip to each instance.
+numeric instance dimensions with aligned `meet`, clipped `slice`, or nonuniform
+`none` scaling. Slice adds only balanced display-list clip commands around the
+cached path reference; rotated and skewed viewport clips await polygon clipping.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the

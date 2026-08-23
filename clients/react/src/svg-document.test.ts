@@ -62,14 +62,27 @@ test("SVG symbol instances map viewBox coordinates with meet alignment and none 
   assert.match(document.layers[1]?.path ?? "", /M50 4H90V44H50z/);
 });
 
-test("SVG symbol instances reject invalid viewports and unsupported slice clipping", () => {
+test("SVG symbol instances clip slice overflow to their transformed viewport", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 60 40"><defs>
+    <symbol id="mark" viewBox="0 0 20 10"><rect width="20" height="10"/></symbol>
+    </defs><use href="#mark" x="5" y="4" width="20" height="20"
+      preserveAspectRatio="xMidYMid slice" fill="#20d890"/></svg>`);
+  assert.equal(document.layers.length, 1);
+  assert.match(document.layers[0]?.path ?? "", /M-5 4H35V24H-5z/);
+  assert.deepEqual(document.layers[0]?.clip, { x: 5, y: 4, width: 20, height: 20 });
+});
+
+test("SVG symbol instances reject invalid and non-rectangular viewport clips", () => {
   assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 50 50"><defs>
     <symbol id="mark" viewBox="0 0 10 10"><rect width="10" height="10"/></symbol>
     </defs><use href="#mark" width="0" height="20"/></svg>`), /positive numeric width/);
   assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 50 50"><defs>
     <symbol id="mark" viewBox="0 0 20 10"><rect width="20" height="10"/></symbol>
-    </defs><use href="#mark" width="20" height="20" preserveAspectRatio="xMidYMid slice"/></svg>`),
-  /requires viewport clipping/);
+    </defs><use href="#mark" width="20" height="20" transform="rotate(10)"
+      preserveAspectRatio="xMidYMid slice"/></svg>`), /requires polygon clipping/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10" data-mgfx-clip="0 0 1 1"><rect width="10" height="10"/></svg>`),
+  /reserved MGFX attribute/);
 });
 
 test("SVG local use rejects unresolved and cyclic references", () => {

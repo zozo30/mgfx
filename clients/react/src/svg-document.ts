@@ -8,6 +8,7 @@ type DashStyle = { readonly length: number; readonly gap: number; readonly offse
 
 export interface SvgVectorLayer {
   readonly path: string;
+  readonly clip?: Rect;
   readonly fill?: Color;
   readonly fillGradient?: LinearGradientPaint;
   readonly fillRadialGradient?: RadialGradientPaint;
@@ -64,6 +65,7 @@ interface PaintState {
   readonly miterLimit?: number;
   readonly currentColor: Color;
   readonly transform: Matrix;
+  readonly clip?: Rect;
   readonly dash?: DashStyle;
 }
 
@@ -146,7 +148,7 @@ function expandLocalUses(source: string): string {
   const useExcluded = new Set(["href", "xlink:href", "x", "y", "width", "height",
     "transform", "preserveAspectRatio"]);
   const symbolViewportTransform = (definition: LocalSvgReference,
-    instance: Readonly<Record<string, string>>): string | undefined => {
+    instance: Readonly<Record<string, string>>): { transform: string; clip?: Rect } | undefined => {
     if (definition.tag !== "symbol" || definition.attributes.viewBox === undefined) return undefined;
     const viewBox = definition.attributes.viewBox.trim().split(/[\s,]+/).map(Number);
     if (viewBox.length !== 4 || !viewBox.every(Number.isFinite) || viewBox[2]! <= 0 || viewBox[3]! <= 0)
@@ -159,18 +161,20 @@ function expandLocalUses(source: string): string {
       "xMidYMid meet").trim();
     if (aspect === "none") {
       const scaleX = width / viewBox[2]!, scaleY = height / viewBox[3]!;
-      return `matrix(${scaleX} 0 0 ${scaleY} ${-viewBox[0]! * scaleX} ${-viewBox[1]! * scaleY})`;
+      return { transform:
+        `matrix(${scaleX} 0 0 ${scaleY} ${-viewBox[0]! * scaleX} ${-viewBox[1]! * scaleY})` };
     }
     const parsed = aspect.match(/^(xMin|xMid|xMax)(YMin|YMid|YMax)(?:\s+(meet|slice))?$/);
     if (!parsed) throw new Error(`Unsupported SVG preserveAspectRatio ${aspect}`);
-    if (parsed[3] === "slice")
-      throw new Error("SVG symbol preserveAspectRatio slice requires viewport clipping");
-    const scale = Math.min(width / viewBox[2]!, height / viewBox[3]!);
+    const slice = parsed[3] === "slice";
+    const scale = slice ? Math.max(width / viewBox[2]!, height / viewBox[3]!)
+      : Math.min(width / viewBox[2]!, height / viewBox[3]!);
     const alignX = parsed[1] === "xMin" ? 0 : parsed[1] === "xMax" ? 1 : 0.5;
     const alignY = parsed[2] === "YMin" ? 0 : parsed[2] === "YMax" ? 1 : 0.5;
     const translateX = (width - viewBox[2]! * scale) * alignX - viewBox[0]! * scale;
     const translateY = (height - viewBox[3]! * scale) * alignY - viewBox[1]! * scale;
-    return `matrix(${scale} 0 0 ${scale} ${translateX} ${translateY})`;
+    return { transform: `matrix(${scale} 0 0 ${scale} ${translateX} ${translateY})`,
+      ...(slice ? { clip: { x: 0, y: 0, width, height } } : {}) };
   };
   const usePattern = /<use\b([^>]*?)(?:\/\s*>|>\s*<\/use\s*>)/gi;
   let expansionCount = 0;
@@ -188,7 +192,7 @@ function expandLocalUses(source: string): string {
       const definitionAttributes = serialize(definition.attributes, definitionExcluded);
       const viewportTransform = symbolViewportTransform(definition, attributes);
       const body = viewportTransform && definition.body !== undefined
-        ? `<g transform="${viewportTransform}">${definition.body}</g>` : definition.body;
+        ? `<g transform="${viewportTransform.transform}">${definition.body}</g>` : definition.body;
       const referenced = definition.body === undefined
         ? `<${definition.tag}${definitionAttributes ? ` ${definitionAttributes}` : ""}/>`
         : `<g${definitionAttributes ? ` ${definitionAttributes}` : ""}>${body}</g>`;
@@ -197,7 +201,10 @@ function expandLocalUses(source: string): string {
       if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("SVG use position must be finite");
       const presentation = serialize(attributes, useExcluded);
       const transform = `${attributes.transform ? `${attributes.transform} ` : ""}translate(${x} ${y})`;
-      return `<g${presentation ? ` ${presentation}` : ""} transform="${escape(transform)}">${expanded}</g>`;
+      const clip = viewportTransform?.clip;
+      const internalClip = clip
+        ? ` data-mgfx-clip="${clip.x} ${clip.y} ${clip.width} ${clip.height}"` : "";
+      return `<g${presentation ? ` ${presentation}` : ""}${internalClip} transform="${escape(transform)}">${expanded}</g>`;
     });
   const expanded = expandFragment(source, []);
   if (Buffer.byteLength(expanded, "utf8") > 4 * 1024 * 1024)
@@ -207,6 +214,7 @@ function expandLocalUses(source: string): string {
 
 export function parseSvgVectorDocument(source: string, defaultColor: Color = white): SvgVectorDocument {
   if (Buffer.byteLength(source, "utf8") > 1024 * 1024) throw new RangeError("SVG exceeds 1 MiB");
+  if (/\bdata-mgfx-clip\s*=/i.test(source)) throw new Error("SVG uses a reserved MGFX attribute");
   if (/<(?:script|image|foreignObject)\b|<!\s*(?:doctype|entity)\b/i.test(source))
     throw new Error("SVG contains external or executable content");
   const expandedSource = expandLocalUses(source.replace(/<!--[\s\S]*?-->/g, ""));
@@ -267,7 +275,8 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     if ((!fill || fill.alpha <= 0) && !fillGradient && !fillRadialGradient &&
         ((!stroke || stroke.alpha <= 0) && !strokeGradient && !strokeRadialGradient ||
          state.strokeWidth <= 0)) continue;
-    layers.push({ path, ...(fill ? { fill } : {}), ...(fillGradient ? { fillGradient } : {}),
+    layers.push({ path, ...(state.clip ? { clip: state.clip } : {}),
+      ...(fill ? { fill } : {}), ...(fillGradient ? { fillGradient } : {}),
       ...(fillRadialGradient ? { fillRadialGradient } : {}),
       ...(stroke ? { stroke } : {}), ...(strokeGradient ? { strokeGradient } : {}),
       ...(strokeRadialGradient ? { strokeRadialGradient } : {}),
@@ -331,6 +340,27 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
       (parent.dash?.offset !== undefined ? String(parent.dash.offset) : undefined));
   const inheritedDash = dash && attributes["stroke-dashoffset"] !== undefined
     ? { ...dash, offset: finiteNumber(attributes["stroke-dashoffset"], 0) } : dash;
+  const transform = multiply(parent.transform, parseTransform(attributes.transform));
+  let clip = parent.clip;
+  const internalClip = attributes["data-mgfx-clip"];
+  if (internalClip !== undefined) {
+    const values = internalClip.trim().split(/[\s,]+/).map(Number);
+    if (values.length !== 4 || !values.every(Number.isFinite) || values[2]! <= 0 || values[3]! <= 0)
+      throw new Error("Invalid internal SVG viewport clip");
+    if (Math.abs(transform.b) > 1e-9 || Math.abs(transform.c) > 1e-9)
+      throw new Error("Rotated or skewed SVG symbol slice requires polygon clipping");
+    const first = transformPoint(transform, { x: values[0]!, y: values[1]! });
+    const second = transformPoint(transform,
+      { x: values[0]! + values[2]!, y: values[1]! + values[3]! });
+    const next = { x: Math.min(first.x, second.x), y: Math.min(first.y, second.y),
+      width: Math.abs(second.x - first.x), height: Math.abs(second.y - first.y) };
+    if (clip) {
+      const x = Math.max(clip.x, next.x), y = Math.max(clip.y, next.y);
+      const right = Math.min(clip.x + clip.width, next.x + next.width);
+      const bottom = Math.min(clip.y + clip.height, next.y + next.height);
+      clip = { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
+    } else clip = next;
+  }
   return { ...(fill ? { fill } : {}), ...(fillGradientId ? { fillGradientId } : {}),
     ...(stroke ? { stroke } : {}),
     ...(inheritedStrokeGradientId ? { strokeGradientId: inheritedStrokeGradientId } : {}),
@@ -338,7 +368,7 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     fillRule, lineCap, lineJoin, currentColor,
     ...(miterLimit !== undefined ? { miterLimit } : {}),
     ...(inheritedDash ? { dash: inheritedDash } : {}),
-    transform: multiply(parent.transform, parseTransform(attributes.transform)) };
+    ...(clip ? { clip } : {}), transform };
 }
 
 function parseDash(value: string, offset: string | undefined) {

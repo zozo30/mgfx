@@ -42,7 +42,7 @@ export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?
 export function Path({ data, color, gradient, radialGradient, conicGradient, texture, strokeColor,
   strokeGradient, strokeRadialGradient, strokeConicGradient, strokeTexture,
   strokeWidth = 0, viewBox, tolerance,
-  fillRule, lineCap = "round", lineJoin = "round", miterLimit, dash, style }: {
+  sourceClip, fillRule, lineCap = "round", lineJoin = "round", miterLimit, dash, style }: {
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
@@ -63,6 +63,7 @@ export function Path({ data, color, gradient, radialGradient, conicGradient, tex
   readonly strokeTexture?: PathTexturePaint;
   readonly strokeWidth?: number; readonly viewBox?: { x: number; y: number;
     width: number; height: number }; readonly tolerance?: number;
+  readonly sourceClip?: { x: number; y: number; width: number; height: number };
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round" | "square";
   readonly lineJoin?: "bevel" | "round" | "miter"; readonly style?: Style;
   readonly miterLimit?: number;
@@ -72,6 +73,7 @@ export function Path({ data, color, gradient, radialGradient, conicGradient, tex
   const resource = useMemo(() => canonicalPath(data), [data]);
   const path: PathData = { resourceId: resource.resourceId, segments: resource.segments,
     viewBox: viewBox ?? resource.bounds, fit: "contain",
+    ...(sourceClip ? { sourceClip } : {}),
     ...(color ? { fill: color } : {}), ...(gradient ? { fillGradient: gradient } : {}),
     ...(radialGradient ? { fillRadialGradient: radialGradient } : {}),
     ...(conicGradient ? { fillConicGradient: conicGradient } : {}),
@@ -98,6 +100,7 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
   const renderLayer = (layer: SvgVectorLayer, index: number, includeFill: boolean,
     includeStroke: boolean, suffix = "") => <Path key={`svg-layer-${index}${suffix}`}
       data={layer.path} viewBox={document.viewBox}
+      {...(layer.clip ? { sourceClip: layer.clip } : {})}
       {...(includeFill && layer.fill ? { color: layer.fill } : {})}
       {...(includeFill && layer.fillGradient ? { gradient: layer.fillGradient } : {})}
       {...(includeFill && layer.fillRadialGradient

@@ -243,6 +243,7 @@ export interface PathData {
   readonly resourceId: number;
   readonly segments: readonly PathSegment[];
   readonly viewBox: Rect;
+  readonly sourceClip?: Rect;
   readonly fit?: "stretch" | "contain";
   readonly fill?: Color;
   readonly fillGradient?: {
@@ -824,6 +825,23 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
       destination = { ...bounds, x: bounds.x + (bounds.width - width) / 2, width };
     }
   }
+  if (path.sourceClip) {
+    const clipValues = [path.sourceClip.x, path.sourceClip.y,
+      path.sourceClip.width, path.sourceClip.height];
+    if (clipValues.some((value) => !Number.isFinite(value)) ||
+        path.sourceClip.width < 0 || path.sourceClip.height < 0)
+      throw new RangeError("Path source clip must be a finite nonnegative rectangle");
+    if (path.sourceClip.width === 0 || path.sourceClip.height === 0) return;
+    const clip = { x: destination.x +
+        (path.sourceClip.x - path.viewBox.x) / path.viewBox.width * destination.width,
+      y: destination.y +
+        (path.sourceClip.y - path.viewBox.y) / path.viewBox.height * destination.height,
+      width: path.sourceClip.width / path.viewBox.width * destination.width,
+      height: path.sourceClip.height / path.viewBox.height * destination.height };
+    encoder.pushClip({ left: clip.x / viewport.width, top: clip.y / viewport.height,
+      right: (clip.x + clip.width) / viewport.width,
+      bottom: (clip.y + clip.height) / viewport.height });
+  }
   encoder.path(path.resourceId, normalizedRect(destination, viewport), path.viewBox, {
     ...(path.fill ? { fill: path.fill } : {}),
     ...(path.fillGradient ? { fillGradient: path.fillGradient } : {}),
@@ -843,6 +861,7 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
     ...(path.miterLimit !== undefined ? { miterLimit: path.miterLimit } : {}),
     ...(path.dash ? { dash: path.dash } : {}),
   });
+  if (path.sourceClip) encoder.popClip();
 }
 
 function paintMesh(encoder: FrameEncoder, bounds: Rect, mesh: MeshData | undefined,
