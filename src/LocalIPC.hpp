@@ -110,6 +110,7 @@ enum ServerCapability : std::uint64_t {
     styledRadialPathPaint = 1ULL << 49U,
     conicPathGradients = 1ULL << 50U,
     texturePathPaint = 1ULL << 51U,
+    nativeTextPlacement = 1ULL << 52U,
 };
 
 enum class ResourceKind : std::uint8_t {

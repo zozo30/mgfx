@@ -7,7 +7,13 @@ type DashStyle = { readonly length: number; readonly gap: number; readonly offse
   { readonly values: readonly number[]; readonly offset?: number };
 
 export interface SvgVectorLayer {
-  readonly path: string;
+  readonly path?: string;
+  readonly text?: { readonly value: string; readonly x: number; readonly y: number;
+    readonly fontSize: number; readonly color: Color;
+    readonly family: "system" | "monospace" | "serif" | "rounded";
+    readonly weight?: "regular" | "medium" | "semibold" | "bold";
+    readonly fontStyle?: "regular" | "italic";
+    readonly letterSpacing?: number; readonly anchor?: "start" | "middle" | "end" };
   readonly clip?: Rect;
   readonly fill?: Color;
   readonly fillGradient?: LinearGradientPaint;
@@ -59,6 +65,12 @@ interface PaintState {
   readonly opacity: number;
   readonly displayed: boolean;
   readonly visible: boolean;
+  readonly fontSize: number;
+  readonly fontFamily: "system" | "monospace" | "serif" | "rounded";
+  readonly fontWeight: "regular" | "medium" | "semibold" | "bold";
+  readonly fontStyle: "regular" | "italic";
+  readonly letterSpacing: number;
+  readonly textAnchor: "start" | "middle" | "end";
   readonly fillOpacity: number;
   readonly strokeOpacity: number;
   readonly fillRule: "nonzero" | "evenodd";
@@ -251,13 +263,16 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
   const initial: PaintState = { fill: { red: 0, green: 0, blue: 0, alpha: 1 },
     strokeWidth: 1, opacity: 1, displayed: true, visible: true,
     fillOpacity: 1, strokeOpacity: 1,
+    fontSize: 16, fontFamily: "system", fontWeight: "regular", fontStyle: "regular",
+    letterSpacing: 0, textAnchor: "start",
     fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
     currentColor: defaultColor, transform: identity };
   const stack: PaintState[] = [initial];
   const layers: SvgVectorLayer[] = [];
-  const tokens = expandedSource.match(/<\/?[A-Za-z][^>]*>/g) ?? [];
+  const tokens = [...expandedSource.matchAll(/<\/?[A-Za-z][^>]*>/g)];
   let hiddenDepth = 0;
-  for (const token of tokens) {
+  for (const tokenMatch of tokens) {
+    const token = tokenMatch[0];
     const closing = /^<\//.test(token);
     const name = token.match(/^<\/?\s*([\w:-]+)/)?.[1]?.toLowerCase();
     if (!name) continue;
@@ -281,6 +296,35 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       continue;
     }
     if (hiddenDepth > 0) continue;
+    if (name === "text") {
+      const bodyStart = tokenMatch.index + token.length;
+      const closingText = /<\/text\s*>/gi;
+      closingText.lastIndex = bodyStart;
+      const closingMatch = closingText.exec(expandedSource);
+      if (!closingMatch) throw new Error("SVG text element is not closed");
+      const body = expandedSource.slice(bodyStart, closingMatch.index);
+      if (/<[^>]*>/.test(body)) throw new Error("SVG text spans require rich text lowering");
+      const value = decodeSvgText(body).replace(/\s+/g, " ").trim();
+      if (!value || !state.displayed || !state.visible) continue;
+      if (state.fillGradientId) throw new Error("SVG text gradient fill is not supported natively");
+      if (state.stroke && state.stroke.alpha > 0 && state.strokeWidth > 0)
+        throw new Error("SVG text stroke is not supported natively");
+      if (!state.fill || state.fill.alpha <= 0) continue;
+      if (Math.abs(state.transform.b) > 1e-9 || Math.abs(state.transform.c) > 1e-9 ||
+          Math.abs(Math.abs(state.transform.a) - Math.abs(state.transform.d)) > 1e-9)
+        throw new Error("Rotated, skewed, or nonuniform SVG text requires affine text placement");
+      const position = transformPoint(state.transform,
+        { x: finiteNumber(attributes.x, 0), y: finiteNumber(attributes.y, 0) });
+      layers.push({ ...(state.clip ? { clip: state.clip } : {}), text: { value,
+        x: position.x, y: position.y, fontSize: state.fontSize * Math.abs(state.transform.a),
+        color: multiplyAlpha(state.fill, state.opacity * state.fillOpacity),
+        family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
+        ...(state.letterSpacing !== 0 ? { letterSpacing: state.letterSpacing / state.fontSize } : {}),
+        ...(state.textAnchor !== "start" ? { anchor: state.textAnchor } : {}) },
+        strokeWidth: 0, fillRule: state.fillRule, lineCap: state.lineCap,
+        lineJoin: state.lineJoin });
+      continue;
+    }
     if (!primitiveTags.has(name)) continue;
     if (!state.displayed || !state.visible) continue;
     const rawPath = svgPrimitivePath(name, attributes);
@@ -329,7 +373,8 @@ function withInlineStyle(attributes: Readonly<Record<string, string>>): Readonly
 const cssProperties = new Set(["color", "fill", "stroke", "opacity", "fill-opacity",
   "stroke-opacity", "stroke-width", "fill-rule", "stroke-linecap", "stroke-linejoin",
   "stroke-miterlimit", "stroke-dasharray", "stroke-dashoffset", "clip-path", "transform",
-  "stop-color", "stop-opacity", "display", "visibility"]);
+  "stop-color", "stop-opacity", "display", "visibility", "font-size", "font-family",
+  "font-weight", "font-style", "letter-spacing", "text-anchor"]);
 
 function parseSvgStyles(source: string): readonly CssRule[] {
   const rules: CssRule[] = [];
@@ -389,6 +434,20 @@ function styledAttributes(attributeSource: string, tag: string,
     }
   }
   return withInlineStyle(result);
+}
+
+function decodeSvgText(value: string): string {
+  return value.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (_token, entity: string) => {
+    const lower = entity.toLowerCase();
+    if (lower === "amp") return "&"; if (lower === "lt") return "<";
+    if (lower === "gt") return ">"; if (lower === "quot") return '"';
+    if (lower === "apos") return "'";
+    const codePoint = lower.startsWith("#x")
+      ? Number.parseInt(lower.slice(2), 16) : Number.parseInt(lower.slice(1), 10);
+    if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff ||
+        codePoint >= 0xd800 && codePoint <= 0xdfff) throw new Error("Invalid SVG text entity");
+    return String.fromCodePoint(codePoint);
+  }).replace(/&[^;\s]*;/g, () => { throw new Error("Unsupported SVG text entity"); });
 }
 
 function parseViewBox(attributes: Readonly<Record<string, string>>): Rect {
@@ -474,6 +533,25 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   const visibilityValue = attributes.visibility?.trim().toLowerCase();
   const visible = visibilityValue === undefined ? parent.visible
     : visibilityValue !== "hidden" && visibilityValue !== "collapse";
+  const fontSize = numberAttribute(attributes["font-size"], parent.fontSize);
+  if (fontSize <= 0) throw new Error("SVG font size must be positive");
+  const familyValue = attributes["font-family"]?.trim().toLowerCase();
+  const fontFamily = familyValue === undefined ? parent.fontFamily
+    : familyValue.includes("mono") ? "monospace" : familyValue.includes("serif") ? "serif"
+      : familyValue.includes("rounded") ? "rounded" : "system";
+  const weightValue = attributes["font-weight"]?.trim().toLowerCase();
+  const numericWeight = Number(weightValue);
+  const fontWeight = weightValue === undefined ? parent.fontWeight
+    : weightValue === "bold" || Number.isFinite(numericWeight) && numericWeight >= 700 ? "bold"
+      : weightValue === "semibold" || Number.isFinite(numericWeight) && numericWeight >= 600 ? "semibold"
+        : weightValue === "medium" || Number.isFinite(numericWeight) && numericWeight >= 500
+          ? "medium" : "regular";
+  const fontStyle = attributes["font-style"] === undefined ? parent.fontStyle
+    : attributes["font-style"]?.trim().toLowerCase() === "italic" ? "italic" : "regular";
+  const letterSpacing = finiteNumber(attributes["letter-spacing"], parent.letterSpacing);
+  const anchorValue = attributes["text-anchor"]?.trim().toLowerCase();
+  const textAnchor = anchorValue === undefined ? parent.textAnchor
+    : anchorValue === "middle" ? "middle" : anchorValue === "end" ? "end" : "start";
   const fillOpacity = clamp01(numberAttribute(attributes["fill-opacity"], parent.fillOpacity));
   const strokeOpacity = clamp01(numberAttribute(attributes["stroke-opacity"], parent.strokeOpacity));
   const fillRule = attributes["fill-rule"] === "evenodd" ? "evenodd" :
@@ -518,7 +596,8 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   return { ...(fill ? { fill } : {}), ...(fillGradientId ? { fillGradientId } : {}),
     ...(stroke ? { stroke } : {}),
     ...(inheritedStrokeGradientId ? { strokeGradientId: inheritedStrokeGradientId } : {}),
-    strokeWidth, opacity, displayed, visible, fillOpacity, strokeOpacity,
+    strokeWidth, opacity, displayed, visible, fontSize, fontFamily, fontWeight, fontStyle,
+    letterSpacing, textAnchor, fillOpacity, strokeOpacity,
     fillRule, lineCap, lineJoin, currentColor,
     ...(miterLimit !== undefined ? { miterLimit } : {}),
     ...(inheritedDash ? { dash: inheritedDash } : {}),

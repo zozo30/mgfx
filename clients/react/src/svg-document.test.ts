@@ -158,6 +158,31 @@ test("SVG CSS styles retain symbol paint and compose use transforms with instanc
   assert.ok((document.layers[0]?.fill?.green ?? 0) > 0.8);
 });
 
+test("SVG text lowers native typography, baseline position, entities, transforms, and anchor", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 80 40"><style>
+    .label { fill: #4cc9ff; font-family: rounded; font-size: 10; font-weight: 700;
+      font-style: italic; letter-spacing: 0.5; text-anchor: middle; }
+  </style><g transform="translate(2 3)"><text class="label" x="20" y="25">MGFX &amp; Ω</text></g>
+  </svg>`);
+  assert.equal(document.layers.length, 1);
+  assert.deepEqual(document.layers[0]?.text, {
+    value: "MGFX & Ω", x: 22, y: 28, fontSize: 10,
+    color: { red: 0.2980392156862745, green: 0.788235294117647, blue: 1, alpha: 1 },
+    family: "rounded", weight: "bold", fontStyle: "italic", letterSpacing: 0.05,
+    anchor: "middle",
+  });
+});
+
+test("SVG text rejects unsupported spans, strokes, and affine placement", () => {
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 40 20"><text><tspan>nested</tspan></text></svg>`), /rich text lowering/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 40 20"><text stroke="red">outlined</text></svg>`), /stroke is not supported/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 40 20"><text transform="rotate(10)">rotated</text></svg>`),
+  /requires affine text placement/);
+});
+
 test("SVG local use rejects unresolved and cyclic references", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><use href="#missing"/></svg>`), /missing #missing/);

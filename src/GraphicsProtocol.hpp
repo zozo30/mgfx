@@ -324,6 +324,8 @@ enum TextDecoration : std::uint8_t {
     underlineText = 1U << 0U,
     strikeThroughText = 1U << 1U,
 };
+enum class TextAnchor : std::uint8_t { start = 0, middle = 1, end = 2 };
+enum class TextBaseline : std::uint8_t { top = 0, alphabetic = 1 };
 
 struct TextCommand {
     FontFamily family;
@@ -337,6 +339,8 @@ struct TextCommand {
     float fontSize;
     Color color;
     std::string text;
+    TextAnchor anchor = TextAnchor::start;
+    TextBaseline baseline = TextBaseline::top;
 };
 
 struct RichTextRun {

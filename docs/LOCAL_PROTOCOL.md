@@ -220,6 +220,10 @@ top-left position and font height, optional persistent font ID, straight RGBA
 color, and validated UTF-8.
 The backend shapes Unicode and caches tessellated glyph outlines; strings no
 longer expand into a triangle command for every pixel-font cell.
+Extension level `4` grows the text header to 48 bytes: byte 44 selects start,
+middle, or end anchoring and byte 45 selects top or alphabetic-baseline placement;
+bytes 46–47 are zero. The server applies native advance and ascent after shaping.
+Capability bit 52 advertises this native text-placement extension.
 
 MGFX opcode `24` (`DrawRichText`) carries one position and size plus up to 256
 UTF-8 runs. Each run independently selects family, weight, style, tracking,

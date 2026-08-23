@@ -12,6 +12,7 @@ namespace gfx {
 struct ShapedText {
     std::vector<PathPoint> triangles;
     float advance = 0.0F;
+    float ascent = 0.0F;
     float underlinePosition = 0.0F;
     float underlineThickness = 0.0F;
     float strikeThroughPosition = 0.0F;

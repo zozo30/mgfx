@@ -98,8 +98,13 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
   const document = useMemo(() => parseSvgVectorDocument(source, currentColor),
     [source, currentColor.red, currentColor.green, currentColor.blue, currentColor.alpha]);
   const renderLayer = (layer: SvgVectorLayer, index: number, includeFill: boolean,
-    includeStroke: boolean, suffix = "") => <Path key={`svg-layer-${index}${suffix}`}
-      data={layer.path} viewBox={document.viewBox}
+    includeStroke: boolean, suffix = "") => layer.text
+    ? <mgfx-vector-text key={`svg-layer-${index}${suffix}`} vectorText={{ ...layer.text,
+      viewBox: document.viewBox, ...(layer.clip ? { sourceClip: layer.clip } : {}) }}
+      style={{ position: "absolute", inset: all(0) }} />
+    : <Path key={`svg-layer-${index}${suffix}`}
+      data={layer.path!}
+      viewBox={document.viewBox}
       {...(layer.clip ? { sourceClip: layer.clip } : {})}
       {...(includeFill && layer.fill ? { color: layer.fill } : {})}
       {...(includeFill && layer.fillGradient ? { gradient: layer.fillGradient } : {})}

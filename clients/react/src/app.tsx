@@ -159,6 +159,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     .signal { stroke: url(#signal); stroke-width: 4; stroke-dasharray: 7 4 2 4;
       stroke-dashoffset: 2; stroke-linecap: square; stroke-linejoin: miter;
       stroke-miterlimit: 6; }
+    .native-label { fill: #d8fff0; font-family: rounded; font-size: 7;
+      font-weight: 600; letter-spacing: 0.45; text-anchor: middle; }
   </style>
   <defs>
     <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="5" y1="5" x2="80" y2="36"
@@ -191,6 +193,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
     <use class="signal" href="#signalGlyph" x="78" y="24" width="53" height="18"
       preserveAspectRatio="xMidYMid slice"/>
+    <text class="native-label" x="104" y="59">NATIVE SVG TEXT</text>
     </g>
   </g>
 </svg>`;

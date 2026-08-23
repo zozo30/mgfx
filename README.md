@@ -70,6 +70,12 @@ selectors for native paint, opacity, stroke geometry, transforms, visibility,
 gradient stops, and local clip references. Presentation attributes, selector
 specificity/source order, and inline styles follow their normal cascade order;
 at-rules, descendant selectors, `!important`, and unsupported properties are rejected.
+Plain SVG `<text>` elements lower to compact server-shaped `DrawText` commands
+with inherited/CSS font family, size, weight, style, tracking, solid fill,
+`text-anchor`, entities, opacity, uniform transforms, and rectangular clipping.
+CoreText applies the alphabetic baseline from its native ascent metric; clients
+never generate glyph triangles. Spans, text strokes/gradients, and affine text
+placement remain explicit fallbacks.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.
@@ -323,8 +329,12 @@ macOS server shapes Unicode with CoreText and caches vector glyph outlines;
 future Vulkan and DirectX hosts can execute the same display-list command using
 their platform text service. The component runtime asynchronously requests and
 caches exact native advances, then performs one corrected layout without
-blocking frames on the Unix socket. Font uploads and multiline rich text are the
-next text layer.
+blocking frames on the Unix socket. Uploaded font resources and multiline rich
+text runs use the same native shaping and cache pipeline.
+
+The text opcode also carries optional start/middle/end anchoring and top/alphabetic
+baseline placement. The backend applies shaped advance and ascent, allowing SVG
+text to retain native baseline semantics without client-side font approximations.
 
 The native Metal host selects 4× multisample antialiasing when the device
 supports it, smoothing glyph outlines, vector paths, circles, and mesh edges in

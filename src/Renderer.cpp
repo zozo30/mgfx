@@ -1726,6 +1726,14 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 (maxInlineBytes / sizeof(gfx::Vertex) / 3) * 3;
             const float aspect = static_cast<float>(drawable->texture()->height()) /
                                  static_cast<float>(drawable->texture()->width());
+            float textLeft = text.left;
+            if (text.anchor == gfx::TextAnchor::middle) {
+                textLeft -= shaped.advance * text.fontSize * aspect * 0.5F;
+            } else if (text.anchor == gfx::TextAnchor::end) {
+                textLeft -= shaped.advance * text.fontSize * aspect;
+            }
+            const float textTop = text.baseline == gfx::TextBaseline::alphabetic
+                ? text.top + shaped.ascent * text.fontSize : text.top;
             const std::array<float, 4> color = {
                 text.color.red, text.color.green, text.color.blue,
                 text.color.alpha * opacityStack.back()};
@@ -1736,8 +1744,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 for (std::size_t index = 0; index < count; ++index) {
                     const gfx::PathPoint& point = points[first + index];
                     vertices.push_back({transformPoint(currentTransform(),
-                        {text.left + point[0] * text.fontSize * aspect,
-                         text.top - point[1] * text.fontSize}), color});
+                        {textLeft + point[0] * text.fontSize * aspect,
+                         textTop - point[1] * text.fontSize}), color});
                 }
                 encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
                 encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

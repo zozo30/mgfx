@@ -7,6 +7,10 @@
 
 int main() {
     const gfx::ShapedText sans = gfx::shapeSystemText("Hello, MGFX — Ω", gfx::FontFamily::systemSans);
+    if (sans.ascent <= 0.0F) {
+        std::cerr << "System text ascent was not reported\n";
+        return 1;
+    }
     if (sans.triangles.empty() || sans.triangles.size() % 3 != 0 || sans.advance <= 0.0F) {
         std::cerr << "System Unicode shaping produced no drawable glyph geometry\n";
         return 1;

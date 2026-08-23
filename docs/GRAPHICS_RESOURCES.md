@@ -132,6 +132,9 @@ path tessellator, and caches geometry by family, weight, style, spacing, and str
 Metal therefore receives compact cached vector text instead of one
 rectangle pair per lit pixel. Other native hosts can execute the same command
 through DirectWrite or a HarfBuzz/FreeType service.
+The level-4 text extension adds start/middle/end anchor and top/alphabetic baseline
+enums. Backends apply cached native advance and ascent, which lets inline SVG text
+retain baseline placement while still sending only UTF-8 and semantic font style.
 
 Family codes select semantic system sans, fixed-pitch, serif, or rounded
 designs. They deliberately do not expose platform font names, so identical

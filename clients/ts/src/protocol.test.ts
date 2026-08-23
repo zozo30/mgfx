@@ -674,6 +674,19 @@ test("system Unicode text is a compact skippable display-list command", () => {
   assert.equal(bytes.subarray(68, 68 + Buffer.byteLength("Hello — Ω")).toString(), "Hello — Ω");
 });
 
+test("native text placement carries server-shaped anchor and alphabetic baseline", () => {
+  const frame = new FrameEncoder();
+  frame.systemText("SVG label", 0.25, 0.4, 0.08,
+    { red: 0.2, green: 0.9, blue: 0.7, alpha: 1 }, "rounded", "semibold", "italic",
+    0.03, TextDecoration.None, 0, "middle", "alphabetic");
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 8);
+  assert.equal(bytes.readUInt8(16 + 8 + 3), 4);
+  assert.equal(bytes.readUInt8(16 + 8 + 44), 1);
+  assert.equal(bytes.readUInt8(16 + 8 + 45), 1);
+});
+
 test("font files upload once as bounded persistent resources", () => {
   const font = encodeFontCreate(42, Buffer.from([0, 1, 0, 0, 4, 8, 15, 16, 23, 42]));
   assert.equal(font.readUInt32LE(0), 42);

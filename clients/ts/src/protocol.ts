@@ -99,6 +99,7 @@ export const ExtendedServerCapability = {
   StyledRadialPathPaint: 1n << 49n,
   ConicPathGradients: 1n << 50n,
   TexturePathPaint: 1n << 51n,
+  NativeTextPlacement: 1n << 52n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -1107,7 +1108,9 @@ export class FrameEncoder {
   systemText(text: string, left: number, top: number, fontSize: number,
     color: Color, family: FontFamily = "system", weight: FontWeight = "regular",
     style: FontStyle = "regular", letterSpacing = 0,
-    decoration: TextDecoration = TextDecoration.None, fontResourceId = 0): void {
+    decoration: TextDecoration = TextDecoration.None, fontResourceId = 0,
+    anchor: "start" | "middle" | "end" = "start",
+    baseline: "top" | "alphabetic" = "top"): void {
     const utf8 = Buffer.from(text, "utf8");
     if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
       throw new RangeError("System text must contain 1 through 65536 non-NUL UTF-8 bytes");
@@ -1117,9 +1120,9 @@ export class FrameEncoder {
       throw new RangeError("Text decoration must contain only underline and line-through flags");
     if (!Number.isInteger(fontResourceId) || fontResourceId < 0 || fontResourceId > 0xffff_ffff)
       throw new RangeError("Font resource ID must be an unsigned 32-bit integer");
-    const extension = fontResourceId !== 0 ? 3
+    const extension = anchor !== "start" || baseline !== "top" ? 4 : fontResourceId !== 0 ? 3
       : decoration !== TextDecoration.None ? 2 : letterSpacing !== 0 ? 1 : 0;
-    const headerSize = extension === 3 ? 44
+    const headerSize = extension === 4 ? 48 : extension === 3 ? 44
       : extension === 2 ? 40 : extension === 1 ? 36 : 32;
     const payload = Buffer.alloc(headerSize + utf8.length);
     payload.writeUInt8(fontFamilyCode(family), 0);
@@ -1133,7 +1136,11 @@ export class FrameEncoder {
       });
     if (extension >= 1) payload.writeFloatLE(letterSpacing, 32);
     if (extension >= 2) payload.writeUInt8(decoration, 36);
-    if (extension === 3) payload.writeUInt32LE(fontResourceId, 40);
+    if (extension >= 3) payload.writeUInt32LE(fontResourceId, 40);
+    if (extension === 4) {
+      payload.writeUInt8(anchor === "middle" ? 1 : anchor === "end" ? 2 : 0, 44);
+      payload.writeUInt8(baseline === "alphabetic" ? 1 : 0, 45);
+    }
     utf8.copy(payload, headerSize);
     this.command(8, payload);
   }

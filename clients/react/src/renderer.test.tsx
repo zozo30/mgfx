@@ -153,6 +153,21 @@ test("React Svg intersects a sliced symbol with a local clip path around its pat
   assert.ok(Math.abs(frame.readFloatLE(clipOffset + 12) - 0.46) < 1e-6);
 });
 
+test("React Svg emits server-shaped text with SVG anchor and alphabetic baseline", () => {
+  let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Svg source={`<svg viewBox="0 0 100 50">
+    <text x="50" y="30" text-anchor="middle" font-size="12" font-family="rounded"
+      font-weight="600" fill="#4cc9ff">Native Ω</text></svg>`}
+    style={{ preferredSize: { width: 200, height: 100 } }} />);
+  surface.resize({ width: 200, height: 100 });
+  assert.equal(frame.readUInt32LE(12), 3);
+  assert.equal(frame.readUInt16LE(40), 8);
+  assert.equal(frame.readUInt8(40 + 8 + 3), 4);
+  assert.equal(frame.readUInt8(40 + 8 + 44), 1);
+  assert.equal(frame.readUInt8(40 + 8 + 45), 1);
+});
+
 test("React Mesh uploads indexed geometry once and draws its resource ID", () => {
   let uploads = 0;
   let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);

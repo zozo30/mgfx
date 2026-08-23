@@ -1,4 +1,5 @@
-import type { MeshData, PathData, Point, RichTextSpan, Style, TextStyle } from "@mgfx/demo-client/ui";
+import type { MeshData, PathData, Point, RichTextSpan, Style, TextStyle,
+  VectorTextData } from "@mgfx/demo-client/ui";
 import type { Key } from "@mgfx/demo-client/protocol";
 import type { Key as ReactKey, ReactNode } from "react";
 
@@ -21,6 +22,7 @@ export interface MGFXProps {
   readonly onTextInput?: (text: string) => void;
   readonly mesh?: MeshData;
   readonly path?: PathData;
+  readonly vectorText?: VectorTextData;
   readonly richTextSpans?: readonly RichTextSpan[];
 }
 
@@ -37,6 +39,7 @@ declare module "react" {
       "mgfx-scroll": MGFXProps;
       "mgfx-mesh": MGFXProps;
       "mgfx-path": MGFXProps;
+      "mgfx-vector-text": MGFXProps;
     }
   }
 }

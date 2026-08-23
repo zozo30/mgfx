@@ -154,6 +154,7 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
     CGFloat ascent = 0.0, descent = 0.0, leading = 0.0;
     shaped.advance = static_cast<float>(CTLineGetTypographicBounds(
         line, &ascent, &descent, &leading) / designSize);
+    shaped.ascent = static_cast<float>(ascent / designSize);
     shaped.underlinePosition = static_cast<float>(
         (ascent - CTFontGetUnderlinePosition(baseFont)) / designSize);
     shaped.underlineThickness = static_cast<float>(

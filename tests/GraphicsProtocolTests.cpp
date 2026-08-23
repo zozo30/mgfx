@@ -180,7 +180,8 @@ int main() {
                       gfx::underlineText | gfx::strikeThroughText,
                       77,
                       -0.8F, 0.7F, 0.08F,
-                      {0.7F, 0.9F, 1.0F, 1.0F}, "Hello — Ω"});
+                      {0.7F, 0.9F, 1.0F, 1.0F}, "Hello — Ω",
+                      gfx::TextAnchor::middle, gfx::TextBaseline::alphabetic});
     encoder.drawRichText({-0.7F, 0.5F, 0.07F, {
         {gfx::FontFamily::systemSans, gfx::FontWeight::bold, gfx::FontStyle::regular,
          0.0F, gfx::noTextDecoration, 0, {1.0F, 0.4F, 0.2F, 1.0F}, "Rich "},
@@ -422,6 +423,7 @@ int main() {
         !nearlyEqual(text.letterSpacing, 0.08F) ||
         text.decoration != (gfx::underlineText | gfx::strikeThroughText) ||
         text.fontResourceId != 77 ||
+        text.anchor != gfx::TextAnchor::middle || text.baseline != gfx::TextBaseline::alphabetic ||
         text.text != "Hello — Ω" || !nearlyEqual(text.fontSize, 0.08F) || !decoder.next(command)) {
         return fail("Text decoding failed");
     }
