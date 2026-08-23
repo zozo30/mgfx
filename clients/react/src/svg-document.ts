@@ -1,5 +1,5 @@
 import { SVGPathData } from "svg-pathdata";
-import type { Color } from "@mgfx/demo-client/protocol";
+import type { Color, RichTextRun } from "@mgfx/demo-client/protocol";
 import type { Rect } from "@mgfx/demo-client/ui";
 import { svgAttributes, svgPrimitivePath } from "./icon-pack.js";
 
@@ -15,6 +15,9 @@ export interface SvgVectorLayer {
     readonly fontStyle?: "regular" | "italic";
     readonly letterSpacing?: number; readonly anchor?: "start" | "middle" | "end";
     readonly sourceTransform?: Matrix };
+  readonly richText?: { readonly runs: readonly RichTextRun[]; readonly x: number;
+    readonly y: number; readonly fontSize: number;
+    readonly anchor?: "start" | "middle" | "end"; readonly sourceTransform?: Matrix };
   readonly clip?: Rect;
   readonly fill?: Color;
   readonly fillGradient?: LinearGradientPaint;
@@ -304,22 +307,70 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const closingMatch = closingText.exec(expandedSource);
       if (!closingMatch) throw new Error("SVG text element is not closed");
       const body = expandedSource.slice(bodyStart, closingMatch.index);
-      if (/<[^>]*>/.test(body)) throw new Error("SVG text spans require rich text lowering");
-      const value = decodeSvgText(body).replace(/\s+/g, " ").trim();
-      if (!value || !state.displayed || !state.visible) continue;
-      if (state.fillGradientId) throw new Error("SVG text gradient fill is not supported natively");
-      if (state.stroke && state.stroke.alpha > 0 && state.strokeWidth > 0)
-        throw new Error("SVG text stroke is not supported natively");
-      if (!state.fill || state.fill.alpha <= 0) continue;
-      layers.push({ ...(state.clip ? { clip: state.clip } : {}), text: { value,
+      const spanPattern = /<tspan\b([^>]*)>([\s\S]*?)<\/tspan\s*>/gi;
+      const pieces: { value: string; state: PaintState }[] = [];
+      let bodyOffset = 0;
+      for (const span of body.matchAll(spanPattern)) {
+        const before = body.slice(bodyOffset, span.index);
+        if (/<[^>]*>/.test(before)) throw new Error("SVG text supports direct tspan children only");
+        if (before) pieces.push({ value: decodeSvgText(before), state });
+        const spanAttributes = styledAttributes(span[1]!, "tspan", cssRules);
+        if (["x", "y", "dx", "dy", "rotate", "transform"].some((key) => spanAttributes[key] !== undefined))
+          throw new Error("SVG tspan positioning requires a separate native text command");
+        const spanState = inherit(state, spanAttributes, clipPaths);
+        if (Math.abs(spanState.fontSize - state.fontSize) > 1e-6 ||
+            spanState.textAnchor !== state.textAnchor)
+          throw new Error("SVG tspan font-size and text-anchor changes require run metrics");
+        if (/<[^>]*>/.test(span[2]!)) throw new Error("Nested SVG tspans are not supported");
+        pieces.push({ value: decodeSvgText(span[2]!), state: spanState });
+        bodyOffset = span.index + span[0].length;
+      }
+      const after = body.slice(bodyOffset);
+      if (/<[^>]*>/.test(after)) throw new Error("SVG text supports direct tspan children only");
+      if (after) pieces.push({ value: decodeSvgText(after), state });
+      if (pieces.length === 0) pieces.push({ value: decodeSvgText(body), state });
+      const normalized = pieces.map((piece) => ({ ...piece, value: piece.value.replace(/\s+/g, " ") }));
+      if (normalized.length > 0) {
+        normalized[0] = { ...normalized[0]!, value: normalized[0]!.value.trimStart() };
+        normalized[normalized.length - 1] = { ...normalized[normalized.length - 1]!,
+          value: normalized[normalized.length - 1]!.value.trimEnd() };
+        for (let index = 1; index < normalized.length; ++index) {
+          if (normalized[index - 1]!.value.endsWith(" ") && normalized[index]!.value.startsWith(" "))
+            normalized[index] = { ...normalized[index]!, value: normalized[index]!.value.slice(1) };
+        }
+      }
+      const hasSpans = [...body.matchAll(/<tspan\b/gi)].length > 0;
+      if (!state.displayed || !state.visible) continue;
+      const drawablePieces = normalized.filter((piece) => piece.value.length > 0 &&
+        piece.state.displayed && piece.state.visible);
+      for (const piece of drawablePieces) {
+        if (piece.state.fillGradientId)
+          throw new Error(`SVG ${hasSpans ? "tspan" : "text"} gradient fill is not supported natively`);
+        if (piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0)
+          throw new Error(`SVG ${hasSpans ? "tspan" : "text"} stroke is not supported natively`);
+      }
+      const visiblePieces = drawablePieces.filter((piece) =>
+        piece.state.fill && piece.state.fill.alpha > 0);
+      const value = visiblePieces.map((piece) => piece.value).join("");
+      if (!value) continue;
+      const placement = {
         x: finiteNumber(attributes.x, 0), y: finiteNumber(attributes.y, 0), fontSize: state.fontSize,
-        color: multiplyAlpha(state.fill, state.opacity * state.fillOpacity),
-        family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
-        ...(state.letterSpacing !== 0 ? { letterSpacing: state.letterSpacing / state.fontSize } : {}),
         ...(state.textAnchor !== "start" ? { anchor: state.textAnchor } : {}),
         ...(state.transform.a !== 1 || state.transform.b !== 0 || state.transform.c !== 0 ||
           state.transform.d !== 1 || state.transform.e !== 0 || state.transform.f !== 0
-          ? { sourceTransform: state.transform } : {}) },
+          ? { sourceTransform: state.transform } : {}) };
+      layers.push({ ...(state.clip ? { clip: state.clip } : {}),
+        ...(hasSpans ? { richText: { ...placement, runs: visiblePieces.map((piece) => ({
+          text: piece.value, color: multiplyAlpha(piece.state.fill!,
+            piece.state.opacity * piece.state.fillOpacity), family: piece.state.fontFamily,
+          weight: piece.state.fontWeight, style: piece.state.fontStyle,
+          ...(piece.state.letterSpacing !== 0
+            ? { letterSpacing: piece.state.letterSpacing / state.fontSize } : {}) })) } }
+          : { text: { ...placement, value,
+            color: multiplyAlpha(state.fill!, state.opacity * state.fillOpacity),
+            family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
+            ...(state.letterSpacing !== 0
+              ? { letterSpacing: state.letterSpacing / state.fontSize } : {}) } }),
         strokeWidth: 0, fillRule: state.fillRule, lineCap: state.lineCap,
         lineJoin: state.lineJoin });
       continue;

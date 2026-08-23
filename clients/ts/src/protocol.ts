@@ -100,6 +100,7 @@ export const ExtendedServerCapability = {
   ConicPathGradients: 1n << 50n,
   TexturePathPaint: 1n << 51n,
   NativeTextPlacement: 1n << 52n,
+  NativeRichTextPlacement: 1n << 53n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -1066,18 +1067,26 @@ export class FrameEncoder {
     this.command(multiGradient ? 31 : dashArray ? 30 : styled ? 29 : extended ? 28 : dashed ? 27 : 7, payload);
   }
 
-  richText(runs: readonly RichTextRun[], left: number, top: number, fontSize: number): void {
+  richText(runs: readonly RichTextRun[], left: number, top: number, fontSize: number,
+    anchor: "start" | "middle" | "end" = "start",
+    baseline: "top" | "alphabetic" = "top"): void {
     if (runs.length === 0 || runs.length > 256)
       throw new RangeError("Rich text requires 1 through 256 runs");
     const encoded = runs.map((run) => Buffer.from(run.text, "utf8"));
-    const payload = Buffer.alloc(16 + encoded.reduce((size, text) => size + 32 + text.length, 0));
+    const placed = anchor !== "start" || baseline !== "top";
+    const headerSize = placed ? 20 : 16;
+    const payload = Buffer.alloc(headerSize + encoded.reduce((size, text) => size + 32 + text.length, 0));
     [left, top, fontSize].forEach((value, index) => {
       if (!Number.isFinite(value) || (index === 2 && value <= 0))
         throw new RangeError("Rich text position and size must be finite and size positive");
       payload.writeFloatLE(value, index * 4);
     });
-    payload.writeUInt32LE(runs.length, 12);
-    let offset = 16;
+    payload.writeUInt32LE(runs.length + (placed ? 0x8000_0000 : 0), 12);
+    if (placed) {
+      payload.writeUInt8(anchor === "middle" ? 1 : anchor === "end" ? 2 : 0, 16);
+      payload.writeUInt8(baseline === "alphabetic" ? 1 : 0, 17);
+    }
+    let offset = headerSize;
     runs.forEach((run, index) => {
       const text = encoded[index]!;
       if (text.length === 0 || text.length > 65536 || text.includes(0))

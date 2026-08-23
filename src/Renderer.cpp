@@ -1761,8 +1761,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             if (clipEmpty()) continue;
             const float aspect = static_cast<float>(drawable->texture()->height()) /
                                  static_cast<float>(drawable->texture()->width());
-            std::vector<gfx::Vertex> vertices;
-            float cursor = 0.0F;
+            std::vector<gfx::ShapedText*> shapedRuns;
+            shapedRuns.reserve(rich.runs.size());
+            float totalAdvance = 0.0F;
             for (const gfx::RichTextRun& run : rich.runs) {
                 std::string key{static_cast<char>(run.family), static_cast<char>(run.weight),
                                 static_cast<char>(run.style)};
@@ -1789,13 +1790,28 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     if ((run.decoration & gfx::strikeThroughText) != 0)
                         decorate(shaped.strikeThroughPosition, shaped.strikeThroughThickness);
                 }
+                shapedRuns.push_back(&shaped);
+                totalAdvance += shaped.advance;
+            }
+            std::vector<gfx::Vertex> vertices;
+            float cursor = 0.0F;
+            float richLeft = rich.left;
+            if (rich.anchor == gfx::TextAnchor::middle)
+                richLeft -= totalAdvance * rich.fontSize * aspect * 0.5F;
+            else if (rich.anchor == gfx::TextAnchor::end)
+                richLeft -= totalAdvance * rich.fontSize * aspect;
+            for (std::size_t runIndex = 0; runIndex < rich.runs.size(); ++runIndex) {
+                const gfx::RichTextRun& run = rich.runs[runIndex];
+                const gfx::ShapedText& shaped = *shapedRuns[runIndex];
+                const float richTop = rich.baseline == gfx::TextBaseline::alphabetic
+                    ? rich.top + shaped.ascent * rich.fontSize : rich.top;
                 const std::array<float, 4> color = {run.color.red, run.color.green, run.color.blue,
                                                      run.color.alpha * opacityStack.back()};
                 vertices.reserve(vertices.size() + shaped.triangles.size());
                 for (const gfx::PathPoint& point : shaped.triangles) {
                     vertices.push_back({transformPoint(currentTransform(),
-                        {rich.left + (cursor + point[0]) * rich.fontSize * aspect,
-                         rich.top - point[1] * rich.fontSize}), color});
+                        {richLeft + (cursor + point[0]) * rich.fontSize * aspect,
+                         richTop - point[1] * rich.fontSize}), color});
                 }
                 cursor += shaped.advance;
             }

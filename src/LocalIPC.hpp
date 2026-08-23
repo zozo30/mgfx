@@ -111,6 +111,7 @@ enum ServerCapability : std::uint64_t {
     conicPathGradients = 1ULL << 50U,
     texturePathPaint = 1ULL << 51U,
     nativeTextPlacement = 1ULL << 52U,
+    nativeRichTextPlacement = 1ULL << 53U,
 };
 
 enum class ResourceKind : std::uint8_t {

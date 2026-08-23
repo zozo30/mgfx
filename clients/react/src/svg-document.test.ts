@@ -174,9 +174,29 @@ test("SVG text lowers native typography, baseline position, entities, transforms
   });
 });
 
-test("SVG text rejects unsupported spans, strokes, and entities", () => {
+test("SVG text lowers styled tspans to native rich-text runs", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 80 20"><style>
+    .accent { fill: #20d890; font-family: serif; font-style: italic; letter-spacing: 1; }
+  </style><text x="40" y="15" font-size="10" fill="#ffffff" text-anchor="middle">
+    Hello <tspan class="accent" font-weight="700">native</tspan> text
+  </text></svg>`);
+  assert.deepEqual(document.layers[0]?.richText, {
+    x: 40, y: 15, fontSize: 10, anchor: "middle", runs: [
+      { text: "Hello ", color: { red: 1, green: 1, blue: 1, alpha: 1 }, family: "system",
+        weight: "regular", style: "regular" },
+      { text: "native", color: { red: 0.12549019607843137, green: 0.8470588235294118,
+        blue: 0.5647058823529412, alpha: 1 }, family: "serif", weight: "bold",
+        style: "italic", letterSpacing: 0.1 },
+      { text: " text", color: { red: 1, green: 1, blue: 1, alpha: 1 }, family: "system",
+        weight: "regular", style: "regular" },
+    ],
+  });
+});
+
+test("SVG text rejects unsupported positioned spans, strokes, and entities", () => {
   assert.throws(() => parseSvgVectorDocument(
-    `<svg viewBox="0 0 40 20"><text><tspan>nested</tspan></text></svg>`), /rich text lowering/);
+    `<svg viewBox="0 0 40 20"><text><tspan dx="2">nested</tspan></text></svg>`),
+  /positioning requires/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text stroke="red">outlined</text></svg>`), /stroke is not supported/);
   assert.throws(() => parseSvgVectorDocument(

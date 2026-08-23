@@ -49,7 +49,9 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.RadialPathGradientStrokes |
     ExtendedServerCapability.StyledRadialPathPaint |
     ExtendedServerCapability.ConicPathGradients |
-    ExtendedServerCapability.TexturePathPaint;
+    ExtendedServerCapability.TexturePathPaint |
+    ExtendedServerCapability.NativeTextPlacement |
+    ExtendedServerCapability.NativeRichTextPlacement;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -712,6 +714,21 @@ test("rich text packs styled UTF-8 runs into one display-list command", () => {
   assert.equal(bytes.readUInt8(second + 2), 1);
   assert.equal(bytes.readUInt8(second + 3), TextDecoration.Underline);
   assert.equal(bytes.readUInt32LE(second + 8), 42);
+});
+
+test("native rich-text placement anchors one server-shaped run list", () => {
+  const frame = new FrameEncoder();
+  frame.richText([
+    { text: "SVG ", color: { red: 1, green: 1, blue: 1, alpha: 1 } },
+    { text: "tspan", color: { red: 0.2, green: 0.9, blue: 0.7, alpha: 1 }, weight: "bold" },
+  ], 0, 0.25, 0.1, "middle", "alphabetic");
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt32LE(36), 0x8000_0002);
+  assert.equal(bytes.readUInt8(40), 1);
+  assert.equal(bytes.readUInt8(41), 1);
+  assert.equal(bytes.readUInt16LE(42), 0);
+  assert.equal(bytes.readUInt8(44), 0);
 });
 
 test("native text metrics correlate asynchronous measurement replies", async () => {

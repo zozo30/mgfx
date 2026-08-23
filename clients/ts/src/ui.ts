@@ -1,7 +1,7 @@
 import { FrameEncoder, Key, TextDecoration,
   type ClipRect, type Color, type PathConicGradientPaint, type PathRadialGradientPaint,
   type PathTexturePaint,
-  type PathSegment, type Vertex } from "./protocol.js";
+  type PathSegment, type RichTextRun, type Vertex } from "./protocol.js";
 
 export interface Point { readonly x: number; readonly y: number }
 export interface Size { readonly width: number; readonly height: number }
@@ -283,8 +283,15 @@ export interface VectorTextData {
   readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
     readonly d: number; readonly e: number; readonly f: number };
 }
+export interface VectorRichTextData {
+  readonly runs: readonly RichTextRun[]; readonly x: number; readonly y: number;
+  readonly fontSize: number; readonly viewBox: Rect; readonly sourceClip?: Rect;
+  readonly anchor?: "start" | "middle" | "end";
+  readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
+    readonly d: number; readonly e: number; readonly f: number };
+}
 export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richText" |
-  "vectorText" | "scroll" | "circle" | "mesh" | "path";
+  "vectorText" | "vectorRichText" | "scroll" | "circle" | "mesh" | "path";
 export interface Element {
   type: ElementType; key: string; style: Style; children: readonly Element[];
   onClick?: () => void; onHoverChange?: (hovered: boolean) => void;
@@ -297,6 +304,7 @@ export interface Element {
   mesh?: MeshData;
   path?: PathData;
   vectorText?: VectorTextData;
+  vectorRichText?: VectorRichTextData;
   richTextSpans?: readonly RichTextSpan[];
 }
 
@@ -310,6 +318,8 @@ export const path = (data: PathData, style: Style = {}, key = ""): Element =>
   ({ ...make("path", [], style, key), path: data });
 export const vectorText = (data: VectorTextData, style: Style = {}, key = ""): Element =>
   ({ ...make("vectorText", [], style, key), vectorText: data });
+export const vectorRichText = (data: VectorRichTextData, style: Style = {}, key = ""): Element =>
+  ({ ...make("vectorRichText", [], style, key), vectorRichText: data });
 export const row = (children: readonly Element[], style: Style = {}, key = ""): Element => make("row", children, style, key);
 export const column = (children: readonly Element[], style: Style = {}, key = ""): Element => make("column", children, style, key);
 export const stack = (children: readonly Element[], style: Style = {}, key = ""): Element => make("stack", children, style, key);
@@ -480,6 +490,7 @@ class Node {
   mesh: MeshData | undefined = undefined;
   path: PathData | undefined = undefined;
   vectorText: VectorTextData | undefined = undefined;
+  vectorRichText: VectorRichTextData | undefined = undefined;
   richTextSpans: readonly RichTextSpan[] = [];
   measured: Size = { width: 0, height: 0 };
   bounds: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -501,6 +512,7 @@ class Node {
     this.mesh = element.mesh;
     this.path = element.path;
     this.vectorText = element.vectorText;
+    this.vectorRichText = element.vectorRichText;
     this.richTextSpans = element.richTextSpans ?? [];
     const old = this.children, used = old.map(() => false);
     this.children = element.children.map((child, index) => {
@@ -696,6 +708,8 @@ class Node {
     if (this.type === "richText")
       paintRichText(encoder, this.bounds, this.richTextSpans, this.textStyle, viewport);
     if (this.type === "vectorText") paintVectorText(encoder, this.bounds, this.vectorText, viewport);
+    if (this.type === "vectorRichText")
+      paintVectorRichText(encoder, this.bounds, this.vectorRichText, viewport);
     for (const child of this.paintOrder()) child.paint(encoder, viewport);
     if (this.style.clip) encoder.popClip();
     if (this.style.transform) encoder.popTransform();
@@ -928,6 +942,57 @@ function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextDa
   encoder.systemText(text.value, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
     fontSize / viewport.height * 2, text.color, text.family, text.weight, text.fontStyle,
     text.letterSpacing ?? 0, TextDecoration.None, 0, text.anchor ?? "start", "alphabetic");
+  if (text.sourceTransform) encoder.popTransform();
+  if (text.sourceClip) encoder.popClip();
+}
+
+function paintVectorRichText(encoder: FrameEncoder, bounds: Rect,
+  text: VectorRichTextData | undefined, viewport: Size): void {
+  if (!text || text.runs.length === 0 || text.fontSize <= 0 ||
+      text.viewBox.width <= 0 || text.viewBox.height <= 0) return;
+  const sourceAspect = text.viewBox.width / text.viewBox.height;
+  const boundsAspect = bounds.width / bounds.height;
+  let destination = bounds;
+  if (sourceAspect > boundsAspect) {
+    const height = bounds.width / sourceAspect;
+    destination = { ...bounds, y: bounds.y + (bounds.height - height) / 2, height };
+  } else {
+    const width = bounds.height * sourceAspect;
+    destination = { ...bounds, x: bounds.x + (bounds.width - width) / 2, width };
+  }
+  if (text.sourceClip) {
+    const clip = { x: destination.x +
+        (text.sourceClip.x - text.viewBox.x) / text.viewBox.width * destination.width,
+      y: destination.y +
+        (text.sourceClip.y - text.viewBox.y) / text.viewBox.height * destination.height,
+      width: text.sourceClip.width / text.viewBox.width * destination.width,
+      height: text.sourceClip.height / text.viewBox.height * destination.height };
+    if (clip.width <= 0 || clip.height <= 0) return;
+    encoder.pushClip({ left: clip.x / viewport.width, top: clip.y / viewport.height,
+      right: (clip.x + clip.width) / viewport.width,
+      bottom: (clip.y + clip.height) / viewport.height });
+  }
+  if (text.sourceTransform) {
+    const matrix = text.sourceTransform;
+    const sourceScaleX = destination.width / text.viewBox.width / viewport.width * 2;
+    const sourceScaleY = -destination.height / text.viewBox.height / viewport.height * 2;
+    const sourceTranslateX = destination.x / viewport.width * 2 - 1 -
+      text.viewBox.x * sourceScaleX;
+    const sourceTranslateY = 1 - destination.y / viewport.height * 2 -
+      text.viewBox.y * sourceScaleY;
+    const m21 = sourceScaleX * matrix.c / sourceScaleY;
+    const m12 = sourceScaleY * matrix.b / sourceScaleX;
+    encoder.pushTransform({ m11: matrix.a, m12, m21, m22: matrix.d,
+      translateX: sourceScaleX * matrix.e + sourceTranslateX -
+        matrix.a * sourceTranslateX - m21 * sourceTranslateY,
+      translateY: sourceScaleY * matrix.f + sourceTranslateY -
+        m12 * sourceTranslateX - matrix.d * sourceTranslateY });
+  }
+  const x = destination.x + (text.x - text.viewBox.x) / text.viewBox.width * destination.width;
+  const y = destination.y + (text.y - text.viewBox.y) / text.viewBox.height * destination.height;
+  const fontSize = text.fontSize / text.viewBox.height * destination.height;
+  encoder.richText(text.runs, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
+    fontSize / viewport.height * 2, text.anchor ?? "start", "alphabetic");
   if (text.sourceTransform) encoder.popTransform();
   if (text.sourceClip) encoder.popClip();
 }

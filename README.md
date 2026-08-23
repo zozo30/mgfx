@@ -75,8 +75,10 @@ with inherited/CSS font family, size, weight, style, tracking, solid fill,
 `text-anchor`, entities, opacity, affine transforms, and rectangular clipping.
 CoreText applies the alphabetic baseline from its native ascent metric; clients
 never generate glyph triangles. SVG rotation, skew, and nonuniform scale conjugate
-into the normalized display-list transform stack around the text command. Spans
-and text strokes or gradients remain explicit fallbacks.
+into the normalized display-list transform stack around the text command. Direct
+`<tspan>` children with independent solid color, family, weight, style, and tracking
+lower to one anchored `DrawRichText` run list. Positioned/nested spans and text
+strokes or gradients remain explicit fallbacks.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.

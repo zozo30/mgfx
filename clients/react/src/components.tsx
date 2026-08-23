@@ -102,6 +102,10 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
     ? <mgfx-vector-text key={`svg-layer-${index}${suffix}`} vectorText={{ ...layer.text,
       viewBox: document.viewBox, ...(layer.clip ? { sourceClip: layer.clip } : {}) }}
       style={{ position: "absolute", inset: all(0) }} />
+    : layer.richText
+    ? <mgfx-vector-rich-text key={`svg-layer-${index}${suffix}`} vectorRichText={{ ...layer.richText,
+      viewBox: document.viewBox, ...(layer.clip ? { sourceClip: layer.clip } : {}) }}
+      style={{ position: "absolute", inset: all(0) }} />
     : <Path key={`svg-layer-${index}${suffix}`}
       data={layer.path!}
       viewBox={document.viewBox}

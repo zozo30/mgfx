@@ -359,6 +359,8 @@ struct RichTextCommand {
     float top;
     float fontSize;
     std::vector<RichTextRun> runs;
+    TextAnchor anchor = TextAnchor::start;
+    TextBaseline baseline = TextBaseline::top;
 };
 
 class CommandEncoder final {

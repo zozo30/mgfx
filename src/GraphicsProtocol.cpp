@@ -616,7 +616,8 @@ void CommandEncoder::drawText(const TextCommand& text) {
 }
 
 void CommandEncoder::drawRichText(const RichTextCommand& text) {
-    constexpr std::size_t headerSize = 16;
+    const bool placed = text.anchor != TextAnchor::start || text.baseline != TextBaseline::top;
+    const std::size_t headerSize = placed ? 20 : 16;
     constexpr std::size_t runHeaderSize = 32;
     std::size_t payloadSize = headerSize;
     for (const RichTextRun& run : text.runs) {
@@ -631,7 +632,13 @@ void CommandEncoder::drawRichText(const RichTextCommand& text) {
     }
     beginCommand(Opcode::drawRichText, static_cast<std::uint32_t>(payloadSize));
     appendFloat(bytes_, text.left); appendFloat(bytes_, text.top); appendFloat(bytes_, text.fontSize);
-    appendU32(bytes_, static_cast<std::uint32_t>(text.runs.size()));
+    appendU32(bytes_, static_cast<std::uint32_t>(text.runs.size()) |
+                      (placed ? 0x80000000U : 0U));
+    if (placed) {
+        bytes_.push_back(static_cast<std::uint8_t>(text.anchor));
+        bytes_.push_back(static_cast<std::uint8_t>(text.baseline));
+        bytes_.insert(bytes_.end(), 2, 0);
+    }
     for (const RichTextRun& run : text.runs) {
         bytes_.push_back(static_cast<std::uint8_t>(run.family));
         bytes_.push_back(static_cast<std::uint8_t>(run.weight));
@@ -1367,12 +1374,20 @@ bool decodeText(const CommandView& command, TextCommand& text) {
 }
 
 bool decodeRichText(const CommandView& command, RichTextCommand& text) {
-    constexpr std::size_t headerSize = 16, runHeaderSize = 32;
-    if (command.opcode != Opcode::drawRichText || command.payloadSize <= headerSize) return false;
+    constexpr std::size_t baseHeaderSize = 16, extendedHeaderSize = 20, runHeaderSize = 32;
+    if (command.opcode != Opcode::drawRichText || command.payloadSize <= baseHeaderSize) return false;
     text.left = readFloat(command.payload);
     text.top = readFloat(command.payload + 4);
     text.fontSize = readFloat(command.payload + 8);
-    const std::uint32_t count = readU32(command.payload + 12);
+    const std::uint32_t encodedCount = readU32(command.payload + 12);
+    const bool placed = (encodedCount & 0x80000000U) != 0;
+    const std::uint32_t count = encodedCount & 0x7fffffffU;
+    const std::size_t headerSize = placed ? extendedHeaderSize : baseHeaderSize;
+    if (placed && (command.payloadSize <= extendedHeaderSize || command.payload[16] > 2 ||
+                   command.payload[17] > 1 || command.payload[18] != 0 || command.payload[19] != 0))
+        return false;
+    text.anchor = placed ? static_cast<TextAnchor>(command.payload[16]) : TextAnchor::start;
+    text.baseline = placed ? static_cast<TextBaseline>(command.payload[17]) : TextBaseline::top;
     if (count == 0 || count > 256 || !std::isfinite(text.left) || !std::isfinite(text.top) ||
         !std::isfinite(text.fontSize) || text.fontSize <= 0.0F) return false;
     text.runs.clear(); text.runs.reserve(count);

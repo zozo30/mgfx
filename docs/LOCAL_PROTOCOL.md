@@ -228,7 +228,12 @@ Capability bit 52 advertises this native text-placement extension.
 MGFX opcode `24` (`DrawRichText`) carries one position and size plus up to 256
 UTF-8 runs. Each run independently selects family, weight, style, tracking,
 decoration, optional font resource, and color. The backend shapes runs in order
-and advances the shared pen from native metrics.
+and advances the shared pen from native metrics. The high bit of the run count
+extends the fixed header from 16 to 20 bytes: byte 16 selects start/middle/end
+anchoring, byte 17 selects top/alphabetic placement, and bytes 18–19 are zero.
+The server anchors from the total shaped advance and aligns every run to the
+shared alphabetic baseline using that run's native ascent. Capability bit 53
+advertises this rich-text placement extension.
 
 MGFX opcode `25` (`DrawLinearGradientCircle`) carries a destination rectangle,
 horizontal/vertical/diagonal direction, and two straight-alpha colors. Backends

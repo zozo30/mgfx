@@ -7,12 +7,14 @@ import {
   box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
   nativeTextAdvance, nativeTextMetricRuns, richText, row, scrollView, stack, text,
   type Element, type Point, type RichTextSpan, type Size, type Style, type TextStyle,
-  mesh, path as vectorPath, vectorText, type MeshData, type PathData, type VectorTextData,
+  mesh, path as vectorPath, vectorRichText, vectorText, type MeshData, type PathData,
+  type VectorRichTextData, type VectorTextData,
 } from "@mgfx/demo-client/ui";
 import { NativeWindowProvider, type NativeWindowCommands } from "./native-window.js";
 
 export type HostType = "mgfx-box" | "mgfx-row" | "mgfx-column" | "mgfx-stack" |
   "mgfx-circle" | "mgfx-text" | "mgfx-rich-text" | "mgfx-vector-text" |
+  "mgfx-vector-rich-text" |
   "mgfx-scroll" | "mgfx-mesh" | "mgfx-path";
 
 export interface HostProps {
@@ -27,6 +29,7 @@ export interface HostProps {
   readonly mesh?: MeshData;
   readonly path?: PathData;
   readonly vectorText?: VectorTextData;
+  readonly vectorRichText?: VectorRichTextData;
   readonly richTextSpans?: readonly RichTextSpan[];
 }
 
@@ -143,6 +146,8 @@ function toElement(child: HostChild): Element[] {
   case "mgfx-path": element = child.props.path ? vectorPath(child.props.path, style, key) : box(style, key); break;
   case "mgfx-vector-text": element = child.props.vectorText
     ? vectorText(child.props.vectorText, style, key) : box(style, key); break;
+  case "mgfx-vector-rich-text": element = child.props.vectorRichText
+    ? vectorRichText(child.props.vectorRichText, style, key) : box(style, key); break;
   case "mgfx-text": {
     const raw = child.children.filter((value): value is TextNode => value.kind === "text")
       .map((value) => value.value).join("");
