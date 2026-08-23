@@ -125,6 +125,9 @@ gradient interior with a differently oriented gradient outline.
 one- or two-value `stroke-dasharray` and signed `stroke-dashoffset` onto it;
 the Metal server splits and tessellates the stroke rather than receiving segments
 or triangles from React.
+SVG and `Path` strokes support butt, round, and square caps plus bevel, round,
+and miter joins. The server owns their geometry and applies a four-half-width
+miter limit, falling back to bevel for overly sharp corners.
 
 ```tsx
 const [name, setName] = useState("");

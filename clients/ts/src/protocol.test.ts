@@ -36,8 +36,9 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.ResourceStatusEvents | ExtendedServerCapability.LinearGradientCircles |
     ExtendedServerCapability.GridPatterns | ExtendedServerCapability.DashedPathStrokes;
   const allCapabilities = capabilities | ExtendedServerCapability.GradientPathStrokes;
-  payload.writeBigUInt64LE(allCapabilities);
-  assert.equal(decodeServerCapabilities(payload), allCapabilities);
+  const completeCapabilities = allCapabilities | ExtendedServerCapability.ExtendedPathStrokeStyles;
+  payload.writeBigUInt64LE(completeCapabilities);
+  assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
 });
 
@@ -417,7 +418,7 @@ test("canonical paths upload once and frames reference server-side vector geomet
       fillGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 0 },
         startColor: { red: 0, green: 0.4, blue: 0.8, alpha: 1 },
         endColor: { red: 0.8, green: 0.2, blue: 1, alpha: 1 } },
-      lineCap: "round", lineJoin: "round",
+      lineCap: "square", lineJoin: "miter",
       strokeGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 24 },
         startColor: { red: 1, green: 0.2, blue: 0.1, alpha: 1 },
         endColor: { red: 1, green: 0.9, blue: 0.2, alpha: 1 } },
@@ -429,6 +430,8 @@ test("canonical paths upload once and frames reference server-side vector geomet
   assert.equal(bytes.readUInt32LE(20), 192);
   assert.equal(bytes.readUInt32LE(24), 12);
   assert.equal(bytes.readUInt8(28), 15);
+  assert.equal(bytes.readUInt8(30), 2);
+  assert.equal(bytes.readUInt8(31), 2);
   assert.equal(bytes.readFloatLE(24 + 124), 1);
   assert.equal(bytes.readFloatLE(24 + 128 + 8), 24);
   assert.equal(bytes.readFloatLE(24 + 176), 7);

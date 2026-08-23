@@ -89,6 +89,12 @@ int main() {
         std::cerr << "Butt-capped stroke contains gaps or overlapping triangles\n";
         return 1;
     }
+    const gfx::PathTriangles squareCapStroke = gfx::tessellatePath(strokePath, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::square, gfx::LineJoin::bevel, 2, 0.25F);
+    if (std::fabs(triangleArea(squareCapStroke.stroke) - 44.0) > 0.001) {
+        std::cerr << "Square caps do not extend by one half-width\n";
+        return 1;
+    }
     const gfx::PathTriangles dashedStroke = gfx::tessellatePath(strokePath, false, true,
         gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::bevel,
         2, 0.25F, 4, 2, 0);
@@ -115,6 +121,14 @@ int main() {
                                   triangleArea(bevelElbow.stroke);
     if (joinDifference <= 0.27 || joinDifference >= 0.30) {
         std::cerr << "Round join is not a clean outer-corner arc\n";
+        return 1;
+    }
+    const gfx::PathTriangles miterElbow = gfx::tessellatePath(elbow, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::miter, 2, 0.25F);
+    const double miterDifference = triangleArea(miterElbow.stroke) -
+                                   triangleArea(bevelElbow.stroke);
+    if (miterDifference <= 0.49 || miterDifference >= 0.51) {
+        std::cerr << "Miter join does not meet at the exact outer intersection\n";
         return 1;
     }
 

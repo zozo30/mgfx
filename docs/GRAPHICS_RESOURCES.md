@@ -78,6 +78,12 @@ The server splits flattened contours at exact arc-length boundaries before using
 the ordinary cap/join stroke tessellator. Dash style participates in the bounded
 geometry cache; clients still upload only the original canonical path.
 
+Stroke caps are encoded as butt (`0`), round (`1`), or square (`2`), and joins
+as bevel (`0`), round (`1`), or miter (`2`). Square-cap extension and miter
+intersection are server tessellation details. Miters longer than four stroke
+half-widths fall back to bevel joins, preventing sharp paths from producing
+unbounded geometry.
+
 MGFX colors are specified as straight RGBA. Backends must premultiply before
 interpolation and use source-over compositing. Texture uploads remain
 premultiplied RGBA8, giving vector and image draws the same blending result.

@@ -216,8 +216,8 @@ struct WaveDotsCommand {
 };
 
 enum class FillRule : std::uint8_t { nonzero = 0, evenodd = 1 };
-enum class LineCap : std::uint8_t { butt = 0, round = 1 };
-enum class LineJoin : std::uint8_t { bevel = 0, round = 1 };
+enum class LineCap : std::uint8_t { butt = 0, round = 1, square = 2 };
+enum class LineJoin : std::uint8_t { bevel = 0, round = 1, miter = 2 };
 
 struct PathRect {
     float x;

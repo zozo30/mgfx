@@ -96,6 +96,7 @@ enum ServerCapability : std::uint64_t {
     gridPatterns = 1ULL << 35U,
     dashedPathStrokes = 1ULL << 36U,
     gradientPathStrokes = 1ULL << 37U,
+    extendedPathStrokeStyles = 1ULL << 38U,
 };
 
 enum class ResourceKind : std::uint8_t {

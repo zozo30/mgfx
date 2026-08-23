@@ -106,6 +106,8 @@ Server-rendered linear-gradient circles are advertised by `1 << 34`.
 Server-rendered technical grid patterns are advertised by `1 << 35`.
 Server-tessellated dashed path strokes are advertised by `1 << 36`.
 Two-stop path stroke gradients are advertised by `1 << 37`.
+Extended path stroke styles (square caps and miter joins) are advertised by
+`1 << 38`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -230,3 +232,9 @@ MGFX opcode `28` (`DrawExtendedPath`) appends an independent 48-byte two-stop
 stroke gradient to `DrawPath`. Its payload is 176 bytes, or 192 bytes when the
 same command also carries the opcode-27 dash fields. Fill and stroke gradients
 are paint-only inputs and do not duplicate or invalidate cached path geometry.
+
+The existing `DrawPath` cap byte is butt (`0`), round (`1`), or square (`2`).
+Its join byte is bevel (`0`), round (`1`), or miter (`2`). Backends apply a
+fixed miter limit of four stroke half-widths and fall back to a bevel when the
+intersection exceeds it. Clients must require capability bit 38 before sending
+either value `2` to an older server.

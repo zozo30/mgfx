@@ -790,8 +790,8 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         command.payloadSize != (extended ? (extendedDashed ? 192U : 176U) : dashed ? 144U : 128U) ||
         command.payload[4] > 15 ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
-        command.payload[6] > static_cast<std::uint8_t>(LineCap::round) ||
-        command.payload[7] > static_cast<std::uint8_t>(LineJoin::round)) return false;
+        command.payload[6] > static_cast<std::uint8_t>(LineCap::square) ||
+        command.payload[7] > static_cast<std::uint8_t>(LineJoin::miter)) return false;
     path.pathId = readU32(command.payload);
     path.fill = (command.payload[4] & 1U) != 0;
     path.stroke = (command.payload[4] & 2U) != 0;

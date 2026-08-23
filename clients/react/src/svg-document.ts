@@ -11,8 +11,8 @@ export interface SvgVectorLayer {
   readonly strokeGradient?: LinearGradientPaint;
   readonly strokeWidth: number;
   readonly fillRule: "nonzero" | "evenodd";
-  readonly lineCap: "butt" | "round";
-  readonly lineJoin: "bevel" | "round";
+  readonly lineCap: "butt" | "round" | "square";
+  readonly lineJoin: "bevel" | "round" | "miter";
   readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 
@@ -39,8 +39,8 @@ interface PaintState {
   readonly fillOpacity: number;
   readonly strokeOpacity: number;
   readonly fillRule: "nonzero" | "evenodd";
-  readonly lineCap: "butt" | "round";
-  readonly lineJoin: "bevel" | "round";
+  readonly lineCap: "butt" | "round" | "square";
+  readonly lineJoin: "bevel" | "round" | "miter";
   readonly currentColor: Color;
   readonly transform: Matrix;
   readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
@@ -155,8 +155,10 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   const fillRule = attributes["fill-rule"] === "evenodd" ? "evenodd" :
     attributes["fill-rule"] === "nonzero" ? "nonzero" : parent.fillRule;
   const lineCap = attributes["stroke-linecap"] === "round" ? "round" :
+    attributes["stroke-linecap"] === "square" ? "square" :
     attributes["stroke-linecap"] === "butt" ? "butt" : parent.lineCap;
   const lineJoin = attributes["stroke-linejoin"] === "round" ? "round" :
+    attributes["stroke-linejoin"] === "miter" ? "miter" :
     attributes["stroke-linejoin"] ? "bevel" : parent.lineJoin;
   const dash = attributes["stroke-dasharray"] === undefined ? parent.dash :
     parseDash(attributes["stroke-dasharray"], attributes["stroke-dashoffset"] ??

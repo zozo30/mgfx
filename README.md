@@ -72,8 +72,9 @@ stroke parameters; they contain no generated path vertices.
 The graphics server owns adaptive curve flattening and tessellation. Its cache
 is keyed independently from destination and paint, so animated colors and
 layout changes reuse geometry. Compound paths support SVG `evenodd` and
-`nonzero` fill rules, while strokes support configurable width, butt or round
-caps, and bevel or round joins. `DrawPath` also supports source-space linear
+`nonzero` fill rules, while strokes support configurable width, butt, round, or
+square caps, and bevel, round, or miter joins. Miters use a fixed safety limit
+of four stroke half-widths and fall back to bevels. `DrawPath` also supports source-space linear
 gradient fills: the server derives vertex colors from cached source geometry,
 and the same gradient paint is available for strokes, so changing gradient colors
 does not invalidate tessellation. Dashed strokes use

@@ -296,6 +296,15 @@ std::vector<PathPoint> offsetSide(const Contour& contour, float side, float half
             result.push_back(add(point, previousOffset));
             if (lineJoin == LineJoin::round && std::fabs(turn) > 0.00001F) {
                 appendArc(point, previousOffset, nextOffset, turn, result, true);
+            } else if (lineJoin == LineJoin::miter) {
+                const PathPoint intersection = offsetIntersection(
+                    point, previousDirection, nextDirection, side, halfWidth);
+                const PathPoint extension = subtract(intersection, point);
+                if (std::hypot(extension[0], extension[1]) <= halfWidth * 4.0F) {
+                    result.back() = intersection;
+                } else {
+                    result.push_back(add(point, nextOffset));
+                }
             } else {
                 result.push_back(add(point, nextOffset));
             }
@@ -345,6 +354,16 @@ void appendStroke(const std::vector<Contour>& contours, float width,
                 ? std::vector<std::vector<PathPoint>>{left, right}
                 : std::vector<std::vector<PathPoint>>{right, left}, triangles);
             continue;
+        }
+        if (lineCap == LineCap::square) {
+            const PathPoint startExtension = multiply(
+                direction(contour.points[0], contour.points[1]), half);
+            const PathPoint endExtension = multiply(direction(
+                contour.points[contour.points.size() - 2], contour.points.back()), half);
+            left.front() = subtract(left.front(), startExtension);
+            right.front() = subtract(right.front(), startExtension);
+            left.back() = add(left.back(), endExtension);
+            right.back() = add(right.back(), endExtension);
         }
         std::vector<PathPoint> outline = left;
         if (lineCap == LineCap::round) {

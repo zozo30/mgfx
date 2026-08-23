@@ -255,8 +255,8 @@ export interface PathData {
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
-  readonly lineCap?: "butt" | "round";
-  readonly lineJoin?: "bevel" | "round";
+  readonly lineCap?: "butt" | "round" | "square";
+  readonly lineJoin?: "bevel" | "round" | "miter";
   readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richText" | "scroll" | "circle" | "mesh" | "path";

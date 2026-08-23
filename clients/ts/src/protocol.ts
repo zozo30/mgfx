@@ -85,6 +85,7 @@ export const ExtendedServerCapability = {
   GridPatterns: 1n << 35n,
   DashedPathStrokes: 1n << 36n,
   GradientPathStrokes: 1n << 37n,
+  ExtendedPathStrokeStyles: 1n << 38n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -246,8 +247,8 @@ export interface PathPaint {
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
-  readonly lineCap?: "butt" | "round";
-  readonly lineJoin?: "bevel" | "round";
+  readonly lineCap?: "butt" | "round" | "square";
+  readonly lineJoin?: "bevel" | "round" | "miter";
   readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 
@@ -752,8 +753,8 @@ export class FrameEncoder {
       (paint.stroke || paint.strokeGradient ? 2 : 0) | (paint.fillGradient ? 4 : 0) |
       (paint.strokeGradient ? 8 : 0), 4);
     payload.writeUInt8(paint.fillRule === "evenodd" ? 1 : 0, 5);
-    payload.writeUInt8(paint.lineCap === "round" ? 1 : 0, 6);
-    payload.writeUInt8(paint.lineJoin === "round" ? 1 : 0, 7);
+    payload.writeUInt8(paint.lineCap === "square" ? 2 : paint.lineCap === "round" ? 1 : 0, 6);
+    payload.writeUInt8(paint.lineJoin === "miter" ? 2 : paint.lineJoin === "round" ? 1 : 0, 7);
     payload.writeFloatLE(paint.strokeWidth ?? 0, 8);
     payload.writeFloatLE(paint.tolerance ?? 0.75, 12);
     [destination.left, destination.top, destination.right, destination.bottom,
