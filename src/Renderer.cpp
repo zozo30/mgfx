@@ -90,12 +90,17 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto circleFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleFragmentMain")));
     auto patternVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternVertexMain")));
     auto patternFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternFragmentMain")));
+    auto linearGradientVertexFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("linearGradientVertexMain")));
+    auto linearGradientFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("linearGradientFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
         !radialVertexFunction || !radialFragmentFunction ||
         !roundedRectVertexFunction || !roundedRectFragmentFunction ||
         !circleVertexFunction || !circleFragmentFunction ||
-        !patternVertexFunction || !patternFragmentFunction) {
+        !patternVertexFunction || !patternFragmentFunction ||
+        !linearGradientVertexFunction || !linearGradientFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -215,6 +220,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(patternDescriptor.get(), &error));
     if (!patternPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the diagonal-pattern pipeline", error));
+    }
+
+    auto linearGradientDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    linearGradientDescriptor->setVertexFunction(linearGradientVertexFunction.get());
+    linearGradientDescriptor->setFragmentFunction(linearGradientFragmentFunction.get());
+    linearGradientDescriptor->setRasterSampleCount(sampleCount);
+    auto* linearGradientColor = linearGradientDescriptor->colorAttachments()->object(0);
+    linearGradientColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    linearGradientColor->setBlendingEnabled(true);
+    linearGradientColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    linearGradientColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    linearGradientColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    linearGradientColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    linearGradientPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(linearGradientDescriptor.get(), &error));
+    if (!linearGradientPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the linear-gradient pipeline", error));
     }
 }
 
@@ -634,6 +656,53 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(patternPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawLinearGradient) {
+            gfx::LinearGradientCommand gradient{};
+            if (!gfx::decodeLinearGradient(command, gradient) ||
+                !std::isfinite(gradient.cornerRadius) || gradient.cornerRadius < 0.0F ||
+                gradient.cornerRadius > 8192.0F) {
+                throw std::runtime_error("Malformed linear-gradient command");
+            }
+            if (clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (gradient.destination.right - gradient.destination.left) * drawableWidth * 0.5F,
+                (gradient.destination.top - gradient.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct LinearGradientVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float cornerRadius;
+                float direction;
+                std::array<float, 4> startColor;
+                std::array<float, 4> endColor;
+            };
+            const std::array<float, 4> start = {gradient.startColor.red, gradient.startColor.green,
+                gradient.startColor.blue, gradient.startColor.alpha * opacityStack.back()};
+            const std::array<float, 4> end = {gradient.endColor.red, gradient.endColor.green,
+                gradient.endColor.blue, gradient.endColor.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return LinearGradientVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, gradient.cornerRadius,
+                    static_cast<float>(gradient.direction), start, end};
+            };
+            const LinearGradientVertex vertices[] = {
+                vertex(gradient.destination.left, gradient.destination.top, 0.0F, 0.0F),
+                vertex(gradient.destination.left, gradient.destination.bottom, 0.0F, size[1]),
+                vertex(gradient.destination.right, gradient.destination.bottom, size[0], size[1]),
+                vertex(gradient.destination.left, gradient.destination.top, 0.0F, 0.0F),
+                vertex(gradient.destination.right, gradient.destination.bottom, size[0], size[1]),
+                vertex(gradient.destination.right, gradient.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(linearGradientPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

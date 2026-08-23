@@ -125,6 +125,47 @@ fragment float4 radialFragmentMain(RadialVertexOut in [[stage_in]]) {
     return float4(color.rgb * alpha, alpha);
 }
 
+struct LinearGradientVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    float cornerRadius;
+    float direction;
+    packed_float4 startColor;
+    packed_float4 endColor;
+};
+
+struct LinearGradientVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float cornerRadius;
+    float direction;
+    float4 startColor;
+    float4 endColor;
+};
+
+vertex LinearGradientVertexOut linearGradientVertexMain(
+    const device LinearGradientVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const LinearGradientVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size,
+            value.cornerRadius, value.direction, value.startColor, value.endColor};
+}
+
+fragment float4 linearGradientFragmentMain(LinearGradientVertexOut in [[stage_in]]) {
+    const float2 normalized = in.local / max(in.size, float2(0.0001));
+    const float amount = clamp(in.direction < 0.5 ? normalized.x :
+        (in.direction < 1.5 ? normalized.y : (normalized.x + normalized.y) * 0.5), 0.0, 1.0);
+    const float4 color = mix(in.startColor, in.endColor, amount);
+    const float2 halfSize = in.size * 0.5;
+    const float radius = min(in.cornerRadius, min(halfSize.x, halfSize.y));
+    const float2 q = abs(in.local - halfSize) - halfSize + radius;
+    const float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    const float coverage = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
+    const float alpha = color.a * coverage;
+    return float4(color.rgb * alpha, alpha);
+}
+
 struct RoundedRectVertex {
     packed_float2 position;
     packed_float2 local;

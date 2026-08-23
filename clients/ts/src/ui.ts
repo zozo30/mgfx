@@ -500,8 +500,7 @@ class Node {
         paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined,
           this.style.borderWidth ?? 0, this.style.borderColor, viewport);
       } else if (gradient) {
-        paintRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined, gradient,
-          0, undefined, viewport);
+        paintLinearGradient(encoder, this.bounds, gradient, this.style.cornerRadius ?? 0, viewport);
         paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined,
           this.style.borderWidth ?? 0, this.style.borderColor, viewport);
       } else paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background,
@@ -510,7 +509,7 @@ class Node {
       let combinedBorder = false;
       if (this.bounds.width > 0 && this.bounds.height > 0) {
         if (radial) paintRadialGradient(encoder, this.bounds, radial, 0, viewport);
-        else if (gradient) encoder.triangles(gradientRectangleVertices(this.bounds, gradient, viewport));
+        else if (gradient) paintLinearGradient(encoder, this.bounds, gradient, 0, viewport);
         else if (!this.style.backgroundImage && !this.style.backgroundPattern) {
           paintServerRoundedRect(encoder, this.bounds, 0, background,
             this.style.borderWidth ?? 0, this.style.borderColor, viewport);
@@ -625,6 +624,14 @@ function paintRadialGradient(encoder: FrameEncoder, bounds: Rect, gradient: Radi
     centerX: gradient.centerX ?? 0.5, centerY: gradient.centerY ?? 0.5,
     radius: gradient.radius ?? Math.hypot(bounds.width, bounds.height) / 2,
     cornerRadius, innerColor: gradient.inner, outerColor: gradient.outer });
+}
+
+function paintLinearGradient(encoder: FrameEncoder, bounds: Rect, gradient: LinearGradient,
+  cornerRadius: number, viewport: Size): void {
+  if (bounds.width <= 0 || bounds.height <= 0) return;
+  encoder.linearGradient({ destination: normalizedRect(bounds, viewport), cornerRadius,
+    direction: gradient.direction ?? "horizontal",
+    startColor: gradient.start, endColor: gradient.end });
 }
 
 function paintServerRoundedRect(encoder: FrameEncoder, bounds: Rect, cornerRadius: number,
@@ -751,27 +758,6 @@ function rectangleVertices(r: Rect, color: Color, v: Size): Vertex[] {
   return [{ x:l,y:t,color },{ x:l,y:b,color },{ x:right,y:b,color },{ x:l,y:t,color },{ x:right,y:b,color },{ x:right,y:t,color }];
 }
 
-function gradientRectangleVertices(r: Rect, gradient: LinearGradient, v: Size): Vertex[] {
-  const topLeft = { x: r.x, y: r.y }, bottomLeft = { x: r.x, y: r.y + r.height };
-  const bottomRight = { x: r.x + r.width, y: r.y + r.height };
-  const topRight = { x: r.x + r.width, y: r.y };
-  return [topLeft, bottomLeft, bottomRight, topLeft, bottomRight, topRight]
-    .map((point) => pointVertex(point, gradientColor(point, r, gradient), v));
-}
-
-function paintBorder(encoder: FrameEncoder, r: Rect, requested: number,
-  color: Color | undefined, viewport: Size): void {
-  const width = Math.min(requested, r.width / 2, r.height / 2);
-  if (!color || color.alpha <= 0 || width <= 0) return;
-  const vertices = [
-    ...rectangleVertices({ x: r.x, y: r.y, width: r.width, height: width }, color, viewport),
-    ...rectangleVertices({ x: r.x, y: r.y + r.height - width, width: r.width, height: width }, color, viewport),
-    ...rectangleVertices({ x: r.x, y: r.y + width, width, height: r.height - width * 2 }, color, viewport),
-    ...rectangleVertices({ x: r.x + r.width - width, y: r.y + width, width, height: r.height - width * 2 }, color, viewport),
-  ];
-  encoder.triangles(vertices);
-}
-
 function paintCircle(encoder: FrameEncoder, r: Rect, fill: Color | undefined,
   gradient: LinearGradient | undefined,
   borderWidth: number, border: Color | undefined, viewport: Size): void {
@@ -793,43 +779,6 @@ function paintCircle(encoder: FrameEncoder, r: Rect, fill: Color | undefined,
       borderColor: border ?? transparent });
 }
 
-function paintRoundedRect(encoder: FrameEncoder, r: Rect, requestedRadius: number,
-  fill: Color | undefined, gradient: LinearGradient | undefined,
-  requestedBorder: number, border: Color | undefined,
-  viewport: Size): void {
-  const points = 32, radius = Math.min(requestedRadius, r.width / 2, r.height / 2);
-  if (radius <= 0) {
-    if (gradient) encoder.triangles(gradientRectangleVertices(r, gradient, viewport));
-    else if (fill && fill.alpha > 0) encoder.triangles(rectangleVertices(r, fill, viewport));
-    paintBorder(encoder, r, requestedBorder, border, viewport);
-    return;
-  }
-  const center = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  if (gradient || (fill && fill.alpha > 0)) {
-    const vertices: Vertex[] = [];
-    const vertex = (point: Point) => pointVertex(point,
-      gradient ? gradientColor(point, r, gradient) : fill!, viewport);
-    for (let index = 0; index < points; index++) vertices.push(vertex(center),
-      vertex(roundedPoint(r, radius, index)), vertex(roundedPoint(r, radius, index + 1)));
-    encoder.triangles(vertices);
-  }
-  const width = Math.min(requestedBorder, r.width / 2, r.height / 2);
-  if (border && border.alpha > 0 && width > 0) {
-    const inner = { x: r.x + width, y: r.y + width,
-      width: r.width - width * 2, height: r.height - width * 2 };
-    const innerRadius = Math.max(0, radius - width), vertices: Vertex[] = [];
-    for (let index = 0; index < points; index++) {
-      const outerA = roundedPoint(r, radius, index), outerB = roundedPoint(r, radius, index + 1);
-      const innerA = inner.width <= 0 || inner.height <= 0 ? center : roundedPoint(inner, innerRadius, index);
-      const innerB = inner.width <= 0 || inner.height <= 0 ? center : roundedPoint(inner, innerRadius, index + 1);
-      vertices.push(pointVertex(outerA, border, viewport), pointVertex(innerA, border, viewport),
-        pointVertex(innerB, border, viewport), pointVertex(outerA, border, viewport),
-        pointVertex(innerB, border, viewport), pointVertex(outerB, border, viewport));
-    }
-    encoder.triangles(vertices);
-  }
-}
-
 function gradientColor(point: Point, bounds: Rect, gradient: LinearGradient): Color {
   const x = bounds.width <= 0 ? 0 : (point.x - bounds.x) / bounds.width;
   const y = bounds.height <= 0 ? 0 : (point.y - bounds.y) / bounds.height;
@@ -841,21 +790,6 @@ function gradientColor(point: Point, bounds: Rect, gradient: LinearGradient): Co
     blue: gradient.start.blue + (gradient.end.blue - gradient.start.blue) * amount,
     alpha: gradient.start.alpha + (gradient.end.alpha - gradient.start.alpha) * amount,
   };
-}
-
-function roundedPoint(r: Rect, radius: number, rawIndex: number): Point {
-  const perCorner = 8, index = rawIndex % (perCorner * 4), corner = Math.floor(index / perCorner);
-  const segment = index % perCorner;
-  const centers = [
-    { x: r.x + radius, y: r.y + radius },
-    { x: r.x + r.width - radius, y: r.y + radius },
-    { x: r.x + r.width - radius, y: r.y + r.height - radius },
-    { x: r.x + radius, y: r.y + r.height - radius },
-  ];
-  const angle = [Math.PI, Math.PI * 1.5, 0, Math.PI * 0.5][corner]! +
-    segment / perCorner * Math.PI * 0.5;
-  const center = centers[corner]!;
-  return { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
 }
 
 function circlePoint(center: Point, radius: number, index: number, segments: number): Point {

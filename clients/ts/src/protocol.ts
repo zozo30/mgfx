@@ -59,6 +59,7 @@ export enum ServerCapability {
   RoundedRectangles = 1 << 17,
   Circles = 1 << 18,
   DiagonalPatterns = 1 << 19,
+  LinearGradients = 1 << 20,
 }
 export interface ServerHello {
   readonly version: number;
@@ -148,6 +149,11 @@ export interface CirclePaint {
 export interface DiagonalPatternPaint {
   readonly destination: ClipRect; readonly stripeWidth: number; readonly gap: number;
   readonly offset: number; readonly backward: boolean; readonly color: Color;
+}
+export interface LinearGradientPaint {
+  readonly destination: ClipRect; readonly cornerRadius: number;
+  readonly direction: "horizontal" | "vertical" | "diagonal";
+  readonly startColor: Color; readonly endColor: Color;
 }
 
 export type PathSegment =
@@ -710,6 +716,20 @@ export class FrameEncoder {
     const payload = Buffer.alloc(48);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(17, payload);
+  }
+
+  linearGradient(value: LinearGradientPaint): void {
+    const directions = { horizontal: 0, vertical: 1, diagonal: 2 } as const;
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.cornerRadius, directions[value.direction],
+      value.startColor.red, value.startColor.green, value.startColor.blue, value.startColor.alpha,
+      value.endColor.red, value.endColor.green, value.endColor.blue, value.endColor.alpha];
+    if (values.some((item) => !Number.isFinite(item)) || value.cornerRadius < 0 ||
+        value.cornerRadius > 8192)
+      throw new RangeError("Linear gradient values are outside supported bounds");
+    const payload = Buffer.alloc(56);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(18, payload);
   }
 
   finish(): Buffer {

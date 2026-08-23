@@ -316,7 +316,7 @@ test("rounded rectangle fill and border are independently drawable", () => {
   assert.equal(frame.readUInt16LE(16), 15);
 });
 
-test("linear gradients lower to interpolated portable vertex colors", () => {
+test("linear gradients lower to one constant-size server command", () => {
   class GradientComponent extends Component {
     build(): Element {
       return box({ preferredSize: { width: 100, height: 40 },
@@ -334,12 +334,10 @@ test("linear gradients lower to interpolated portable vertex colors", () => {
   host.paint(encoder, { width: 100, height: 40 });
   encoder.endFrame();
   const frame = encoder.finish();
-  const firstVertexColor = 16 + 8 + 8 + 8;
-  const thirdVertexColor = firstVertexColor + 24 * 2;
-  assert.equal(frame.readFloatLE(firstVertexColor), 1);
-  assert.equal(frame.readFloatLE(firstVertexColor + 8), 0);
-  assert.equal(frame.readFloatLE(thirdVertexColor), 0);
-  assert.equal(frame.readFloatLE(thirdVertexColor + 8), 1);
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 18);
+  assert.equal(frame.readUInt32LE(20), 56);
+  assert.equal(frame.readFloatLE(44), 0); // Horizontal direction.
 });
 
 test("diagonal patterns lower to one constant-size server command", () => {

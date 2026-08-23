@@ -145,6 +145,24 @@ test("MGFX radial gradient remains a compact server primitive", () => {
     outerColor: { red: 0, green: 0, blue: 0, alpha: 1 } }));
 });
 
+test("MGFX linear gradient is one fixed server command", () => {
+  const frame = new FrameEncoder();
+  frame.linearGradient({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
+    cornerRadius: 12, direction: "diagonal",
+    startColor: { red: 0.2, green: 0.8, blue: 1, alpha: 1 },
+    endColor: { red: 0.7, green: 0.2, blue: 1, alpha: 0.75 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 18);
+  assert.equal(bytes.readUInt32LE(20), 56);
+  assert.equal(bytes.readFloatLE(44), 2);
+  assert.equal(bytes.readFloatLE(76), 0.75);
+  assert.throws(() => frame.linearGradient({
+    destination: { left: -1, top: 1, right: 1, bottom: -1 }, cornerRadius: -1,
+    direction: "horizontal", startColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+    endColor: { red: 1, green: 1, blue: 1, alpha: 1 } }));
+});
+
 test("MGFX rounded rectangle combines fill and border in one command", () => {
   const frame = new FrameEncoder();
   frame.roundedRect({ destination: { left: -0.7, top: 0.5, right: 0.7, bottom: -0.5 },

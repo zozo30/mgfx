@@ -46,6 +46,10 @@ int main() {
                         {0.7F, 1.0F, 0.8F, 0.9F}});
     encoder.drawDiagonalPattern({{-0.9F, 0.3F, 0.9F, -0.3F}, 8.0F, 10.0F, 3.5F, true,
                                  {1.0F, 0.5F, 0.1F, 0.8F}});
+    encoder.drawLinearGradient({{-0.8F, 0.2F, 0.8F, -0.2F}, 12.0F,
+                                gfx::GradientDirection::diagonal,
+                                {0.2F, 0.8F, 1.0F, 1.0F},
+                                {0.7F, 0.2F, 1.0F, 0.75F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -126,6 +130,14 @@ int main() {
         !pattern.backward || !nearlyEqual(pattern.color.alpha, 0.8F) ||
         !decoder.next(command)) {
         return fail("Diagonal-pattern decoding failed");
+    }
+    gfx::LinearGradientCommand linear{};
+    if (!gfx::decodeLinearGradient(command, linear) ||
+        linear.direction != gfx::GradientDirection::diagonal ||
+        !nearlyEqual(linear.cornerRadius, 12.0F) ||
+        !nearlyEqual(linear.startColor.green, 0.8F) ||
+        !nearlyEqual(linear.endColor.alpha, 0.75F) || !decoder.next(command)) {
+        return fail("Linear-gradient decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

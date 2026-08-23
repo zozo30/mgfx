@@ -131,6 +131,14 @@ pipeline calculates smooth radial falloff and an antialiased rounded mask. It
 inherits transforms, opacity, and clipping and is advertised by
 `radialGradients`.
 
+## Linear gradients
+
+`DrawLinearGradient` carries one destination, rounded-corner radius, a portable
+horizontal/vertical/diagonal direction, and two colors. Metal interpolates the
+straight-alpha colors and applies an antialiased rounded mask per fragment. The
+command inherits clipping, transforms, and opacity and is advertised by
+`linearGradients`.
+
 ## Rounded rectangles
 
 `DrawRoundedRect` combines destination, pixel corner radius and border width,

@@ -171,6 +171,11 @@ Radial backgrounds follow the same model: one command carries focal position,
 pixel radius, rounded-corner mask, and inner/outer colors. Metal evaluates the
 falloff per fragment, so React and future VM clients never generate gradient fans.
 
+Two-stop linear backgrounds are server primitives as well. One fixed record carries
+the destination, horizontal/vertical/diagonal direction, rounded-corner radius, and
+colors. Metal interpolates and masks the fill per fragment, replacing client-colored
+rectangle and rounded-rectangle meshes.
+
 Solid boxes and borders now use one `DrawRoundedRect` record backed by an
 antialiased rounded-box SDF. This replaces the old 32-segment client fan/ring,
 shrinks animated frames, and eliminates polygon seam and one-pixel border overlap.
@@ -194,24 +199,22 @@ normalized nested clip stack; Metal maps it to intersected scissor rectangles,
 leaving equivalent Vulkan and DirectX implementations straightforward.
 
 Boxes support `borderWidth` and `borderColor`. `Circle` elements support a fill,
-a border ring, or both. Circles use a portable 32-segment triangle mesh and rings
-use an annulus mesh, so these shapes require no Metal-specific protocol opcode.
+a border ring, or both, lowered to the backend-neutral `DrawCircle` server primitive.
 The TypeScript demo header uses these primitives for a framed 4×4 dot-grid icon.
 
-Boxes also accept `cornerRadius`. Rounded fills use a 32-point convex mesh and
-rounded borders use a matching inner/outer ring, with radii and border widths
-clamped to legal geometry. Cards, list rows, panels, and fields demonstrate it.
+Boxes also accept `cornerRadius`. Solid fills and borders lower to one
+`DrawRoundedRect` command, with radii and border widths clamped to legal geometry.
+Cards, list rows, panels, and fields demonstrate it.
 
-TypeScript styles also accept horizontal, vertical, or diagonal linear
-gradients. The layout runtime lowers them to per-vertex colors on the same
-portable triangle meshes used by rectangles, rounded rectangles, and circles;
-the GPU backend only performs ordinary interpolation. The React demo combines
-these fills with a native-clock-driven wave pattern.
+TypeScript styles also accept horizontal, vertical, or diagonal linear gradients.
+Rectangle and rounded-rectangle backgrounds lower to a constant-size
+`DrawLinearGradient` command; explicit circle gradients retain the colored-mesh
+fallback until a gradient-circle variant is added. The React demo combines these
+fills with a native-clock-driven wave pattern.
 
 Rectangular areas can additionally use an animated diagonal stripe pattern with
-configurable color, stripe width, gap, direction, and phase offset. The runtime
-tessellates full-area parallelograms and clips them at the area boundary, again
-using only ordinary MGFX triangles and clip commands.
+configurable color, stripe width, gap, direction, and phase offset. One
+`DrawDiagonalPattern` command drives the Metal fragment shader regardless of area.
 
 The TypeScript runtime builds on clipping with nested vertical scroll views.
 Wheel and trackpad events carry the pointer position plus normalized deltas, so
