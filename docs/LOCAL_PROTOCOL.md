@@ -167,3 +167,8 @@ MGFX opcodes `4` (`PushClip`) and `5` (`PopClip`) form a balanced hierarchical
 clip stack. `PushClip` carries four `f32` values—left, top, right, bottom—in
 normalized top-left coordinates from `0` to `1`. Backends intersect nested clips
 and apply them before draw commands.
+
+MGFX opcode `8` (`DrawText`) carries a portable system-font family, normalized
+top-left position and font height, straight RGBA color, and validated UTF-8.
+The backend shapes Unicode and caches tessellated glyph outlines; strings no
+longer expand into a triangle command for every pixel-font cell.

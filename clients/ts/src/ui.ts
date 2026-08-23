@@ -38,7 +38,11 @@ export interface Style {
   zIndex?: number;
   modal?: boolean;
 }
-export interface TextStyle { fontSize?: number; color?: Color }
+export interface TextStyle {
+  fontSize?: number;
+  color?: Color;
+  fontFamily?: "pixel" | "system" | "monospace";
+}
 export interface MeshData {
   readonly positions: readonly Point[];
   readonly indices: readonly number[];
@@ -272,8 +276,15 @@ class Node {
     if (this.type === "scroll") inner.maxHeight = 1_000_000;
     let width = 0, height = 0;
     if (this.type === "text" && this.value) {
-      const fontSize = this.textStyle.fontSize ?? 16, cell = fontSize / 7;
-      width = this.value.length * cell * 6 - cell; height = fontSize;
+      const fontSize = this.textStyle.fontSize ?? 16;
+      if (this.textStyle.fontFamily && this.textStyle.fontFamily !== "pixel") {
+        const averageAdvance = this.textStyle.fontFamily === "monospace" ? 0.60 : 0.56;
+        width = [...this.value].length * fontSize * averageAdvance;
+      } else {
+        const cell = fontSize / 7;
+        width = this.value.length * cell * 6 - cell;
+      }
+      height = fontSize;
     }
     let flowCount = 0;
     for (const child of this.children) {
@@ -704,6 +715,12 @@ const glyphs: Readonly<Record<string, readonly number[]>> = {
 const fallback = [31,17,1,2,4,0,4] as const;
 function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: TextStyle, viewport: Size): void {
   const fontSize = style.fontSize ?? 16, color = style.color ?? { red:1,green:1,blue:1,alpha:1 }, cell = fontSize / 7;
+  if (style.fontFamily && style.fontFamily !== "pixel") {
+    encoder.systemText(value, bounds.x / viewport.width * 2 - 1,
+      1 - bounds.y / viewport.height * 2, fontSize / viewport.height * 2,
+      color, style.fontFamily);
+    return;
+  }
   const vertices: Vertex[] = [];
   [...value.toUpperCase()].forEach((character, characterIndex) => (glyphs[character] ?? fallback).forEach((bits, row) => {
     for (let column = 0; column < 5; column++) if (bits & (1 << (4 - column))) vertices.push(...rectangleVertices({

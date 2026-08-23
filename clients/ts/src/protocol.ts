@@ -136,6 +136,8 @@ export interface PathPaint {
   readonly lineJoin?: "bevel" | "round";
 }
 
+export type FontFamily = "system" | "monospace";
+
 export function encodeTextureCreate(id: number, width: number, height: number,
   rgba: Uint8Array): Buffer {
   if (!Number.isSafeInteger(id) || id <= 0 || id > 0xffff_ffff ||
@@ -506,6 +508,22 @@ export class FrameEncoder {
         payload.writeFloatLE(value, 16 + index * 4);
       });
     this.command(7, payload);
+  }
+
+  systemText(text: string, left: number, top: number, fontSize: number,
+    color: Color, family: FontFamily = "system"): void {
+    const utf8 = Buffer.from(text, "utf8");
+    if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
+      throw new RangeError("System text must contain 1 through 65536 non-NUL UTF-8 bytes");
+    const payload = Buffer.alloc(32 + utf8.length);
+    payload.writeUInt8(family === "monospace" ? 1 : 0, 0);
+    [left, top, fontSize, color.red, color.green, color.blue, color.alpha]
+      .forEach((value, index) => {
+        if (!Number.isFinite(value)) throw new RangeError("System text values must be finite");
+        payload.writeFloatLE(value, 4 + index * 4);
+      });
+    utf8.copy(payload, 32);
+    this.command(8, payload);
   }
 
   endFrame(): void {

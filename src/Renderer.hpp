@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GraphicsProtocol.hpp"
+#include "SystemText.hpp"
 #include "VectorPath.hpp"
 
 #include <Foundation/Foundation.hpp>
@@ -49,4 +50,5 @@ private:
         std::vector<CachedPath> cache;
     };
     std::unordered_map<std::uint32_t, PathResource> paths_;
+    std::unordered_map<std::string, gfx::ShapedText> textCache_;
 };

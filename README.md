@@ -195,11 +195,12 @@ state change. The host records the invalidation and reconciles once at the start
 of the next layout pass, so an event handler never mutates the retained tree while
 hit testing is in progress.
 
-`Text` elements provide intrinsic measurement and a temporary built-in 5x7 font
-for ASCII letters, digits, spaces, and hyphens. Every label batches its glyph
-cells into one triangle-list command. This keeps the first text path portable;
-font shaping and an atlas-backed glyph protocol can replace it later without
-changing component or layout semantics.
+`Text` elements retain the built-in 5x7 diagnostic font, and can select `system`
+or `monospace` text. Those modes emit one compact UTF-8 `DrawText` command. The
+macOS server shapes Unicode with CoreText and caches vector glyph outlines;
+future Vulkan and DirectX hosts can execute the same display-list command using
+their platform text service. Font uploads and exact rich-text measurement are
+the next text layer.
 
 ## Requirements
 

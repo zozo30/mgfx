@@ -37,6 +37,8 @@ find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
 find_library(METAL_FRAMEWORK Metal REQUIRED)
 find_library(METALKIT_FRAMEWORK MetalKit REQUIRED)
 find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
+find_library(CORETEXT_FRAMEWORK CoreText REQUIRED)
+find_library(COREGRAPHICS_FRAMEWORK CoreGraphics REQUIRED)
 
 execute_process(
     COMMAND xcrun -sdk macosx metal -v
@@ -83,6 +85,8 @@ add_executable(MGFXServer MACOSX_BUNDLE
     src/LocalIPC.hpp
     src/Renderer.cpp
     src/Renderer.hpp
+    src/SystemText.mm
+    src/SystemText.hpp
     src/VectorPath.cpp
     src/VectorPath.hpp
     src/MetalCpp.cpp
@@ -118,6 +122,8 @@ target_link_libraries(MGFXServer PRIVATE
     ${METAL_FRAMEWORK}
     ${METALKIT_FRAMEWORK}
     ${QUARTZCORE_FRAMEWORK}
+    ${CORETEXT_FRAMEWORK}
+    ${COREGRAPHICS_FRAMEWORK}
 )
 
 set_target_properties(MGFXServer PROPERTIES
@@ -170,4 +176,22 @@ if(BUILD_TESTING)
     target_include_directories(VectorPathTests SYSTEM PRIVATE "${earcut_hpp_SOURCE_DIR}/include")
     target_compile_options(VectorPathTests PRIVATE -Wall -Wextra -Wpedantic)
     add_test(NAME vector_path_tessellation COMMAND VectorPathTests)
+
+    add_executable(SystemTextTests
+        tests/SystemTextTests.mm
+        src/SystemText.mm
+        src/VectorPath.cpp
+    )
+    target_compile_features(SystemTextTests PRIVATE cxx_std_17)
+    target_include_directories(SystemTextTests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+    target_include_directories(SystemTextTests SYSTEM PRIVATE "${earcut_hpp_SOURCE_DIR}/include")
+    target_compile_options(SystemTextTests PRIVATE -Wall -Wextra -Wpedantic -fobjc-arc)
+    target_link_libraries(SystemTextTests PRIVATE
+        ${FOUNDATION_FRAMEWORK}
+        ${CORETEXT_FRAMEWORK}
+        ${COREGRAPHICS_FRAMEWORK}
+    )
+    add_test(NAME system_text_shaping COMMAND SystemTextTests)
 endif()

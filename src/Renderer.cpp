@@ -314,6 +314,46 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             if (path.fill) drawPathTriangles(cached->triangles.fill, path.fillColor,
                                              path.fillGradient ? &path.gradient : nullptr);
             if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor, nullptr);
+        } else if (command.opcode == gfx::Opcode::drawText) {
+            gfx::TextCommand text{};
+            if (!gfx::decodeText(command, text) || !std::isfinite(text.left) ||
+                !std::isfinite(text.top) || !std::isfinite(text.fontSize) ||
+                text.fontSize <= 0.0F) {
+                throw std::runtime_error("Malformed text command");
+            }
+            std::string cacheKey(1, static_cast<char>(text.family));
+            cacheKey += text.text;
+            auto [found, inserted] = textCache_.try_emplace(cacheKey);
+            if (inserted) found->second = gfx::shapeSystemText(text.text, text.family);
+            const std::vector<gfx::PathPoint>& points = found->second.triangles;
+            if (points.empty() || clipEmpty()) continue;
+            if (encoder == nullptr) {
+                encoder = commandBuffer->renderCommandEncoder(renderPass);
+                applyClip();
+            }
+            encoder->setRenderPipelineState(pipelineState_.get());
+            constexpr std::size_t maxInlineBytes = 4096;
+            constexpr std::size_t maxVertices =
+                (maxInlineBytes / sizeof(gfx::Vertex) / 3) * 3;
+            const float aspect = static_cast<float>(drawable->texture()->height()) /
+                                 static_cast<float>(drawable->texture()->width());
+            const std::array<float, 4> color = {
+                text.color.red, text.color.green, text.color.blue, text.color.alpha};
+            for (std::size_t first = 0; first < points.size();) {
+                const std::size_t count = std::min(maxVertices, points.size() - first);
+                std::vector<gfx::Vertex> vertices;
+                vertices.reserve(count);
+                for (std::size_t index = 0; index < count; ++index) {
+                    const gfx::PathPoint& point = points[first + index];
+                    vertices.push_back({{text.left + point[0] * text.fontSize * aspect,
+                                         text.top - point[1] * text.fontSize}, color});
+                }
+                encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
+                encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                        static_cast<NS::UInteger>(0),
+                                        static_cast<NS::UInteger>(vertices.size()));
+                first += count;
+            }
         } else if (command.opcode == gfx::Opcode::popClip) {
             if (command.payloadSize != 0 || clipStack.empty()) {
                 throw std::runtime_error("Malformed or unbalanced pop-clip command");

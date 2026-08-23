@@ -165,6 +165,23 @@ void CommandEncoder::drawPath(const PathCommand& path) {
     }
 }
 
+void CommandEncoder::drawText(const TextCommand& text) {
+    constexpr std::size_t headerSize = 32;
+    if (text.text.size() > std::numeric_limits<std::uint32_t>::max() - headerSize) {
+        throw std::length_error("Text command exceeds 4 GiB");
+    }
+    beginCommand(Opcode::drawText,
+                 static_cast<std::uint32_t>(headerSize + text.text.size()));
+    bytes_.push_back(static_cast<std::uint8_t>(text.family));
+    bytes_.insert(bytes_.end(), 3, 0);
+    for (float value : {text.left, text.top, text.fontSize,
+                        text.color.red, text.color.green,
+                        text.color.blue, text.color.alpha}) {
+        appendFloat(bytes_, value);
+    }
+    bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
+}
+
 std::vector<std::uint8_t> CommandEncoder::finish() {
     if (bytes_.size() > std::numeric_limits<std::uint32_t>::max()) {
         throw std::length_error("Graphics command stream exceeds 4 GiB");
@@ -309,6 +326,25 @@ bool decodePath(const CommandView& command, PathCommand& path) {
                       readFloat(command.payload + 120), readFloat(command.payload + 124)}};
     return path.pathId != 0 && (path.fill || path.stroke) &&
            (!path.fillGradient || path.fill);
+}
+
+bool decodeText(const CommandView& command, TextCommand& text) {
+    constexpr std::size_t headerSize = 32;
+    if (command.opcode != Opcode::drawText || command.payloadSize <= headerSize ||
+        command.payloadSize > headerSize + 65536 ||
+        command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemMonospace) ||
+        command.payload[1] != 0 || command.payload[2] != 0 || command.payload[3] != 0) {
+        return false;
+    }
+    text.family = static_cast<FontFamily>(command.payload[0]);
+    text.left = readFloat(command.payload + 4);
+    text.top = readFloat(command.payload + 8);
+    text.fontSize = readFloat(command.payload + 12);
+    text.color = {readFloat(command.payload + 16), readFloat(command.payload + 20),
+                  readFloat(command.payload + 24), readFloat(command.payload + 28)};
+    text.text.assign(reinterpret_cast<const char*>(command.payload + headerSize),
+                     command.payloadSize - headerSize);
+    return text.text.find('\0') == std::string::npos;
 }
 
 } // namespace gfx

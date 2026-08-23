@@ -188,7 +188,8 @@ function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons
         },
         mainAxisAlignment: "spaceBetween",
         crossAxisAlignment: "center" }}>
-        <Text value="MGFX REACT" style={{ fontSize: 24 }} />
+        <Text value="MGFX React" style={{ fontSize: 24, fontFamily: "system",
+          color: rgba(0.9, 0.96, 1) }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
           <Image textureId={1} sourceWidth={headerImageSize.width}
             sourceHeight={headerImageSize.height} fit="cover"
@@ -269,12 +270,19 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
             backgroundGradient: { start: rgba(0.08, 0.46, 0.36),
               end: rgba(0.28, 0.12, 0.68), direction: "horizontal" },
             mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
-            <Text value="GRAPHICS ROUTE" style={{ fontSize: 24 }} />
+            <Text value="Graphics Route — native glyph outlines" style={{ fontSize: 24,
+              fontFamily: "system", color: rgba(0.9, 1, 0.97) }} />
             <Button label="BACK" onPress={router.back} background={rgba(0.08, 0.12, 0.20)}
               style={{ preferredSize: { width: 120, height: 42 } }} />
           </Row>
           <ServerVectorPath time={animationTime} />
           <IconGallery icons={vectorIcons} time={animationTime} />
+          <Row style={{ preferredSize: { height: 62 }, padding: all(16), cornerRadius: 12,
+            background: rgba(0.045, 0.065, 0.10), crossAxisAlignment: "center" }}>
+            <Text value="CoreText shaping: Árvíztűrő — Ω → MGFX"
+              style={{ fontSize: 23, fontFamily: "system",
+                color: rgba(0.62, 0.88, 1) }} />
+          </Row>
           <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,
             background: rgba(0.055, 0.07, 0.11), borderWidth: 1,
             borderColor: rgba(0.22, 0.30, 0.46) }}>

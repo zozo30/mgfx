@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FrameEncoder, Key } from "./protocol.js";
-import { box, circle, Component, ComponentHost, constrain, focusable, mesh, row, scrollView, stack, type Element } from "./ui.js";
+import { box, circle, Component, ComponentHost, constrain, focusable, mesh, row, scrollView, stack, text, type Element } from "./ui.js";
 
 test("constraints clamp desired sizes", () => {
   assert.deepEqual(constrain({ width: 200, height: 5 }, {
@@ -99,6 +99,25 @@ test("UTF-8 text and editing keys route only to the focused node", () => {
   assert.equal(host.textInput("hé"), true);
   host.keyDown(Key.Backspace, false, false);
   assert.equal(value, "h");
+});
+
+test("system text lowers to one server-shaped UTF-8 command", () => {
+  class TextComponent extends Component {
+    build(): Element {
+      return text("Árvíztűrő — Ω", { fontSize: 20, fontFamily: "system",
+        color: { red: 0.6, green: 0.9, blue: 1, alpha: 1 } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new TextComponent());
+  host.layout({ width: 300, height: 40 });
+  const encoder = new FrameEncoder();
+  host.paint(encoder, { width: 300, height: 40 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 8);
+  assert.equal(frame.subarray(56, 56 + Buffer.byteLength("Árvíztűrő — Ω")).toString(),
+    "Árvíztűrő — Ω");
 });
 
 test("filled and bordered circles emit portable triangle meshes", () => {

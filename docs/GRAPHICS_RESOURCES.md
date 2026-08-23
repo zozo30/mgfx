@@ -54,14 +54,19 @@ premultiplied RGBA8, giving vector and image draws the same blending result.
 
 ## Text and fonts
 
-The built-in 5×7 font is only a bootstrap path. Production text uses uploaded
-font-byte resources and shaped glyph runs. The language runtime shapes Unicode
-with a HarfBuzz-compatible engine and sends font ID, glyph IDs, advances,
-offsets, direction, and cluster mapping. This keeps line breaking, selection,
-and accessibility semantics with the component system.
+The built-in 5×7 font remains a bootstrap and diagnostic path. The implemented
+`DrawText` command carries UTF-8, a portable system-family choice, position,
+size, and color. The macOS server shapes it with CoreText, converts glyph
+outlines through the shared path tessellator, and caches geometry by family and
+string. Metal therefore receives compact cached vector text instead of one
+rectangle pair per lit pixel. Other native hosts can execute the same command
+through DirectWrite or a HarfBuzz/FreeType service.
 
-The server's platform-neutral text service rasterizes requested glyph IDs into
-persistent atlas textures, then each backend draws cached textured quads. Atlas
+Deterministic application fonts will use uploaded font-byte resources and
+explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
+cluster mapping. This keeps line breaking, selection, and accessibility
+semantics with the component system. A future atlas path can rasterize requested
+glyph IDs into persistent textures and draw cached textured quads. Atlas
 entries are keyed by font generation, size, variation axes, glyph ID, and render
 mode. SDF/MSDF atlases may later improve scalable UI text, while grayscale or
 color glyph atlases remain available for small text and emoji.
@@ -78,7 +83,9 @@ color glyph atlases remain available for small text and emoji.
    Direct `<Mesh>` remains available.
    Next add persistent mesh resources and selective lowering of complete
    `<Svg>` documents.
-4. Add font upload, shaping, glyph atlas caching, and measured rich text.
+4. **Partially implemented:** compact Unicode `DrawText`, native shaping, and
+   cached glyph-outline geometry. Next add font uploads, exact asynchronous
+   metrics, rich-text runs, and atlas caching.
 5. Add cache budgets, device-loss recreation, and resource tracing tools.
 
 None of these stages changes window, layout, event, or component ownership: the

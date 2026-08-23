@@ -18,6 +18,7 @@ enum class Opcode : std::uint16_t {
     popClip = 5,
     drawImage = 6,
     drawPath = 7,
+    drawText = 8,
 };
 
 enum class Primitive : std::uint8_t {
@@ -98,6 +99,17 @@ struct PathCommand {
     PathGradient gradient{};
 };
 
+enum class FontFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
+
+struct TextCommand {
+    FontFamily family;
+    float left;
+    float top;
+    float fontSize;
+    Color color;
+    std::string text;
+};
+
 class CommandEncoder final {
 public:
     CommandEncoder();
@@ -109,6 +121,7 @@ public:
     void popClip();
     void drawImage(const ImageCommand& image);
     void drawPath(const PathCommand& path);
+    void drawText(const TextCommand& text);
 
     std::vector<std::uint8_t> finish();
 
@@ -141,5 +154,6 @@ bool decodeDraw(const CommandView& command, DrawCommand& draw);
 bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
 bool decodePath(const CommandView& command, PathCommand& path);
+bool decodeText(const CommandView& command, TextCommand& text);
 
 } // namespace gfx
