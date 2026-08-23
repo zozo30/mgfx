@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { Key, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Button, Path, TextField } from "./components.js";
+import { Button, Path, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { DotGrid } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -20,6 +20,15 @@ test("React JSX commits an MGFX binary frame", () => {
   assert.ok(frame);
   assert.equal(frame.toString("ascii", 0, 4), "MGFX");
   assert.equal(frame.readUInt32LE(8), frame.length);
+});
+
+test("React Text defaults to native server shaping", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Text value="default native text" style={{ fontSize: 18 }} />);
+  surface.resize({ width: 240, height: 40 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 8);
 });
 
 test("React Path uploads canonical curves once and emits DrawPath instead of triangles", () => {
@@ -41,26 +50,28 @@ test("React Path uploads canonical curves once and emits DrawPath instead of tri
   assert.equal(frame.readUInt16LE(40), 7);
 });
 
-test("React relayouts once when exact native text metrics arrive", async () => {
+test("React requests exact native metrics per line and relayouts", async () => {
   let frames = 0, requests = 0;
+  const measured = new Set<string>();
   const surface = new ReactSurface(() => { frames += 1; }, undefined, {
     createPath: () => {},
     measureText: async (family, value) => {
       requests += 1;
       assert.equal(family, "system");
-      assert.equal(value, "ASYNC METRIC 937");
+      measured.add(value);
       return 8.75;
     },
   });
-  surface.render(<mgfx-text value="ASYNC METRIC 937"
-    textStyle={{ fontSize: 20, fontFamily: "system" }} />);
+  surface.render(<mgfx-text value={"ASYNC METRIC 937\nSECOND LINE 937"}
+    textStyle={{ fontSize: 20, lineHeight: 24, fontFamily: "system" }} />);
   surface.resize({ width: 400, height: 60 });
   const approximateFrames = frames;
   await new Promise<void>((resolve) => setImmediate(resolve));
-  assert.equal(requests, 1);
-  assert.ok(frames > approximateFrames);
+  assert.equal(requests, 2);
+  assert.deepEqual(measured, new Set(["ASYNC METRIC 937", "SECOND LINE 937"]));
+  assert.equal(frames, approximateFrames + 1);
   surface.resize({ width: 420, height: 60 });
-  assert.equal(requests, 1);
+  assert.equal(requests, 2);
 });
 
 test("native router pushes and pops React route history", () => {

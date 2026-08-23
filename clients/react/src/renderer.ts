@@ -167,6 +167,7 @@ export class ReactSurface {
   private viewport: Size = { width: 0, height: 0 };
   private readonly uploadedPaths = new Set<number>();
   private readonly requestedTextMetrics = new Set<string>();
+  private metricRelayoutScheduled = false;
 
   constructor(private readonly onFrame: (frame: Buffer) => void,
               private readonly windowCommands?: NativeWindowCommands,
@@ -232,15 +233,23 @@ export class ReactSurface {
         const family = child.props.textStyle?.fontFamily;
         const value = child.props.value ?? child.children
           .filter((item): item is TextNode => item.kind === "text").map((item) => item.value).join("");
-        if ((family === "system" || family === "monospace") && value &&
-            nativeTextAdvance(family, value) === undefined) {
-          const key = `${family}\0${value}`;
-          if (!this.requestedTextMetrics.has(key) && this.resourceCommands?.measureText) {
-            this.requestedTextMetrics.add(key);
-            void this.resourceCommands.measureText(family, value).then((advance) => {
-              cacheNativeTextAdvance(family, value, advance);
-              this.submit();
-            }).catch(() => {});
+        if (family === "system" || family === "monospace") {
+          for (const line of value.split("\n")) {
+            if (!line || nativeTextAdvance(family, line) !== undefined) continue;
+            const key = `${family}\0${line}`;
+            if (!this.requestedTextMetrics.has(key) && this.resourceCommands?.measureText) {
+              this.requestedTextMetrics.add(key);
+              void this.resourceCommands.measureText(family, line).then((advance) => {
+                cacheNativeTextAdvance(family, line, advance);
+                if (!this.metricRelayoutScheduled) {
+                  this.metricRelayoutScheduled = true;
+                  queueMicrotask(() => {
+                    this.metricRelayoutScheduled = false;
+                    this.submit();
+                  });
+                }
+              }).catch(() => {});
+            }
           }
         }
       }

@@ -277,10 +277,11 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
           </Row>
           <ServerVectorPath time={animationTime} />
           <IconGallery icons={vectorIcons} time={animationTime} />
-          <Row style={{ preferredSize: { height: 62 }, padding: all(16), cornerRadius: 12,
+          <Row style={{ preferredSize: { height: 92 }, padding: all(16), cornerRadius: 12,
             background: rgba(0.045, 0.065, 0.10), crossAxisAlignment: "center" }}>
-            <Text value="CoreText shaping: Árvíztűrő — Ω → MGFX"
-              style={{ fontSize: 23, fontFamily: "system",
+            <Text value={"CoreText shaping: Árvíztűrő — Ω → MGFX\n" +
+              "Two measured lines, two compact DrawText commands"}
+              style={{ fontSize: 21, lineHeight: 27, fontFamily: "system",
                 color: rgba(0.62, 0.88, 1) }} />
           </Row>
           <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,

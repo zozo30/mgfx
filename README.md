@@ -195,8 +195,11 @@ state change. The host records the invalidation and reconciles once at the start
 of the next layout pass, so an event handler never mutates the retained tree while
 hit testing is in progress.
 
-`Text` elements retain the built-in 5x7 diagnostic font, and can select `system`
-or `monospace` text. Those modes emit one compact UTF-8 `DrawText` command. The
+React `Text` now defaults to native `system` rendering; `fontFamily: "pixel"`
+keeps the built-in 5x7 font available only as a diagnostic/bootstrap mode, and
+`monospace` selects the native fixed-pitch family. Native modes emit one compact
+UTF-8 `DrawText` command per visible line. Explicit newlines and configurable
+line height participate in intrinsic measurement. The
 macOS server shapes Unicode with CoreText and caches vector glyph outlines;
 future Vulkan and DirectX hosts can execute the same display-list command using
 their platform text service. The component runtime asynchronously requests and

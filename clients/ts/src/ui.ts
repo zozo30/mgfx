@@ -42,6 +42,7 @@ export interface TextStyle {
   fontSize?: number;
   color?: Color;
   fontFamily?: "pixel" | "system" | "monospace";
+  lineHeight?: number;
 }
 
 const nativeTextAdvances = new Map<string, number>();
@@ -287,16 +288,21 @@ class Node {
     let width = 0, height = 0;
     if (this.type === "text" && this.value) {
       const fontSize = this.textStyle.fontSize ?? 16;
+      const lines = this.value.split("\n");
       if (this.textStyle.fontFamily && this.textStyle.fontFamily !== "pixel") {
-        const exactAdvance = nativeTextAdvance(this.textStyle.fontFamily, this.value);
         const averageAdvance = this.textStyle.fontFamily === "monospace" ? 0.60 : 0.56;
-        width = exactAdvance !== undefined ? exactAdvance * fontSize
-          : [...this.value].length * fontSize * averageAdvance;
+        width = Math.max(0, ...lines.map((line) => {
+          const exactAdvance = nativeTextAdvance(this.textStyle.fontFamily as "system" | "monospace", line);
+          return exactAdvance !== undefined ? exactAdvance * fontSize
+            : [...line].length * fontSize * averageAdvance;
+        }));
       } else {
         const cell = fontSize / 7;
-        width = this.value.length * cell * 6 - cell;
+        width = Math.max(0, ...lines.map((line) => line.length === 0 ? 0
+          : line.length * cell * 6 - cell));
       }
-      height = fontSize;
+      const lineHeight = this.textStyle.lineHeight ?? fontSize * 1.2;
+      height = fontSize + Math.max(0, lines.length - 1) * lineHeight;
     }
     let flowCount = 0;
     for (const child of this.children) {
@@ -727,17 +733,24 @@ const glyphs: Readonly<Record<string, readonly number[]>> = {
 const fallback = [31,17,1,2,4,0,4] as const;
 function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: TextStyle, viewport: Size): void {
   const fontSize = style.fontSize ?? 16, color = style.color ?? { red:1,green:1,blue:1,alpha:1 }, cell = fontSize / 7;
+  const lines = value.split("\n"), lineHeight = style.lineHeight ?? fontSize * 1.2;
   if (style.fontFamily && style.fontFamily !== "pixel") {
-    encoder.systemText(value, bounds.x / viewport.width * 2 - 1,
-      1 - bounds.y / viewport.height * 2, fontSize / viewport.height * 2,
-      color, style.fontFamily);
+    const family = style.fontFamily;
+    lines.forEach((line, index) => {
+      if (line.length === 0) return;
+      encoder.systemText(line, bounds.x / viewport.width * 2 - 1,
+        1 - (bounds.y + index * lineHeight) / viewport.height * 2,
+        fontSize / viewport.height * 2, color, family);
+    });
     return;
   }
   const vertices: Vertex[] = [];
-  [...value.toUpperCase()].forEach((character, characterIndex) => (glyphs[character] ?? fallback).forEach((bits, row) => {
-    for (let column = 0; column < 5; column++) if (bits & (1 << (4 - column))) vertices.push(...rectangleVertices({
-      x: bounds.x + characterIndex * cell * 6 + column * cell, y: bounds.y + row * cell, width: cell, height: cell,
-    }, color, viewport));
-  }));
+  lines.forEach((line, lineIndex) => [...line.toUpperCase()]
+    .forEach((character, characterIndex) => (glyphs[character] ?? fallback).forEach((bits, row) => {
+      for (let column = 0; column < 5; column++) if (bits & (1 << (4 - column))) vertices.push(...rectangleVertices({
+        x: bounds.x + characterIndex * cell * 6 + column * cell,
+        y: bounds.y + lineIndex * lineHeight + row * cell, width: cell, height: cell,
+      }, color, viewport));
+    })));
   if (vertices.length) encoder.triangles(vertices);
 }

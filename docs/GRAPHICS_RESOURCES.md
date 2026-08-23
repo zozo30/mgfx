@@ -67,6 +67,11 @@ correlated `TextMeasure`/`TextMetrics` MGIP messages. React first lays out with 
 nonblocking estimate, caches the em-unit reply, and performs one corrected
 layout; animation frames do not repeat measurement traffic.
 
+React uses native system text by default. Explicit newline boundaries are
+measured independently and lower to one `DrawText` command per nonempty line;
+blank lines still contribute configured line-height spacing. The pixel font is
+available only through an explicit diagnostic style.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

@@ -120,6 +120,25 @@ test("system text lowers to one server-shaped UTF-8 command", () => {
     "Árvíztűrő — Ω");
 });
 
+test("multiline system text emits one compact shaped command per visible line", () => {
+  class LinesComponent extends Component {
+    build(): Element {
+      return text("ONE\nΩ", { fontSize: 18, lineHeight: 24, fontFamily: "system" });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new LinesComponent());
+  host.layout({ width: 200, height: 60 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 200, height: 60 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 3);
+  assert.equal(frame.readUInt16LE(16), 8);
+  const secondCommand = 16 + 8 + 32 + Buffer.byteLength("ONE");
+  assert.equal(frame.readUInt16LE(secondCommand), 8);
+  assert.equal(frame.subarray(secondCommand + 8 + 32,
+    secondCommand + 8 + 32 + Buffer.byteLength("Ω")).toString(), "Ω");
+});
+
 test("cached native advance participates in row measurement", () => {
   cacheNativeTextAdvance("system", "METRIC", 2);
   class MetricsComponent extends Component {

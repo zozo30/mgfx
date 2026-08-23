@@ -59,7 +59,7 @@ export function Text({ value, style }: {
   readonly value: string;
   readonly style?: TextStyle;
 }) {
-  return <mgfx-text value={value} textStyle={style ?? {}} />;
+  return <mgfx-text value={value} textStyle={{ fontFamily: "system", ...style }} />;
 }
 
 export interface ButtonProps {
