@@ -73,7 +73,9 @@ color glyph atlases remain available for small text and emoji.
    fill/contain/cover geometry. Resource-ready acknowledgements remain to add.
 3. **Implemented:** persistent canonical path resources plus server-side
    adaptive curve flattening, concave/compound fills, and width/cap/join stroke
-   tessellation with geometry caching. Direct `<Mesh>` remains available.
+   tessellation with geometry caching. Stroke contours are triangulated as one
+   outline, so translucent segment joins do not darken from overlapping quads.
+   Direct `<Mesh>` remains available.
    Next add persistent mesh resources and selective lowering of complete
    `<Svg>` documents.
 4. Add font upload, shaping, glyph atlas caching, and measured rich text.

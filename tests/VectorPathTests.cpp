@@ -82,5 +82,47 @@ int main() {
         std::cerr << "Server stroke tessellation failed\n";
         return 1;
     }
+
+    const gfx::PathTriangles buttStroke = gfx::tessellatePath(strokePath, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::bevel, 2, 0.25F);
+    if (std::fabs(triangleArea(buttStroke.stroke) - 40.0) > 0.001) {
+        std::cerr << "Butt-capped stroke contains gaps or overlapping triangles\n";
+        return 1;
+    }
+    const double roundArea = triangleArea(stroke.stroke);
+    if (roundArea <= 43.0 || roundArea >= 43.2) {
+        std::cerr << "Round caps do not form a non-overlapping semicircle pair\n";
+        return 1;
+    }
+
+    const std::vector<mgfx::ipc::PathSegment> elbow = {
+        point(mgfx::ipc::PathVerb::moveTo, 0, 0),
+        point(mgfx::ipc::PathVerb::lineTo, 10, 0),
+        point(mgfx::ipc::PathVerb::lineTo, 10, 10),
+    };
+    const gfx::PathTriangles bevelElbow = gfx::tessellatePath(elbow, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::bevel, 2, 0.25F);
+    const gfx::PathTriangles roundElbow = gfx::tessellatePath(elbow, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::round, 2, 0.25F);
+    const double joinDifference = triangleArea(roundElbow.stroke) -
+                                  triangleArea(bevelElbow.stroke);
+    if (joinDifference <= 0.27 || joinDifference >= 0.30) {
+        std::cerr << "Round join is not a clean outer-corner arc\n";
+        return 1;
+    }
+
+    const std::vector<mgfx::ipc::PathSegment> closedSquare = {
+        point(mgfx::ipc::PathVerb::moveTo, 0, 0),
+        point(mgfx::ipc::PathVerb::lineTo, 10, 0),
+        point(mgfx::ipc::PathVerb::lineTo, 10, 10),
+        point(mgfx::ipc::PathVerb::lineTo, 0, 10),
+        {mgfx::ipc::PathVerb::close, {}},
+    };
+    const gfx::PathTriangles squareStroke = gfx::tessellatePath(closedSquare, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::bevel, 2, 0.25F);
+    if (std::fabs(triangleArea(squareStroke.stroke) - 78.0) > 0.001) {
+        std::cerr << "Closed bevel stroke contains gaps or overlapping triangles\n";
+        return 1;
+    }
     return 0;
 }
