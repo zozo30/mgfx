@@ -1,0 +1,39 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "clangd",
+      "displayName": "clangd / Nova",
+      "description": "Generates compile_commands.json for editor indexing",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build-clangd",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "13.0",
+        "BUILD_TESTING": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "clangd",
+      "configurePreset": "clangd",
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "clangd",
+      "configurePreset": "clangd",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

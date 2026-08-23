@@ -1,0 +1,228 @@
+#pragma once
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+
+namespace mgfx::ipc {
+
+inline constexpr std::uint16_t protocolVersion = 1;
+inline constexpr std::uint32_t maximumPayloadBytes = 64U * 1024U * 1024U;
+
+enum class MessageType : std::uint16_t {
+    frame = 1,
+    resize = 2,
+    pointerDown = 3,
+    close = 4,
+    pointerMove = 5,
+    pointerUp = 6,
+    keyDown = 7,
+    keyUp = 8,
+    scroll = 9,
+    textInput = 10,
+    windowTitle = 11,
+    windowConfig = 12,
+    windowState = 13,
+    serverHello = 14,
+    framePresented = 15,
+    requestAnimationFrame = 16,
+    animationFrame = 17,
+    windowCursor = 18,
+    clipboardWrite = 19,
+    clipboardRead = 20,
+    clipboardText = 21,
+    windowChrome = 22,
+    windowChromeMetrics = 23,
+    textureCreate = 24,
+    textureDestroy = 25,
+};
+
+enum class GraphicsBackend : std::uint16_t {
+    metal = 1,
+    vulkan = 2,
+    directX = 3,
+};
+
+enum ServerCapability : std::uint32_t {
+    clientWindowLifecycle = 1U << 0U,
+    pointerInput = 1U << 1U,
+    keyboardInput = 1U << 2U,
+    textInputCapability = 1U << 3U,
+    scrollInput = 1U << 4U,
+    framePresentation = 1U << 5U,
+    animationFrameClock = 1U << 6U,
+    clientCursor = 1U << 7U,
+    clipboard = 1U << 8U,
+    clientWindowChrome = 1U << 9U,
+    textureResources = 1U << 10U,
+};
+
+enum class WindowChromeMode : std::uint8_t {
+    native = 0,
+    overlay = 1,
+};
+
+struct WindowChrome {
+    WindowChromeMode mode;
+    std::uint32_t draggableHeight;
+};
+
+struct WindowChromeMetrics {
+    float leadingInset;
+    float titleBarHeight;
+};
+
+struct TextureUpload {
+    std::uint32_t id;
+    std::uint32_t width;
+    std::uint32_t height;
+    std::vector<std::uint8_t> rgba;
+};
+
+enum class CursorShape : std::uint8_t {
+    arrow = 0,
+    pointingHand = 1,
+    text = 2,
+    crosshair = 3,
+    resizeHorizontal = 4,
+    resizeVertical = 5,
+};
+
+struct ServerHello {
+    std::uint16_t version;
+    GraphicsBackend backend;
+    std::uint32_t capabilities;
+};
+
+enum class Key : std::uint16_t {
+    unknown = 0,
+    tab = 1,
+    enter = 2,
+    space = 3,
+    escape = 4,
+    arrowLeft = 5,
+    arrowRight = 6,
+    arrowUp = 7,
+    arrowDown = 8,
+    backspace = 9,
+    copy = 10,
+    cut = 11,
+    paste = 12,
+};
+
+enum KeyModifier : std::uint16_t {
+    shift = 1U << 0U,
+    control = 1U << 1U,
+    alt = 1U << 2U,
+    command = 1U << 3U,
+};
+
+struct Message {
+    MessageType type{};
+    std::uint32_t sequence = 0;
+    std::vector<std::uint8_t> payload;
+};
+
+struct WindowConfig {
+    std::uint32_t width;
+    std::uint32_t height;
+    std::uint32_t minimumWidth;
+    std::uint32_t minimumHeight;
+};
+
+enum class WindowMode : std::uint8_t {
+    normal = 0,
+    maximized = 1,
+    fullscreen = 2,
+};
+
+struct WindowState {
+    WindowMode mode;
+    bool resizable;
+};
+
+class Connection final {
+public:
+    explicit Connection(int descriptor);
+    ~Connection();
+
+    Connection(const Connection&) = delete;
+    Connection& operator=(const Connection&) = delete;
+
+    bool send(MessageType type,
+              const std::vector<std::uint8_t>& payload = {},
+              std::uint32_t sequence = 0);
+    bool receive(Message& message);
+    void close();
+
+private:
+    std::atomic<int> descriptor_{-1};
+    std::mutex sendMutex_;
+};
+
+class Listener final {
+public:
+    explicit Listener(std::string socketPath);
+    ~Listener();
+
+    Listener(const Listener&) = delete;
+    Listener& operator=(const Listener&) = delete;
+
+    std::shared_ptr<Connection> accept();
+    void close();
+    const std::string& socketPath() const { return socketPath_; }
+
+private:
+    std::string socketPath_;
+    std::string lockPath_;
+    int descriptor_ = -1;
+    int lockDescriptor_ = -1;
+};
+
+std::shared_ptr<Connection> connect(const std::string& socketPath);
+std::string defaultSocketPath();
+
+std::vector<std::uint8_t> encodeSize(std::uint32_t width, std::uint32_t height);
+bool decodeSize(const std::vector<std::uint8_t>& payload,
+                std::uint32_t& width,
+                std::uint32_t& height);
+std::vector<std::uint8_t> encodePoint(float x, float y);
+bool decodePoint(const std::vector<std::uint8_t>& payload, float& x, float& y);
+std::vector<std::uint8_t> encodeKey(Key key, std::uint16_t modifiers, bool repeat);
+bool decodeKey(const std::vector<std::uint8_t>& payload,
+               Key& key,
+               std::uint16_t& modifiers,
+               bool& repeat);
+std::vector<std::uint8_t> encodeScroll(float x, float y, float deltaX, float deltaY);
+bool decodeScroll(const std::vector<std::uint8_t>& payload,
+                  float& x,
+                  float& y,
+                  float& deltaX,
+                  float& deltaY);
+std::vector<std::uint8_t> encodeText(const std::string& text);
+bool decodeText(const std::vector<std::uint8_t>& payload, std::string& text);
+std::vector<std::uint8_t> encodeWindowConfig(WindowConfig config);
+bool decodeWindowConfig(const std::vector<std::uint8_t>& payload, WindowConfig& config);
+std::vector<std::uint8_t> encodeWindowState(WindowState state);
+bool decodeWindowState(const std::vector<std::uint8_t>& payload, WindowState& state);
+std::vector<std::uint8_t> encodeServerHello(ServerHello hello);
+bool decodeServerHello(const std::vector<std::uint8_t>& payload, ServerHello& hello);
+std::vector<std::uint8_t> encodeAnimationTime(std::uint64_t nanoseconds);
+bool decodeAnimationTime(const std::vector<std::uint8_t>& payload,
+                         std::uint64_t& nanoseconds);
+std::vector<std::uint8_t> encodeCursor(CursorShape cursor);
+bool decodeCursor(const std::vector<std::uint8_t>& payload, CursorShape& cursor);
+std::vector<std::uint8_t> encodeWindowChrome(WindowChrome chrome);
+bool decodeWindowChrome(const std::vector<std::uint8_t>& payload, WindowChrome& chrome);
+std::vector<std::uint8_t> encodeWindowChromeMetrics(WindowChromeMetrics metrics);
+bool decodeWindowChromeMetrics(const std::vector<std::uint8_t>& payload,
+                               WindowChromeMetrics& metrics);
+std::vector<std::uint8_t> encodeTextureUpload(const TextureUpload& texture);
+bool decodeTextureUpload(const std::vector<std::uint8_t>& payload, TextureUpload& texture);
+std::vector<std::uint8_t> encodeResourceId(std::uint32_t id);
+bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& id);
+
+} // namespace mgfx::ipc
