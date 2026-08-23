@@ -31,6 +31,8 @@ int main() {
     encoder.popClip();
     encoder.pushTransform({0.8F, 0.2F, -0.2F, 0.8F, 0.1F, -0.1F});
     encoder.popTransform();
+    encoder.pushOpacity(0.625F);
+    encoder.popOpacity();
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -73,6 +75,12 @@ int main() {
         command.opcode != gfx::Opcode::popTransform || command.payloadSize != 0 ||
         !decoder.next(command)) {
         return fail("Transform decoding failed");
+    }
+    float opacity = 0.0F;
+    if (!gfx::decodePushOpacity(command, opacity) || !nearlyEqual(opacity, 0.625F) ||
+        !decoder.next(command) || command.opcode != gfx::Opcode::popOpacity ||
+        command.payloadSize != 0 || !decoder.next(command)) {
+        return fail("Opacity decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

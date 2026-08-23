@@ -134,6 +134,15 @@ void CommandEncoder::popTransform() {
     beginCommand(Opcode::popTransform, 0);
 }
 
+void CommandEncoder::pushOpacity(float opacity) {
+    beginCommand(Opcode::pushOpacity, sizeof(float));
+    appendFloat(bytes_, opacity);
+}
+
+void CommandEncoder::popOpacity() {
+    beginCommand(Opcode::popOpacity, 0);
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -300,6 +309,12 @@ bool decodePushTransform(const CommandView& command, AffineTransform& transform)
     transform = {readFloat(command.payload), readFloat(command.payload + 4),
                  readFloat(command.payload + 8), readFloat(command.payload + 12),
                  readFloat(command.payload + 16), readFloat(command.payload + 20)};
+    return true;
+}
+
+bool decodePushOpacity(const CommandView& command, float& opacity) {
+    if (command.opcode != Opcode::pushOpacity || command.payloadSize != 4) return false;
+    opacity = readFloat(command.payload);
     return true;
 }
 

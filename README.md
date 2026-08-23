@@ -158,6 +158,10 @@ cached paths, native text, and clip bounds. Hit testing applies the matching
 inverse transform, so animated controls remain interactive at their drawn
 position.
 
+An inherited `opacity` style lowers to a separate balanced stack. Nested values
+multiply on the server and tint every drawable category while leaving cached
+geometry and uploaded resources unchanged.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,

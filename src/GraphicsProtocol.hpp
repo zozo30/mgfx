@@ -21,6 +21,8 @@ enum class Opcode : std::uint16_t {
     drawText = 8,
     pushTransform = 9,
     popTransform = 10,
+    pushOpacity = 11,
+    popOpacity = 12,
 };
 
 enum class Primitive : std::uint8_t {
@@ -137,6 +139,8 @@ public:
     void drawText(const TextCommand& text);
     void pushTransform(AffineTransform transform);
     void popTransform();
+    void pushOpacity(float opacity);
+    void popOpacity();
 
     std::vector<std::uint8_t> finish();
 
@@ -171,5 +175,6 @@ bool decodeImage(const CommandView& command, ImageCommand& image);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);
 bool decodePushTransform(const CommandView& command, AffineTransform& transform);
+bool decodePushOpacity(const CommandView& command, float& opacity);
 
 } // namespace gfx

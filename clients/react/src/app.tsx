@@ -141,7 +141,7 @@ function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
           style={{ preferredSize: { width: 76, height: 76 }, transform: {
             rotation: Math.sin(time / 520 + index * 0.8) * 7,
             scaleX: 0.94 + pulse * 0.08, scaleY: 0.94 + pulse * 0.08,
-          } }} />)}
+          }, opacity: 0.72 + pulse * 0.28 }} />)}
       </Row>
     </Row>
   );

@@ -44,6 +44,7 @@ export interface Style {
   zIndex?: number;
   modal?: boolean;
   transform?: Transform;
+  opacity?: number;
 }
 export interface TextStyle {
   fontSize?: number;
@@ -454,6 +455,7 @@ class Node {
     }
   }
   paint(encoder: FrameEncoder, viewport: Size): void {
+    if (this.style.opacity !== undefined) encoder.pushOpacity(this.style.opacity);
     if (this.style.transform) encoder.pushTransform(this.affineTransform(viewport));
     if (this.style.clip) encoder.pushClip({ left: this.bounds.x / viewport.width,
       top: this.bounds.y / viewport.height, right: (this.bounds.x + this.bounds.width) / viewport.width,
@@ -488,6 +490,7 @@ class Node {
     for (const child of this.paintOrder()) child.paint(encoder, viewport);
     if (this.style.clip) encoder.popClip();
     if (this.style.transform) encoder.popTransform();
+    if (this.style.opacity !== undefined) encoder.popOpacity();
   }
   hitTarget(point: Point): Node | undefined {
     const transformedPoint = this.inverseTransform(point);

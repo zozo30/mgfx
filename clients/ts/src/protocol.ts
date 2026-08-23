@@ -53,6 +53,7 @@ export enum ServerCapability {
   PathResources = 1 << 11,
   NativeTextMetrics = 1 << 12,
   TransformStack = 1 << 13,
+  OpacityStack = 1 << 14,
 }
 export interface ServerHello {
   readonly version: number;
@@ -611,6 +612,15 @@ export class FrameEncoder {
   }
 
   popTransform(): void { this.command(10, Buffer.alloc(0)); }
+
+  pushOpacity(opacity: number): void {
+    if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1)
+      throw new RangeError("Opacity must be finite and between zero and one");
+    const payload = Buffer.alloc(4); payload.writeFloatLE(opacity);
+    this.command(11, payload);
+  }
+
+  popOpacity(): void { this.command(12, Buffer.alloc(0)); }
 
   finish(): Buffer {
     const byteCount = MGFX_HEADER_BYTES + this.commands.reduce((sum, item) => sum + item.length, 0);

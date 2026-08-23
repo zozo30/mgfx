@@ -159,6 +159,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
     MTL::RenderCommandEncoder* encoder = nullptr;
     std::vector<gfx::ClipRect> clipStack;
     std::vector<gfx::AffineTransform> transformStack{{1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F}};
+    std::vector<float> opacityStack{1.0F};
     const auto currentTransform = [&]() -> const gfx::AffineTransform& {
         return transformStack.back();
     };
@@ -197,6 +198,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
             for (gfx::Vertex& vertex : draw.vertices) {
                 vertex.position = transformPoint(currentTransform(), vertex.position);
+                vertex.color[3] *= opacityStack.back();
             }
             if (encoder == nullptr) {
                 encoder = commandBuffer->renderCommandEncoder(renderPass);
@@ -263,7 +265,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 std::array<float, 4> tint;
             };
             const std::array<float, 4> tint = {image.tint.red, image.tint.green,
-                                               image.tint.blue, image.tint.alpha};
+                                               image.tint.blue,
+                                               image.tint.alpha * opacityStack.back()};
             ImageVertex vertices[] = {
                 {{image.destination.left, image.destination.top}, {image.uv.left, image.uv.top}, tint},
                 {{image.destination.left, image.destination.bottom}, {image.uv.left, image.uv.bottom}, tint},
@@ -347,6 +350,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                 mix(gradient->startColor.blue, gradient->endColor.blue),
                                 mix(gradient->startColor.alpha, gradient->endColor.alpha)};
                         }
+                        vertexColor[3] *= opacityStack.back();
                         const float x = path.destination.left +
                             (point[0] - path.viewBox.x) / path.viewBox.width *
                             (path.destination.right - path.destination.left);
@@ -389,7 +393,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             const float aspect = static_cast<float>(drawable->texture()->height()) /
                                  static_cast<float>(drawable->texture()->width());
             const std::array<float, 4> color = {
-                text.color.red, text.color.green, text.color.blue, text.color.alpha};
+                text.color.red, text.color.green, text.color.blue,
+                text.color.alpha * opacityStack.back()};
             for (std::size_t first = 0; first < points.size();) {
                 const std::size_t count = std::min(maxVertices, points.size() - first);
                 std::vector<gfx::Vertex> vertices;
@@ -423,6 +428,18 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 throw std::runtime_error("Malformed or unbalanced pop-transform command");
             }
             transformStack.pop_back();
+        } else if (command.opcode == gfx::Opcode::pushOpacity) {
+            float opacity = 0.0F;
+            if (!gfx::decodePushOpacity(command, opacity) || !std::isfinite(opacity) ||
+                opacity < 0.0F || opacity > 1.0F) {
+                throw std::runtime_error("Malformed push-opacity command");
+            }
+            opacityStack.push_back(opacityStack.back() * opacity);
+        } else if (command.opcode == gfx::Opcode::popOpacity) {
+            if (command.payloadSize != 0 || opacityStack.size() <= 1) {
+                throw std::runtime_error("Malformed or unbalanced pop-opacity command");
+            }
+            opacityStack.pop_back();
         }
         // End-frame and unknown opcodes need no Metal work. Unknown commands are
         // safely skippable because every protocol record carries its byte size.
@@ -435,6 +452,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
     }
     if (transformStack.size() != 1) {
         throw std::runtime_error("Unbalanced graphics transform stack");
+    }
+    if (opacityStack.size() != 1) {
+        throw std::runtime_error("Unbalanced graphics opacity stack");
     }
     if (encoder == nullptr) {
         encoder = commandBuffer->renderCommandEncoder(renderPass);

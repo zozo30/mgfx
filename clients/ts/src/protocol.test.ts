@@ -100,6 +100,17 @@ test("MGFX affine transforms use balanced skippable commands", () => {
     translateX: 0, translateY: 0 }));
 });
 
+test("MGFX inherited opacity uses balanced skippable commands", () => {
+  const frame = new FrameEncoder();
+  frame.pushOpacity(0.625); frame.popOpacity(); frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 11);
+  assert.equal(bytes.readUInt32LE(20), 4);
+  assert.ok(Math.abs(bytes.readFloatLE(24) - 0.625) < 0.00001);
+  assert.equal(bytes.readUInt16LE(28), 12);
+  assert.throws(() => frame.pushOpacity(1.1));
+});
+
 test("text input decodes validated UTF-8", () => {
   assert.equal(decodeText(encodeText("árvíz")), "árvíz");
   assert.throws(() => decodeText(Buffer.from([0xc3, 0x28])));

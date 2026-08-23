@@ -110,6 +110,11 @@ The retained input tree walks the inverse transforms for pointer hit testing.
 Servers advertise this optional display-list extension with the negotiated
 `transformStack` capability bit.
 
+`PushOpacity`/`PopOpacity` form a parallel inherited-alpha stack. Metal
+multiplies the effective alpha into vertex colors, image tint, path gradients,
+and native text after decoding. This is lightweight inherited opacity rather
+than offscreen group isolation, and is advertised by `opacityStack`.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

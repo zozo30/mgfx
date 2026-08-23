@@ -78,6 +78,22 @@ test("transformed components paint transform commands and hit their visual posit
   assert.equal(frame.readUInt16LE(16), 9);
 });
 
+test("component opacity lowers around the complete subtree", () => {
+  class OpacityComponent extends Component {
+    build(): Element {
+      return stack([circle({ preferredSize: { width: 20, height: 20 },
+        background: { red: 1, green: 0, blue: 0, alpha: 1 } })], { opacity: 0.4 });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new OpacityComponent());
+  host.layout({ width: 40, height: 40 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 40, height: 40 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 11);
+  assert.equal(frame.readUInt16LE(frame.length - 16), 12);
+});
+
 test("keyboard focus traverses and activates controls", () => {
   let first = 0, second = 0;
   class KeyboardComponent extends Component {
