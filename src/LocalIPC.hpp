@@ -93,6 +93,7 @@ enum ServerCapability : std::uint64_t {
     capabilityWords64 = 1ULL << 32U,
     resourceStatusEvents = 1ULL << 33U,
     linearGradientCircles = 1ULL << 34U,
+    gridPatterns = 1ULL << 35U,
 };
 
 enum class ResourceKind : std::uint8_t {

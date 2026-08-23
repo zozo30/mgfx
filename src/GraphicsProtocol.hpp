@@ -36,6 +36,7 @@ enum class Opcode : std::uint16_t {
     drawConicGradient = 23,
     drawRichText = 24,
     drawLinearGradientCircle = 25,
+    drawGridPattern = 26,
 };
 
 enum class Primitive : std::uint8_t {
@@ -156,6 +157,19 @@ struct LinearGradientCircleCommand {
     GradientDirection direction;
     Color startColor;
     Color endColor;
+};
+
+struct GridPatternCommand {
+    ClipRect destination;
+    float spacing;
+    float minorWidth;
+    float majorWidth;
+    float offsetX;
+    float offsetY;
+    std::uint32_t majorEvery;
+    float cornerRadius;
+    Color minorColor;
+    Color majorColor;
 };
 
 struct ConicGradientCommand {
@@ -314,6 +328,7 @@ public:
     void drawDiagonalPattern(const DiagonalPatternCommand& pattern);
     void drawLinearGradient(const LinearGradientCommand& gradient);
     void drawLinearGradientCircle(const LinearGradientCircleCommand& gradient);
+    void drawGridPattern(const GridPatternCommand& pattern);
     void drawDotGrid(const DotGridCommand& grid);
     void drawConicGradient(const ConicGradientCommand& gradient);
     void drawWaveDots(const WaveDotsCommand& wave);
@@ -363,6 +378,7 @@ bool decodeDiagonalPattern(const CommandView& command, DiagonalPatternCommand& p
 bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gradient);
 bool decodeLinearGradientCircle(const CommandView& command,
                                 LinearGradientCircleCommand& gradient);
+bool decodeGridPattern(const CommandView& command, GridPatternCommand& pattern);
 bool decodeDotGrid(const CommandView& command, DotGridCommand& grid);
 bool decodeConicGradient(const CommandView& command, ConicGradientCommand& gradient);
 bool decodeWaveDots(const CommandView& command, WaveDotsCommand& wave);

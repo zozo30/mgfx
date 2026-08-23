@@ -178,7 +178,11 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
     <Stack>
     <Column style={{ position: "absolute", inset: all(0),
       padding: { top: 14, right: 20, bottom: 20, left: 20 }, gap: 16,
-      crossAxisAlignment: "stretch" }}>
+      crossAxisAlignment: "stretch", background: rgba(0.012, 0.018, 0.03),
+      backgroundGrid: { spacing: 28, minorWidth: 0.8, majorWidth: 1.4, majorEvery: 5,
+        offsetX: animationTime / 180, offsetY: animationTime / 260,
+        minorColor: rgba(0.16, 0.28, 0.48, 0.14),
+        majorColor: rgba(0.18, 0.48, 0.72, 0.22) } }}>
       <Row style={{ preferredSize: { height: 72 },
         padding: { top: 14, right: 14, bottom: 14,
           left: Math.max(82, chromeMetrics.leadingInset - 20) }, cornerRadius: 14,

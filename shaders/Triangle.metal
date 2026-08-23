@@ -406,6 +406,67 @@ fragment float4 patternFragmentMain(PatternVertexOut in [[stage_in]]) {
     return float4(in.color.rgb * alpha, alpha);
 }
 
+struct GridPatternVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    float spacing;
+    float minorWidth;
+    float majorWidth;
+    packed_float2 offset;
+    float majorEvery;
+    float cornerRadius;
+    packed_float4 minorColor;
+    packed_float4 majorColor;
+};
+
+struct GridPatternVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float spacing;
+    float minorWidth;
+    float majorWidth;
+    float2 offset;
+    float majorEvery;
+    float cornerRadius;
+    float4 minorColor;
+    float4 majorColor;
+};
+
+vertex GridPatternVertexOut gridPatternVertexMain(
+    const device GridPatternVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const GridPatternVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size, value.spacing,
+            value.minorWidth, value.majorWidth, value.offset, value.majorEvery, value.cornerRadius,
+            value.minorColor, value.majorColor};
+}
+
+fragment float4 gridPatternFragmentMain(GridPatternVertexOut in [[stage_in]]) {
+    const float2 coordinate = (in.local + in.offset) / in.spacing;
+    const float2 nearest = round(coordinate);
+    const float2 lineDistance = abs(coordinate - nearest) * in.spacing;
+    const float minorDistance = min(lineDistance.x, lineDistance.y);
+    const bool majorX = fmod(abs(nearest.x), in.majorEvery) < 0.5;
+    const bool majorY = fmod(abs(nearest.y), in.majorEvery) < 0.5;
+    const float majorDistance = min(majorX ? lineDistance.x : 1.0e20,
+                                    majorY ? lineDistance.y : 1.0e20);
+    const float aa = max(fwidth(in.local.x) + fwidth(in.local.y), 0.75);
+    const float minorCoverage = 1.0 - smoothstep(in.minorWidth * 0.5 - aa,
+                                                 in.minorWidth * 0.5 + aa, minorDistance);
+    const float majorCoverage = 1.0 - smoothstep(in.majorWidth * 0.5 - aa,
+                                                 in.majorWidth * 0.5 + aa, majorDistance);
+    const float minorAlpha = in.minorColor.a * minorCoverage * (1.0 - majorCoverage);
+    const float majorAlpha = in.majorColor.a * majorCoverage;
+    const float2 halfSize = in.size * 0.5;
+    const float radius = min(in.cornerRadius, min(halfSize.x, halfSize.y));
+    const float2 q = abs(in.local - halfSize) - halfSize + radius;
+    const float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    const float mask = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
+    return float4((in.minorColor.rgb * minorAlpha + in.majorColor.rgb * majorAlpha) * mask,
+                  (minorAlpha + majorAlpha) * mask);
+}
+
 struct DotGridVertex {
     packed_float2 position;
     packed_float2 local;

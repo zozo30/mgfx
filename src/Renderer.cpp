@@ -95,6 +95,10 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto circleFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleFragmentMain")));
     auto patternVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternVertexMain")));
     auto patternFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternFragmentMain")));
+    auto gridPatternVertexFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("gridPatternVertexMain")));
+    auto gridPatternFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("gridPatternFragmentMain")));
     auto linearGradientVertexFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("linearGradientVertexMain")));
     auto linearGradientFragmentFunction = NS::TransferPtr(
@@ -116,6 +120,7 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         !roundedRectVertexFunction || !roundedRectFragmentFunction ||
         !circleVertexFunction || !circleFragmentFunction ||
         !patternVertexFunction || !patternFragmentFunction ||
+        !gridPatternVertexFunction || !gridPatternFragmentFunction ||
         !linearGradientVertexFunction || !linearGradientFragmentFunction ||
         !linearGradientCircleFragmentFunction ||
         !dotGridVertexFunction || !dotGridFragmentFunction ||
@@ -257,6 +262,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(patternDescriptor.get(), &error));
     if (!patternPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the diagonal-pattern pipeline", error));
+    }
+
+    auto gridPatternDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    gridPatternDescriptor->setVertexFunction(gridPatternVertexFunction.get());
+    gridPatternDescriptor->setFragmentFunction(gridPatternFragmentFunction.get());
+    gridPatternDescriptor->setRasterSampleCount(sampleCount);
+    auto* gridPatternColor = gridPatternDescriptor->colorAttachments()->object(0);
+    gridPatternColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    gridPatternColor->setBlendingEnabled(true);
+    gridPatternColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    gridPatternColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    gridPatternColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    gridPatternColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    gridPatternPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(gridPatternDescriptor.get(), &error));
+    if (!gridPatternPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the grid-pattern pipeline", error));
     }
 
     auto linearGradientDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -821,6 +843,65 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(patternPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawGridPattern) {
+            gfx::GridPatternCommand pattern{};
+            if (!gfx::decodeGridPattern(command, pattern) ||
+                !std::isfinite(pattern.spacing) || !std::isfinite(pattern.minorWidth) ||
+                !std::isfinite(pattern.majorWidth) || !std::isfinite(pattern.offsetX) ||
+                !std::isfinite(pattern.offsetY) || !std::isfinite(pattern.cornerRadius) ||
+                pattern.spacing < 2.0F ||
+                pattern.spacing > 1024.0F || pattern.minorWidth < 0.0F ||
+                pattern.majorWidth < 0.0F || pattern.minorWidth > pattern.spacing ||
+                pattern.majorWidth > pattern.spacing || pattern.cornerRadius < 0.0F ||
+                pattern.cornerRadius > 8192.0F) {
+                throw std::runtime_error("Malformed grid-pattern command");
+            }
+            if (clipEmpty() || (pattern.minorColor.alpha <= 0.0F &&
+                                pattern.majorColor.alpha <= 0.0F)) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (pattern.destination.right - pattern.destination.left) * drawableWidth * 0.5F,
+                (pattern.destination.top - pattern.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct GridPatternVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float spacing;
+                float minorWidth;
+                float majorWidth;
+                std::array<float, 2> offset;
+                float majorEvery;
+                float cornerRadius;
+                std::array<float, 4> minorColor;
+                std::array<float, 4> majorColor;
+            };
+            const std::array<float, 4> minor = {pattern.minorColor.red, pattern.minorColor.green,
+                pattern.minorColor.blue, pattern.minorColor.alpha * opacityStack.back()};
+            const std::array<float, 4> major = {pattern.majorColor.red, pattern.majorColor.green,
+                pattern.majorColor.blue, pattern.majorColor.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return GridPatternVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, pattern.spacing, pattern.minorWidth,
+                    pattern.majorWidth, {pattern.offsetX, pattern.offsetY},
+                    static_cast<float>(pattern.majorEvery), pattern.cornerRadius, minor, major};
+            };
+            const GridPatternVertex vertices[] = {
+                vertex(pattern.destination.left, pattern.destination.top, 0.0F, 0.0F),
+                vertex(pattern.destination.left, pattern.destination.bottom, 0.0F, size[1]),
+                vertex(pattern.destination.right, pattern.destination.bottom, size[0], size[1]),
+                vertex(pattern.destination.left, pattern.destination.top, 0.0F, 0.0F),
+                vertex(pattern.destination.right, pattern.destination.bottom, size[0], size[1]),
+                vertex(pattern.destination.right, pattern.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(gridPatternPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

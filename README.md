@@ -208,6 +208,11 @@ a 32-bit fill mask, optional active cell, geometry, and colors. Metal evaluates 
 antialiased dot from the destination rectangle; the animated 4×4 title icon therefore
 replaces sixteen React circle nodes and sixteen per-frame draw commands.
 
+Technical background grids use one `DrawGridPattern` record. Minor spacing and
+width, stronger periodic major lines, two colors, rounded masking, and animated
+pixel offsets are evaluated per fragment. The dashboard now moves an effectively
+unbounded drafting grid while sending only one fixed-size command per frame.
+
 The animated wave row is one `DrawWaveDots` command rather than 24 reconciled circle
 components. Count, phase, frequency, radius range, border, and trough/crest gradients
 remain backend-neutral inputs; Metal derives every dot's size and paint per fragment.

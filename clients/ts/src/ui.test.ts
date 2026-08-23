@@ -361,6 +361,28 @@ test("gradient circles emit one server SDF command instead of a triangle fan", (
   assert.equal(frame.readUInt32LE(20), 52);
 });
 
+test("technical grids lower to one clipped server pattern command", () => {
+  class GridComponent extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 400, height: 240 }, cornerRadius: 16,
+        background: { red: 0.02, green: 0.03, blue: 0.06, alpha: 1 },
+        backgroundGrid: { spacing: 20, minorWidth: 1, majorWidth: 2, majorEvery: 4,
+          minorColor: { red: 0.2, green: 0.4, blue: 0.8, alpha: 0.2 },
+          majorColor: { red: 0.3, green: 0.7, blue: 1, alpha: 0.4 } } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new GridComponent());
+  host.layout({ width: 400, height: 240 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 400, height: 240 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 15);
+  const gridOffset = 16 + 8 + frame.readUInt32LE(20);
+  assert.equal(frame.readUInt16LE(gridOffset), 26);
+  assert.equal(frame.readUInt32LE(gridOffset + 4), 76);
+  assert.equal(frame.readFloatLE(gridOffset + 8 + 40), 16);
+});
+
 test("rounded rectangle fill and border are independently drawable", () => {
   class RoundedComponent extends Component {
     build(): Element {

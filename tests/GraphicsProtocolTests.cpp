@@ -54,6 +54,10 @@ int main() {
                                       gfx::GradientDirection::vertical,
                                       {0.1F, 0.9F, 0.7F, 1.0F},
                                       {0.5F, 0.2F, 1.0F, 0.8F}});
+    encoder.drawGridPattern({{-0.9F, 0.9F, 0.9F, -0.9F}, 24.0F, 1.0F, 2.0F,
+                             3.0F, -4.0F, 5, 12.0F,
+                             {0.2F, 0.4F, 0.8F, 0.25F},
+                             {0.3F, 0.7F, 1.0F, 0.5F}});
     encoder.drawConicGradient({{-0.3F, 0.3F, 0.3F, -0.3F}, 0.5F, 0.5F, 1.25F, 30.0F,
                                {0.1F, 0.8F, 1.0F, 1.0F}, {0.7F, 0.2F, 1.0F, 1.0F},
                                {0.1F, 0.8F, 1.0F, 1.0F}});
@@ -176,6 +180,14 @@ int main() {
         !nearlyEqual(linearCircle.startColor.green, 0.9F) ||
         !nearlyEqual(linearCircle.endColor.alpha, 0.8F) || !decoder.next(command)) {
         return fail("Linear-gradient circle decoding failed");
+    }
+    gfx::GridPatternCommand technicalGrid{};
+    if (!gfx::decodeGridPattern(command, technicalGrid) ||
+        !nearlyEqual(technicalGrid.spacing, 24.0F) ||
+        !nearlyEqual(technicalGrid.offsetY, -4.0F) || technicalGrid.majorEvery != 5 ||
+        !nearlyEqual(technicalGrid.cornerRadius, 12.0F) ||
+        !nearlyEqual(technicalGrid.majorColor.alpha, 0.5F) || !decoder.next(command)) {
+        return fail("Grid-pattern decoding failed");
     }
     gfx::ConicGradientCommand conic{};
     if (!gfx::decodeConicGradient(command, conic) ||

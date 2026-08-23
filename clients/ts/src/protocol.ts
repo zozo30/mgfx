@@ -82,6 +82,7 @@ export const ExtendedServerCapability = {
   CapabilityWords64: 1n << 32n,
   ResourceStatusEvents: 1n << 33n,
   LinearGradientCircles: 1n << 34n,
+  GridPatterns: 1n << 35n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -192,6 +193,13 @@ export interface LinearGradientCirclePaint {
   readonly destination: ClipRect;
   readonly direction: "horizontal" | "vertical" | "diagonal";
   readonly startColor: Color; readonly endColor: Color;
+}
+export interface GridPatternPaint {
+  readonly destination: ClipRect;
+  readonly spacing: number; readonly minorWidth: number; readonly majorWidth: number;
+  readonly offsetX: number; readonly offsetY: number; readonly majorEvery: number;
+  readonly cornerRadius: number;
+  readonly minorColor: Color; readonly majorColor: Color;
 }
 export interface ConicGradientPaint {
   readonly destination: ClipRect; readonly centerX: number; readonly centerY: number;
@@ -952,6 +960,23 @@ export class FrameEncoder {
     const payload = Buffer.alloc(52);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(25, payload);
+  }
+
+  gridPattern(value: GridPatternPaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.spacing, value.minorWidth, value.majorWidth,
+      value.offsetX, value.offsetY, value.majorEvery, value.cornerRadius,
+      value.minorColor.red, value.minorColor.green, value.minorColor.blue, value.minorColor.alpha,
+      value.majorColor.red, value.majorColor.green, value.majorColor.blue, value.majorColor.alpha];
+    if (values.some((item) => !Number.isFinite(item)) || value.spacing < 2 ||
+        value.spacing > 1024 || value.minorWidth < 0 || value.majorWidth < 0 ||
+        value.minorWidth > value.spacing || value.majorWidth > value.spacing ||
+        value.cornerRadius < 0 || value.cornerRadius > 8192 ||
+        !Number.isInteger(value.majorEvery) || value.majorEvery < 1 || value.majorEvery > 256)
+      throw new RangeError("Grid pattern values are outside supported bounds");
+    const payload = Buffer.alloc(76);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(26, payload);
   }
 
   conicGradient(value: ConicGradientPaint): void {

@@ -233,6 +233,21 @@ void CommandEncoder::drawLinearGradientCircle(const LinearGradientCircleCommand&
     }
 }
 
+void CommandEncoder::drawGridPattern(const GridPatternCommand& pattern) {
+    beginCommand(Opcode::drawGridPattern, 19 * sizeof(float));
+    for (float value : {pattern.destination.left, pattern.destination.top,
+                        pattern.destination.right, pattern.destination.bottom,
+                        pattern.spacing, pattern.minorWidth, pattern.majorWidth,
+                        pattern.offsetX, pattern.offsetY, static_cast<float>(pattern.majorEvery),
+                        pattern.cornerRadius,
+                        pattern.minorColor.red, pattern.minorColor.green,
+                        pattern.minorColor.blue, pattern.minorColor.alpha,
+                        pattern.majorColor.red, pattern.majorColor.green,
+                        pattern.majorColor.blue, pattern.majorColor.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawConicGradient(const ConicGradientCommand& gradient) {
     beginCommand(Opcode::drawConicGradient, 20 * sizeof(float));
     for (float value : {gradient.destination.left, gradient.destination.top,
@@ -619,6 +634,26 @@ bool decodeLinearGradientCircle(const CommandView& command,
                            readFloat(command.payload + 28), readFloat(command.payload + 32)};
     gradient.endColor = {readFloat(command.payload + 36), readFloat(command.payload + 40),
                          readFloat(command.payload + 44), readFloat(command.payload + 48)};
+    return true;
+}
+
+bool decodeGridPattern(const CommandView& command, GridPatternCommand& pattern) {
+    if (command.opcode != Opcode::drawGridPattern || command.payloadSize != 76) return false;
+    pattern.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                           readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    pattern.spacing = readFloat(command.payload + 16);
+    pattern.minorWidth = readFloat(command.payload + 20);
+    pattern.majorWidth = readFloat(command.payload + 24);
+    pattern.offsetX = readFloat(command.payload + 28);
+    pattern.offsetY = readFloat(command.payload + 32);
+    const float majorEvery = readFloat(command.payload + 36);
+    if (majorEvery < 1.0F || majorEvery > 256.0F || std::floor(majorEvery) != majorEvery) return false;
+    pattern.majorEvery = static_cast<std::uint32_t>(majorEvery);
+    pattern.cornerRadius = readFloat(command.payload + 40);
+    pattern.minorColor = {readFloat(command.payload + 44), readFloat(command.payload + 48),
+                          readFloat(command.payload + 52), readFloat(command.payload + 56)};
+    pattern.majorColor = {readFloat(command.payload + 60), readFloat(command.payload + 64),
+                          readFloat(command.payload + 68), readFloat(command.payload + 72)};
     return true;
 }
 

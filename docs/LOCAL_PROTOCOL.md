@@ -103,6 +103,7 @@ The 64-bit capability companion itself is advertised by `1 << 32` in its full
 mask. Bits 0–31 exactly mirror the legacy `ServerHello` word.
 Native resource readiness events are advertised by `1 << 33`.
 Server-rendered linear-gradient circles are advertised by `1 << 34`.
+Server-rendered technical grid patterns are advertised by `1 << 35`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -212,3 +213,8 @@ MGFX opcode `25` (`DrawLinearGradientCircle`) carries a destination rectangle,
 horizontal/vertical/diagonal direction, and two straight-alpha colors. Backends
 derive a centered circle from the shorter destination axis and apply the gradient
 and antialiased edge per fragment.
+
+MGFX opcode `26` (`DrawGridPattern`) carries a destination, pixel spacing, minor
+and major widths, two-dimensional pixel offset, integer major-line interval,
+rounded-corner radius, and minor/major straight-alpha colors. Its payload remains
+76 bytes regardless of the destination area or number of visible grid lines.

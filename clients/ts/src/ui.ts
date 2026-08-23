@@ -18,6 +18,11 @@ export interface DiagonalStripePattern {
   readonly direction?: "forward" | "backward";
   readonly offset?: number;
 }
+export interface GridPattern {
+  readonly spacing?: number; readonly minorWidth?: number; readonly majorWidth?: number;
+  readonly offsetX?: number; readonly offsetY?: number; readonly majorEvery?: number;
+  readonly minorColor: Color; readonly majorColor: Color;
+}
 export interface DotGridPattern {
   readonly rows: number; readonly columns: number; readonly filledMask: number;
   readonly activeIndex?: number; readonly inset?: number; readonly radius?: number;
@@ -62,6 +67,7 @@ export interface Style {
   backgroundRadialGradient?: RadialGradient;
   backgroundConicGradient?: ConicGradient;
   backgroundPattern?: DiagonalStripePattern; flexGrow?: number;
+  backgroundGrid?: GridPattern;
   backgroundDotGrid?: DotGridPattern;
   backgroundWaveDots?: WaveDotPattern;
   backgroundImage?: ImagePaint;
@@ -622,6 +628,8 @@ class Node {
       }
       paintImage(encoder, this.bounds, this.style.backgroundImage,
         this.style.cornerRadius ?? 0, viewport);
+      paintGridPattern(encoder, this.bounds, this.style.backgroundGrid,
+        this.style.cornerRadius ?? 0, viewport);
       paintDotGrid(encoder, this.bounds, this.style.backgroundDotGrid, viewport);
       paintWaveDots(encoder, this.bounds, this.style.backgroundWaveDots, viewport);
       if (!combinedBorder) paintServerRoundedRect(encoder, this.bounds,
@@ -634,6 +642,7 @@ class Node {
         else if (conic) paintConicGradient(encoder, this.bounds, conic, 0, viewport);
         else if (gradient) paintLinearGradient(encoder, this.bounds, gradient, 0, viewport);
         else if (!this.style.backgroundImage && !this.style.backgroundPattern &&
+          !this.style.backgroundGrid &&
           !this.style.backgroundDotGrid && !this.style.backgroundWaveDots) {
           paintServerRoundedRect(encoder, this.bounds, 0, background,
             this.style.borderWidth ?? 0, this.style.borderColor, viewport);
@@ -641,6 +650,7 @@ class Node {
         } else paintServerRoundedRect(encoder, this.bounds, 0, background, 0, undefined, viewport);
         paintImage(encoder, this.bounds, this.style.backgroundImage, 0, viewport);
       }
+      paintGridPattern(encoder, this.bounds, this.style.backgroundGrid, 0, viewport);
       paintDiagonalStripes(encoder, this.bounds, this.style.backgroundPattern, viewport);
       paintDotGrid(encoder, this.bounds, this.style.backgroundDotGrid, viewport);
       paintWaveDots(encoder, this.bounds, this.style.backgroundWaveDots, viewport);
@@ -878,6 +888,16 @@ function paintDiagonalStripes(encoder: FrameEncoder, r: Rect,
   encoder.diagonalPattern({ destination: normalizedRect(r, viewport), stripeWidth: width,
     gap: Math.max(0, pattern.gap ?? 8), offset: pattern.offset ?? 0,
     backward: pattern.direction === "backward", color: pattern.color });
+}
+
+function paintGridPattern(encoder: FrameEncoder, bounds: Rect, pattern: GridPattern | undefined,
+  cornerRadius: number, viewport: Size): void {
+  if (!pattern || bounds.width <= 0 || bounds.height <= 0) return;
+  encoder.gridPattern({ destination: normalizedRect(bounds, viewport),
+    spacing: pattern.spacing ?? 24, minorWidth: pattern.minorWidth ?? 1,
+    majorWidth: pattern.majorWidth ?? 1.5, offsetX: pattern.offsetX ?? 0,
+    offsetY: pattern.offsetY ?? 0, majorEvery: pattern.majorEvery ?? 5,
+    cornerRadius, minorColor: pattern.minorColor, majorColor: pattern.majorColor });
 }
 
 function paintDotGrid(encoder: FrameEncoder, bounds: Rect, pattern: DotGridPattern | undefined,

@@ -207,6 +207,12 @@ direction, and color. The fragment shader derives a periodic antialiased mask;
 wire size stays constant as the patterned area grows. Support is advertised by
 `diagonalPatterns`.
 
+`DrawGridPattern` carries pixel spacing, minor and major widths, a periodic major
+interval, two colors, rounded-corner radius, and a two-dimensional phase offset.
+Metal derives the nearest horizontal and vertical lines per fragment and gives
+major intersections priority without overlapping-alpha seams. Support is
+advertised by `gridPatterns`.
+
 `DrawDotGrid` carries a destination, up to 32 cells, a fill bitmask, an optional
 active cell, dot geometry, and fill/ring/highlight colors. The fragment shader derives
 cell centers and antialiased disk or ring coverage, so grid density does not multiply
