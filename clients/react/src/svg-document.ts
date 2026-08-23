@@ -36,6 +36,7 @@ export interface RadialGradientPaint {
   readonly axisY: { readonly x: number; readonly y: number };
   readonly innerColor: Color;
   readonly outerColor: Color;
+  readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
 }
 
 export interface SvgVectorDocument {
@@ -82,7 +83,7 @@ interface RadialGradientDefinition {
   readonly units: "objectBoundingBox" | "userSpaceOnUse";
   readonly cx: string; readonly cy: string; readonly radius: string;
   readonly transform: Matrix;
-  readonly innerColor: Color; readonly outerColor: Color;
+  readonly stops: readonly { readonly offset: number; readonly color: Color }[];
 }
 
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -296,11 +297,11 @@ function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<
       return { offset: unitInterval(values.offset ?? "0"),
         color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
     }).sort((left, right) => left.offset - right.offset);
-    if (stops.length !== 2 || stops[0]!.offset !== 0 || stops[1]!.offset !== 1) continue;
+    if (stops.length < 2 || stops.length > 8) continue;
     definitions.set(id, {
       units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
       cx, cy, radius: attributes.r ?? "50%", transform: parseTransform(attributes.gradientTransform),
-      innerColor: stops[0]!.color, outerColor: stops[1]!.color,
+      stops,
     });
   }
   return definitions;
@@ -330,10 +331,14 @@ function resolveRadialGradient(definitions: ReadonlyMap<string, RadialGradientDe
     center = map({ x: cx, y: cy }); edgeX = map({ x: cx + radius, y: cy });
     edgeY = map({ x: cx, y: cy + radius });
   }
+  const stops = definition.stops.map((stop) => ({ offset: stop.offset,
+    color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
+  const needsExplicitStops = stops.length > 2 || stops[0]!.offset !== 0 ||
+    stops[stops.length - 1]!.offset !== 1;
   return { center, axisX: { x: edgeX.x - center.x, y: edgeX.y - center.y },
     axisY: { x: edgeY.x - center.x, y: edgeY.y - center.y },
-    innerColor: multiplyAlpha(definition.innerColor, state.opacity * paintOpacity),
-    outerColor: multiplyAlpha(definition.outerColor, state.opacity * paintOpacity) };
+    innerColor: stops[0]!.color, outerColor: stops[stops.length - 1]!.color,
+    ...(needsExplicitStops ? { stops } : {}) };
 }
 
 function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,

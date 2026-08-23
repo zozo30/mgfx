@@ -157,8 +157,9 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     </linearGradient>
     <linearGradient id="signal" href="#signalPalette" gradientUnits="userSpaceOnUse"
       x1="78" y1="24" x2="131" y2="42"/>
-    <radialGradient id="orb"><stop offset="0" stop-color="#d8fff0"/>
-      <stop offset="1" stop-color="#16c784"/></radialGradient>
+          <radialGradient id="orb"><stop offset="0" stop-color="#d8fff0"/>
+            <stop offset="0.48" stop-color="#58e6b5"/>
+            <stop offset="1" stop-color="#16c784"/></radialGradient>
   </defs>
   <g transform="translate(4 4)">
     <rect x="1" y="1" width="150" height="62" rx="12" fill="url(#panel)"

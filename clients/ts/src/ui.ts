@@ -252,6 +252,7 @@ export interface PathData {
   readonly fillRadialGradient?: {
     readonly center: Point; readonly axisX: Point; readonly axisY: Point;
     readonly innerColor: Color; readonly outerColor: Color;
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   };
   readonly stroke?: Color;
   readonly strokeGradient?: {

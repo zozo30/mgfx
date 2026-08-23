@@ -51,8 +51,8 @@ It lowers paths, lines, polylines, polygons, rectangles, circles, and ellipses;
 inherits fill/stroke presentation attributes through nested groups; applies affine
 group transforms in source coordinates; resolves two- through eight-stop `<linearGradient>` definitions,
 including local `href`/`xlink:href` inheritance and `pad`, `repeat`, or `reflect`
-spread, in user space or object-bounding-box space; resolves centered two-stop
-`<radialGradient>` fills with `pad` spread into native elliptical path paint;
+spread, in user space or object-bounding-box space; resolves centered two- through
+eight-stop `<radialGradient>` fills with `pad` spread into native elliptical path paint;
 lowers SVG dash arrays of up to 32 values;
 and uploads every canonical layer once.
 Frames then contain only `DrawPath` references at the component's current layout
@@ -82,8 +82,8 @@ back to bevels beyond the limit. `DrawPath` also supports source-space linear
 gradient fills: the server derives colors from cached source geometry and clips
 triangles at intermediate stop boundaries for exact piecewise interpolation.
 Centered radial fills likewise remain paint-only: the command carries a center,
-two source-space radius vectors, and endpoint colors, while Metal evaluates the
-elliptical falloff per fragment over the server-owned path mesh.
+two source-space radius vectors, and up to eight ordered colors, while Metal
+evaluates the elliptical falloff per fragment over the server-owned path mesh.
 The same gradient paint is available for strokes, so changing gradient colors
 does not invalidate tessellation. Two-value dashed strokes use the compact
 `DrawDashedPath` extension, while longer rhythms use `DrawDashArrayPath`: dash

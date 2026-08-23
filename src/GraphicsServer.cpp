@@ -373,7 +373,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::arbitraryPathDashArrays |
             mgfx::ipc::ServerCapability::multiStopPathGradients |
             mgfx::ipc::ServerCapability::pathGradientSpreadModes |
-            mgfx::ipc::ServerCapability::radialPathGradients;
+            mgfx::ipc::ServerCapability::radialPathGradients |
+            mgfx::ipc::ServerCapability::multiStopRadialPathGradients;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

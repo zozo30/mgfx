@@ -1211,7 +1211,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                    command.opcode == gfx::Opcode::drawStyledPath ||
                    command.opcode == gfx::Opcode::drawDashArrayPath ||
                    command.opcode == gfx::Opcode::drawMultiGradientPath ||
-                   command.opcode == gfx::Opcode::drawRadialPath) {
+                   command.opcode == gfx::Opcode::drawRadialPath ||
+                   command.opcode == gfx::Opcode::drawMultiRadialPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1254,6 +1255,18 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     !std::isfinite(path.radialGradient.outerColor.green) ||
                     !std::isfinite(path.radialGradient.outerColor.blue) ||
                     !std::isfinite(path.radialGradient.outerColor.alpha) ||
+                    (!path.radialGradient.stops.empty() &&
+                     (path.radialGradient.stops.size() < 2U ||
+                      path.radialGradient.stops.size() > 8U ||
+                      std::any_of(path.radialGradient.stops.begin(),
+                                  path.radialGradient.stops.end(),
+                          [](const gfx::PathGradient::Stop& stop) {
+                              return !std::isfinite(stop.offset) ||
+                                  !std::isfinite(stop.color.red) ||
+                                  !std::isfinite(stop.color.green) ||
+                                  !std::isfinite(stop.color.blue) ||
+                                  !std::isfinite(stop.color.alpha);
+                          }))) ||
                     std::fabs(path.radialGradient.axisXX * path.radialGradient.axisYY -
                               path.radialGradient.axisXY * path.radialGradient.axisYX) < 0.000001F)) ||
                 path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
@@ -1300,9 +1313,33 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     }
                     encoder->setRenderPipelineState(radialPathPipelineState_.get());
                     struct RadialPathVertex {
-                        std::array<float, 2> position, source, center, axisX, axisY;
-                        std::array<float, 4> innerColor, outerColor;
+                        std::array<float, 2> position, source;
                     };
+                    struct RadialPathUniforms {
+                        std::array<float, 2> center, axisX, axisY;
+                        std::uint32_t stopCount = 0;
+                        std::uint32_t reserved = 0;
+                        std::array<std::array<float, 4>, 2> offsets{};
+                        std::array<std::array<float, 4>, 8> colors{};
+                    };
+                    RadialPathUniforms uniforms{{radial->centerX, radial->centerY},
+                        {radial->axisXX, radial->axisXY},
+                        {radial->axisYX, radial->axisYY}};
+                    uniforms.stopCount = static_cast<std::uint32_t>(
+                        radial->stops.empty() ? 2U : radial->stops.size());
+                    const auto setStop = [&](std::size_t index, float offset, gfx::Color stopColor) {
+                        uniforms.offsets[index / 4U][index % 4U] = offset;
+                        uniforms.colors[index] = {stopColor.red, stopColor.green, stopColor.blue,
+                                                  stopColor.alpha * opacityStack.back()};
+                    };
+                    if (radial->stops.empty()) {
+                        setStop(0, 0.0F, radial->innerColor);
+                        setStop(1, 1.0F, radial->outerColor);
+                    } else {
+                        for (std::size_t index = 0; index < radial->stops.size(); ++index)
+                            setStop(index, radial->stops[index].offset, radial->stops[index].color);
+                    }
+                    encoder->setFragmentBytes(&uniforms, sizeof(uniforms), 0);
                     constexpr std::size_t maxVertices = (4096 / sizeof(RadialPathVertex) / 3) * 3;
                     for (std::size_t first = 0; first < points.size();) {
                         const std::size_t count = std::min(maxVertices, points.size() - first);
@@ -1315,15 +1352,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                             const float y = path.destination.top +
                                 (point[1] - path.viewBox.y) / path.viewBox.height *
                                 (path.destination.bottom - path.destination.top);
-                            vertices.push_back({transformPoint(currentTransform(), {x, y}), point,
-                                {radial->centerX, radial->centerY},
-                                {radial->axisXX, radial->axisXY}, {radial->axisYX, radial->axisYY},
-                                {radial->innerColor.red, radial->innerColor.green,
-                                 radial->innerColor.blue,
-                                 radial->innerColor.alpha * opacityStack.back()},
-                                {radial->outerColor.red, radial->outerColor.green,
-                                 radial->outerColor.blue,
-                                 radial->outerColor.alpha * opacityStack.back()}});
+                            vertices.push_back({transformPoint(currentTransform(), {x, y}), point});
                         }
                         encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(RadialPathVertex), 0);
                         encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

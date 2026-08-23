@@ -91,6 +91,7 @@ export const ExtendedServerCapability = {
   MultiStopPathGradients: 1n << 41n,
   PathGradientSpreadModes: 1n << 42n,
   RadialPathGradients: 1n << 43n,
+  MultiStopRadialPathGradients: 1n << 44n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -251,6 +252,7 @@ export interface PathPaint {
     readonly axisX: { readonly x: number; readonly y: number };
     readonly axisY: { readonly x: number; readonly y: number };
     readonly innerColor: Color; readonly outerColor: Color;
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   };
   readonly stroke?: Color;
   readonly strokeGradient?: PathGradientPaint;
@@ -762,6 +764,8 @@ export class FrameEncoder {
     const dashed = paint.dash !== undefined && !dashArray;
     const extended = paint.strokeGradient !== undefined;
     const radialGradient = paint.fillRadialGradient !== undefined;
+    const radialStops = paint.fillRadialGradient?.stops ?? [];
+    const multiRadialGradient = radialStops.length > 0;
     const styled = paint.miterLimit !== undefined;
     const fillStops = paint.fillGradient?.stops ?? [];
     const strokeStops = paint.strokeGradient?.stops ?? [];
@@ -770,7 +774,8 @@ export class FrameEncoder {
         Number.isFinite(stop.offset) && stop.offset >= 0 && stop.offset <= 1 &&
         (index === 0 || stop.offset >= stops[index - 1]!.offset) &&
         [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha].every(Number.isFinite)));
-    if (!validateStops(fillStops) || !validateStops(strokeStops))
+    if (!validateStops(fillStops) || !validateStops(strokeStops) ||
+        (multiRadialGradient && !validateStops(radialStops)))
       throw new RangeError("Path gradients require 2 through 8 ordered finite stops");
     const multiGradient = fillStops.length > 2 || strokeStops.length > 2 ||
       (paint.fillGradient?.spread !== undefined && paint.fillGradient.spread !== "pad") ||
@@ -786,7 +791,8 @@ export class FrameEncoder {
       throw new RangeError("Path dash arrays require 2 through 32 positive values in pairs");
     const multiDash = paint.dash === undefined ? [] : "values" in paint.dash
       ? paint.dash.values : [paint.dash.length, paint.dash.gap];
-    const payload = Buffer.alloc(radialGradient ? 184 : multiGradient ? 192 + multiDash.length * 4 +
+    const payload = Buffer.alloc(multiRadialGradient ? 160 + radialStops.length * 20 :
+      radialGradient ? 184 : multiGradient ? 192 + multiDash.length * 4 +
       (fillStops.length + strokeStops.length) * 20 : dashArray ? 192 + paint.dash.values.length * 4 :
       styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     payload.writeUInt32LE(pathId, 0);
@@ -817,17 +823,28 @@ export class FrameEncoder {
       });
     if (paint.fillRadialGradient) {
       const radial = paint.fillRadialGradient;
-      [radial.center.x, radial.center.y, radial.axisX.x, radial.axisX.y,
-        radial.axisY.x, radial.axisY.y,
+      const radialHeader = [radial.center.x, radial.center.y, radial.axisX.x, radial.axisX.y,
+        radial.axisY.x, radial.axisY.y];
+      const radialValues = multiRadialGradient ? radialHeader : [...radialHeader,
         radial.innerColor.red, radial.innerColor.green, radial.innerColor.blue, radial.innerColor.alpha,
-        radial.outerColor.red, radial.outerColor.green, radial.outerColor.blue, radial.outerColor.alpha]
+        radial.outerColor.red, radial.outerColor.green, radial.outerColor.blue, radial.outerColor.alpha];
+      radialValues
         .forEach((value, index) => {
           if (!Number.isFinite(value)) throw new RangeError("Radial path values must be finite");
           payload.writeFloatLE(value, 128 + index * 4);
         });
       const determinant = radial.axisX.x * radial.axisY.y - radial.axisX.y * radial.axisY.x;
       if (Math.abs(determinant) < 0.000001) throw new RangeError("Radial path axes must be invertible");
-      this.command(32, payload);
+      if (multiRadialGradient) {
+        payload.writeUInt8(radialStops.length, 152);
+        radialStops.forEach((stop, index) => {
+          const offset = 160 + index * 20;
+          payload.writeFloatLE(stop.offset, offset);
+          [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha]
+            .forEach((value, channel) => payload.writeFloatLE(value, offset + 4 + channel * 4));
+        });
+      }
+      this.command(multiRadialGradient ? 33 : 32, payload);
       return;
     }
     if (paint.strokeGradient) {

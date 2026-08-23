@@ -113,6 +113,7 @@ Arbitrary path dash arrays are advertised by `1 << 40`.
 Multi-stop path gradients are advertised by `1 << 41`.
 Path-gradient repeat and reflect spread modes are advertised by `1 << 42`.
 Two-stop radial path gradients are advertised by `1 << 43`.
+Multi-stop radial path gradients are advertised by `1 << 44`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -271,3 +272,9 @@ appends 14 `f32` values: source-space center, two source-space radius vectors,
 inner RGBA, and outer RGBA. Its fixed payload is 184 bytes. The radius-vector
 matrix must be finite and invertible. The current command represents a centered,
 two-stop, pad-spread radial fill; capability bit 43 is required.
+
+MGFX opcode `33` (`DrawMultiRadialPath`) starts with the 128-byte `DrawPath`
+base, followed by six `f32` values for center and radius vectors, `u8 stopCount`,
+seven reserved zero bytes, then each stop as `f32 offset` plus RGBA. Payload size
+is `160 + stopCount * 20`, with 2 through 8 ordered stops in `[0,1]`. Capability
+bit 44 is required. The first implementation uses SVG `pad` spread.
