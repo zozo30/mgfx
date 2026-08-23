@@ -144,8 +144,14 @@ function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
 }
 
 const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
+  <defs>
+    <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="5" y1="5" x2="155" y2="67">
+      <stop offset="0%" stop-color="#07111f"/>
+      <stop offset="100%" stop-color="#183b69"/>
+    </linearGradient>
+  </defs>
   <g transform="translate(4 4)">
-    <rect x="1" y="1" width="150" height="62" rx="12" fill="#07111f"
+    <rect x="1" y="1" width="150" height="62" rx="12" fill="url(#panel)"
       stroke="currentColor" stroke-width="2"/>
     <circle cx="34" cy="32" r="17" fill="#16c784" stroke="#b9ffe0" stroke-width="3"/>
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>

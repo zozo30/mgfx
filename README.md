@@ -49,9 +49,10 @@ only the same portable texture resource and `DrawImage` command.
 React also exposes a selective vector `<Svg>` path for complete inline documents.
 It lowers paths, lines, polylines, polygons, rectangles, circles, and ellipses;
 inherits fill/stroke presentation attributes through nested groups; applies affine
-group transforms in source coordinates; and uploads every canonical layer once.
+group transforms in source coordinates; resolves two-stop `<linearGradient>` definitions
+in user space or object-bounding-box space; and uploads every canonical layer once.
 Frames then contain only `DrawPath` references at the component's current layout
-size. Documents using gradients, masks, text, embedded images, or external content
+size. Documents using more complex gradients, masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.
 
 React can also submit indexed normalized `Mesh` geometry directly. Positions,

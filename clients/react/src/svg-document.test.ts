@@ -27,3 +27,36 @@ test("SVG vector lowering rejects executable or external document content", () =
     `<svg viewBox="0 0 10 10"><image href="https://example.com/a.png"/></svg>`),
   /external or executable/);
 });
+
+test("SVG documents lower user-space linear gradients to native path paint", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 60" fill="none">
+    <defs><linearGradient id="glow" gradientUnits="userSpaceOnUse" x1="5" y1="10" x2="45" y2="30">
+      <stop offset="0%" stop-color="#ff8000" stop-opacity="0.5"/>
+      <stop offset="100%" style="stop-color: #20d890; stop-opacity: 0.75"/>
+    </linearGradient></defs>
+    <g transform="translate(10 4)"><rect x="0" y="0" width="50" height="30"
+      fill="url(#glow)" fill-opacity="0.8"/></g>
+  </svg>`);
+  const gradient = document.layers[0]?.fillGradient;
+  assert.deepEqual(gradient?.start, { x: 15, y: 14 });
+  assert.deepEqual(gradient?.end, { x: 55, y: 34 });
+  assert.equal(gradient?.startColor.alpha, 0.4);
+  assert.ok(Math.abs((gradient?.endColor.alpha ?? 0) - 0.6) < 1e-9);
+  assert.equal(document.layers[0]?.fill, undefined);
+});
+
+test("SVG object-bounding-box gradients map onto transformed path bounds", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 50">
+    <defs><linearGradient id="horizontal"><stop offset="0" stop-color="red"/>
+      <stop offset="1" stop-color="blue"/></linearGradient></defs>
+    <rect x="10" y="5" width="40" height="20" transform="translate(3 2)" fill="url(#horizontal)"/>
+  </svg>`);
+  assert.deepEqual(document.layers[0]?.fillGradient?.start, { x: 13, y: 7 });
+  assert.deepEqual(document.layers[0]?.fillGradient?.end, { x: 53, y: 7 });
+});
+
+test("SVG vector lowering reports unresolved gradient paint", () => {
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z" fill="url(#missing)"/></svg>`),
+  /gradient #missing/);
+});

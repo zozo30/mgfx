@@ -52,9 +52,11 @@ language client without embedding a complete SVG engine in the server.
 React `<Svg>` implements the selective document path: a bounded parser reads the
 root view box, inherited fill/stroke/opacity state, nested groups, primitive
 shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
-becomes a stable path resource with its own compact paint command. Executable or
-external content is rejected, while gradients, masks, text, and embedded images
-deliberately continue through the high-quality raster fallback.
+becomes a stable path resource with its own compact paint command. Two-stop linear
+gradients resolve from `<defs>` in either SVG user space or object-bounding-box
+space, including stop opacity and gradient transforms, then use native `DrawPath`
+gradient paint. Executable or external content is rejected, while complex gradients,
+masks, text, and embedded images deliberately continue through the high-quality raster fallback.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the

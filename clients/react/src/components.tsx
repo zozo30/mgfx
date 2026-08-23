@@ -70,6 +70,7 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
   return <Stack style={style ?? {}}>{document.layers.map((layer, index) =>
     <Path key={`svg-layer-${index}`} data={layer.path} viewBox={document.viewBox}
       {...(layer.fill ? { color: layer.fill } : {})}
+      {...(layer.fillGradient ? { gradient: layer.fillGradient } : {})}
       {...(layer.stroke ? { strokeColor: layer.stroke, strokeWidth: layer.strokeWidth } : {})}
       fillRule={layer.fillRule} lineCap={layer.lineCap} lineJoin={layer.lineJoin}
       tolerance={tolerance} style={{ position: "absolute", inset: all(0) }} />)}

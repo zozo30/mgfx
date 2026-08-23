@@ -6,11 +6,19 @@ import { svgAttributes, svgPrimitivePath } from "./icon-pack.js";
 export interface SvgVectorLayer {
   readonly path: string;
   readonly fill?: Color;
+  readonly fillGradient?: LinearGradientPaint;
   readonly stroke?: Color;
   readonly strokeWidth: number;
   readonly fillRule: "nonzero" | "evenodd";
   readonly lineCap: "butt" | "round";
   readonly lineJoin: "bevel" | "round";
+}
+
+export interface LinearGradientPaint {
+  readonly start: { readonly x: number; readonly y: number };
+  readonly end: { readonly x: number; readonly y: number };
+  readonly startColor: Color;
+  readonly endColor: Color;
 }
 
 export interface SvgVectorDocument {
@@ -21,14 +29,28 @@ export interface SvgVectorDocument {
 interface Matrix { a: number; b: number; c: number; d: number; e: number; f: number }
 interface PaintState {
   readonly fill?: Color;
+  readonly fillGradientId?: string;
   readonly stroke?: Color;
   readonly strokeWidth: number;
   readonly opacity: number;
+  readonly fillOpacity: number;
+  readonly strokeOpacity: number;
   readonly fillRule: "nonzero" | "evenodd";
   readonly lineCap: "butt" | "round";
   readonly lineJoin: "bevel" | "round";
   readonly currentColor: Color;
   readonly transform: Matrix;
+}
+
+interface GradientDefinition {
+  readonly units: "objectBoundingBox" | "userSpaceOnUse";
+  readonly x1: string;
+  readonly y1: string;
+  readonly x2: string;
+  readonly y2: string;
+  readonly transform: Matrix;
+  readonly startColor: Color;
+  readonly endColor: Color;
 }
 
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -43,8 +65,10 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
   if (!svgMatch) throw new Error("SVG document has no root element");
   const rootAttributes = withInlineStyle(svgAttributes(svgMatch[1]!));
   const viewBox = parseViewBox(rootAttributes);
+  const gradients = parseLinearGradients(source, defaultColor);
   const initial: PaintState = { fill: { red: 0, green: 0, blue: 0, alpha: 1 },
-    strokeWidth: 1, opacity: 1, fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
+    strokeWidth: 1, opacity: 1, fillOpacity: 1, strokeOpacity: 1,
+    fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
     currentColor: defaultColor, transform: identity };
   const stack: PaintState[] = [initial];
   const layers: SvgVectorLayer[] = [];
@@ -70,11 +94,14 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     const rawPath = svgPrimitivePath(name, attributes);
     if (!rawPath) continue;
     const path = applyMatrix(rawPath, state.transform);
-    const opacity = state.opacity;
-    const fill = state.fill ? multiplyAlpha(state.fill, opacity) : undefined;
-    const stroke = state.stroke ? multiplyAlpha(state.stroke, opacity) : undefined;
-    if ((!fill || fill.alpha <= 0) && (!stroke || stroke.alpha <= 0 || state.strokeWidth <= 0)) continue;
-    layers.push({ path, ...(fill ? { fill } : {}), ...(stroke ? { stroke } : {}),
+    const fill = state.fill ? multiplyAlpha(state.fill, state.opacity * state.fillOpacity) : undefined;
+    const fillGradient = state.fillGradientId
+      ? resolveGradient(gradients, state.fillGradientId, path, state, viewBox) : undefined;
+    const stroke = state.stroke ? multiplyAlpha(state.stroke, state.opacity * state.strokeOpacity) : undefined;
+    if ((!fill || fill.alpha <= 0) && !fillGradient &&
+        (!stroke || stroke.alpha <= 0 || state.strokeWidth <= 0)) continue;
+    layers.push({ path, ...(fill ? { fill } : {}), ...(fillGradient ? { fillGradient } : {}),
+      ...(stroke ? { stroke } : {}),
       strokeWidth: state.strokeWidth * matrixScale(state.transform), fillRule: state.fillRule,
       lineCap: state.lineCap, lineJoin: state.lineJoin });
     if (layers.length > 1024) throw new RangeError("SVG exceeds 1024 vector layers");
@@ -103,22 +130,101 @@ function parseViewBox(attributes: Readonly<Record<string, string>>): Rect {
 
 function inherit(parent: PaintState, attributes: Readonly<Record<string, string>>): PaintState {
   const currentColor = parseColor(attributes.color, parent.currentColor) ?? parent.currentColor;
-  const fill = attributes.fill === undefined ? parent.fill : parseColor(attributes.fill, currentColor);
+  const gradientId = attributes.fill?.trim().match(/^url\(\s*#([^\s)]+)\s*\)$/i)?.[1];
+  const fill = attributes.fill === undefined ? parent.fill : gradientId ? undefined :
+    parseColor(attributes.fill, currentColor);
+  const fillGradientId = attributes.fill === undefined ? parent.fillGradientId : gradientId;
   const stroke = attributes.stroke === undefined ? parent.stroke : parseColor(attributes.stroke, currentColor);
   const strokeWidth = numberAttribute(attributes["stroke-width"], parent.strokeWidth);
   const opacity = clamp01(parent.opacity * numberAttribute(attributes.opacity, 1));
-  const fillOpacity = clamp01(numberAttribute(attributes["fill-opacity"], 1));
-  const strokeOpacity = clamp01(numberAttribute(attributes["stroke-opacity"], 1));
+  const fillOpacity = clamp01(numberAttribute(attributes["fill-opacity"], parent.fillOpacity));
+  const strokeOpacity = clamp01(numberAttribute(attributes["stroke-opacity"], parent.strokeOpacity));
   const fillRule = attributes["fill-rule"] === "evenodd" ? "evenodd" :
     attributes["fill-rule"] === "nonzero" ? "nonzero" : parent.fillRule;
   const lineCap = attributes["stroke-linecap"] === "round" ? "round" :
     attributes["stroke-linecap"] === "butt" ? "butt" : parent.lineCap;
   const lineJoin = attributes["stroke-linejoin"] === "round" ? "round" :
     attributes["stroke-linejoin"] ? "bevel" : parent.lineJoin;
-  return { ...(fill ? { fill: multiplyAlpha(fill, fillOpacity) } : {}),
-    ...(stroke ? { stroke: multiplyAlpha(stroke, strokeOpacity) } : {}),
-    strokeWidth, opacity, fillRule, lineCap, lineJoin, currentColor,
+  return { ...(fill ? { fill } : {}), ...(fillGradientId ? { fillGradientId } : {}),
+    ...(stroke ? { stroke } : {}), strokeWidth, opacity, fillOpacity, strokeOpacity,
+    fillRule, lineCap, lineJoin, currentColor,
     transform: multiply(parent.transform, parseTransform(attributes.transform)) };
+}
+
+function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<string, GradientDefinition> {
+  const definitions = new Map<string, GradientDefinition>();
+  for (const match of source.matchAll(/<linearGradient\b([^>]*)>([\s\S]*?)<\/linearGradient\s*>/gi)) {
+    const attributes = withInlineStyle(svgAttributes(match[1]!));
+    const id = attributes.id?.trim();
+    if (!id) continue;
+    const stops = [...match[2]!.matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
+      const values = withInlineStyle(svgAttributes(stop[1]!));
+      const color = parseColor(values["stop-color"] ?? "black", currentColor)!;
+      return { offset: unitInterval(values.offset ?? "0"),
+        color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
+    }).sort((left, right) => left.offset - right.offset);
+    if (stops.length !== 2) continue;
+    definitions.set(id, {
+      units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
+      x1: attributes.x1 ?? "0%", y1: attributes.y1 ?? "0%",
+      x2: attributes.x2 ?? "100%", y2: attributes.y2 ?? "0%",
+      transform: parseTransform(attributes.gradientTransform),
+      startColor: stops[0]!.color, endColor: stops[stops.length - 1]!.color,
+    });
+  }
+  return definitions;
+}
+
+function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,
+  path: string, state: PaintState, viewBox: Rect): LinearGradientPaint {
+  const definition = definitions.get(id);
+  if (!definition) throw new Error(`SVG linear gradient #${id} is not defined or does not have two stops`);
+  let start: { x: number; y: number }, end: { x: number; y: number };
+  if (definition.units === "userSpaceOnUse") {
+    start = { x: coordinate(definition.x1, viewBox.x, viewBox.width),
+      y: coordinate(definition.y1, viewBox.y, viewBox.height) };
+    end = { x: coordinate(definition.x2, viewBox.x, viewBox.width),
+      y: coordinate(definition.y2, viewBox.y, viewBox.height) };
+    start = transformPoint(state.transform, transformPoint(definition.transform, start));
+    end = transformPoint(state.transform, transformPoint(definition.transform, end));
+  } else {
+    const bounds = new SVGPathData(path).getBounds();
+    const normalizedStart = transformPoint(definition.transform,
+      { x: unitCoordinate(definition.x1), y: unitCoordinate(definition.y1) });
+    const normalizedEnd = transformPoint(definition.transform,
+      { x: unitCoordinate(definition.x2), y: unitCoordinate(definition.y2) });
+    start = { x: bounds.minX + normalizedStart.x * (bounds.maxX - bounds.minX),
+      y: bounds.minY + normalizedStart.y * (bounds.maxY - bounds.minY) };
+    end = { x: bounds.minX + normalizedEnd.x * (bounds.maxX - bounds.minX),
+      y: bounds.minY + normalizedEnd.y * (bounds.maxY - bounds.minY) };
+  }
+  return { start, end,
+    startColor: multiplyAlpha(definition.startColor, state.opacity * state.fillOpacity),
+    endColor: multiplyAlpha(definition.endColor, state.opacity * state.fillOpacity) };
+}
+
+function transformPoint(matrix: Matrix, point: { readonly x: number; readonly y: number }) {
+  return { x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.f };
+}
+
+function unitInterval(value: string): number {
+  const result = value.trim().endsWith("%") ? Number(value.slice(0, -1)) / 100 : Number(value);
+  if (!Number.isFinite(result)) throw new Error(`Invalid SVG percentage ${value}`);
+  return clamp01(result);
+}
+
+function unitCoordinate(value: string): number {
+  const result = value.trim().endsWith("%") ? Number(value.slice(0, -1)) / 100 : Number(value);
+  if (!Number.isFinite(result)) throw new Error(`Invalid SVG gradient coordinate ${value}`);
+  return result;
+}
+
+function coordinate(value: string, origin: number, extent: number): number {
+  if (value.trim().endsWith("%")) return origin + unitCoordinate(value) * extent;
+  const result = Number(value);
+  if (!Number.isFinite(result)) throw new Error(`Invalid SVG gradient coordinate ${value}`);
+  return result;
 }
 
 function parseColor(value: string | undefined, currentColor: Color): Color | undefined {
