@@ -111,6 +111,7 @@ Extended path stroke styles (square caps and miter joins) are advertised by
 Custom path miter limits are advertised by `1 << 39`.
 Arbitrary path dash arrays are advertised by `1 << 40`.
 Multi-stop path gradients are advertised by `1 << 41`.
+Path-gradient repeat and reflect spread modes are advertised by `1 << 42`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -257,7 +258,9 @@ Capability bit 40 is required before sending opcode 30.
 
 MGFX opcode `31` (`DrawMultiGradientPath`) starts with the same 176-byte base
 and stroke-gradient blocks, followed by `f32 miterLimit`, `f32 dashOffset`,
-`u16 dashCount`, `u8 fillStopCount`, `u8 strokeStopCount`, and reserved zero
-`u32`. Dash lengths follow, then each gradient stop as `f32 offset` plus RGBA.
+`u16 dashCount`, `u8 fillStopCount`, `u8 strokeStopCount`, `u8 fillSpread`,
+`u8 strokeSpread`, and reserved zero `u16`. Spread is pad (`0`), repeat (`1`),
+or reflect (`2`). Dash lengths follow, then each gradient stop as `f32 offset` plus RGBA.
 Each gradient supports 2 through 8 ordered stops in `[0,1]`; at least one side
-must contain more than two. Capability bit 41 is required.
+must contain more than two or request a non-pad spread. Capability bit 41 covers
+multi-stop paint; bit 42 is required for repeat or reflect.

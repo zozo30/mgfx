@@ -85,9 +85,11 @@ int main() {
                        {0.0F, 0.4F, 0.8F, 1.0F}, {0.8F, 0.2F, 1.0F, 1.0F},
                        {{0.0F, {0.0F, 0.4F, 0.8F, 1.0F}},
                         {0.5F, {0.2F, 1.0F, 0.6F, 1.0F}},
-                        {1.0F, {0.8F, 0.2F, 1.0F, 1.0F}}}}, true,
+                        {1.0F, {0.8F, 0.2F, 1.0F, 1.0F}}},
+                       gfx::PathGradient::Spread::reflect}, true,
                       {0.0F, 0.0F, 24.0F, 24.0F,
-                      {1.0F, 0.2F, 0.1F, 1.0F}, {1.0F, 0.9F, 0.2F, 1.0F}},
+                      {1.0F, 0.2F, 0.1F, 1.0F}, {1.0F, 0.9F, 0.2F, 1.0F}, {},
+                      gfx::PathGradient::Spread::pad},
                       0.0F, 0.0F, -2.0F, 6.0F, {7.0F, 4.0F, 2.0F, 4.0F}});
     encoder.drawText({gfx::FontFamily::systemRounded, gfx::FontWeight::semibold,
                       gfx::FontStyle::italic,
@@ -242,6 +244,7 @@ int main() {
         !path.fillGradient || !nearlyEqual(path.gradient.endColor.blue, 1.0F) ||
         path.gradient.stops.size() != 3 ||
         !nearlyEqual(path.gradient.stops[1].offset, 0.5F) ||
+        path.gradient.spread != gfx::PathGradient::Spread::reflect ||
         !path.strokeGradient ||
         !nearlyEqual(path.strokeGradientPaint.endColor.green, 0.9F) ||
         !nearlyEqual(path.dashOffset, -2.0F) ||

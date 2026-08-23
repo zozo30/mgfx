@@ -89,6 +89,7 @@ export const ExtendedServerCapability = {
   CustomPathMiterLimits: 1n << 39n,
   ArbitraryPathDashArrays: 1n << 40n,
   MultiStopPathGradients: 1n << 41n,
+  PathGradientSpreadModes: 1n << 42n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -238,6 +239,7 @@ export interface PathGradientPaint {
   readonly startColor: Color;
   readonly endColor: Color;
   readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+  readonly spread?: "pad" | "repeat" | "reflect";
 }
 
 export interface PathPaint {
@@ -761,7 +763,9 @@ export class FrameEncoder {
         [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha].every(Number.isFinite)));
     if (!validateStops(fillStops) || !validateStops(strokeStops))
       throw new RangeError("Path gradients require 2 through 8 ordered finite stops");
-    const multiGradient = fillStops.length > 2 || strokeStops.length > 2;
+    const multiGradient = fillStops.length > 2 || strokeStops.length > 2 ||
+      (paint.fillGradient?.spread !== undefined && paint.fillGradient.spread !== "pad") ||
+      (paint.strokeGradient?.spread !== undefined && paint.strokeGradient.spread !== "pad");
     if (styled && (!Number.isFinite(paint.miterLimit) || paint.miterLimit < 1 || paint.miterLimit > 1000))
       throw new RangeError("Path miter limit must be between 1 and 1000");
     if (dashArray && (paint.dash.values.length < 2 || paint.dash.values.length > 32 ||
@@ -818,6 +822,10 @@ export class FrameEncoder {
       payload.writeUInt16LE(multiDash.length, 184);
       payload.writeUInt8(fillStops.length, 186);
       payload.writeUInt8(strokeStops.length, 187);
+      const spreadCode = (spread: "pad" | "repeat" | "reflect" | undefined) =>
+        spread === "repeat" ? 1 : spread === "reflect" ? 2 : 0;
+      payload.writeUInt8(spreadCode(paint.fillGradient?.spread), 188);
+      payload.writeUInt8(spreadCode(paint.strokeGradient?.spread), 189);
       multiDash.forEach((value, index) => payload.writeFloatLE(value, 192 + index * 4));
       let stopOffset = 192 + multiDash.length * 4;
       [...fillStops, ...strokeStops].forEach((stop) => {

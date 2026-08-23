@@ -247,12 +247,14 @@ export interface PathData {
     readonly start: Point; readonly end: Point;
     readonly startColor: Color; readonly endColor: Color;
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+    readonly spread?: "pad" | "repeat" | "reflect";
   };
   readonly stroke?: Color;
   readonly strokeGradient?: {
     readonly start: Point; readonly end: Point;
     readonly startColor: Color; readonly endColor: Color;
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+    readonly spread?: "pad" | "repeat" | "reflect";
   };
   readonly strokeWidth?: number;
   readonly tolerance?: number;

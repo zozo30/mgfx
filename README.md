@@ -50,8 +50,8 @@ React also exposes a selective vector `<Svg>` path for complete inline documents
 It lowers paths, lines, polylines, polygons, rectangles, circles, and ellipses;
 inherits fill/stroke presentation attributes through nested groups; applies affine
 group transforms in source coordinates; resolves two- through eight-stop `<linearGradient>` definitions,
-including local `href`/`xlink:href` inheritance, in user space or object-bounding-box
-space; lowers SVG dash arrays of up to 32 values;
+including local `href`/`xlink:href` inheritance and `pad`, `repeat`, or `reflect`
+spread, in user space or object-bounding-box space; lowers SVG dash arrays of up to 32 values;
 and uploads every canonical layer once.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, masks, text, embedded images, or external content

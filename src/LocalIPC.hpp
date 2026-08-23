@@ -100,6 +100,7 @@ enum ServerCapability : std::uint64_t {
     customPathMiterLimits = 1ULL << 39U,
     arbitraryPathDashArrays = 1ULL << 40U,
     multiStopPathGradients = 1ULL << 41U,
+    pathGradientSpreadModes = 1ULL << 42U,
 };
 
 enum class ResourceKind : std::uint8_t {

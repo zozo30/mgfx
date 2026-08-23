@@ -340,7 +340,9 @@ void CommandEncoder::drawPath(const PathCommand& path) {
     const bool styled = path.miterLimit != 4.0F;
     const bool dashArray = !path.dashPattern.empty();
     const bool multiGradient = path.gradient.stops.size() > 2 ||
-                               path.strokeGradientPaint.stops.size() > 2;
+        path.strokeGradientPaint.stops.size() > 2 ||
+        path.gradient.spread != PathGradient::Spread::pad ||
+        path.strokeGradientPaint.spread != PathGradient::Spread::pad;
     const std::size_t multiDashCount = dashArray ? path.dashPattern.size() : dashed ? 2U : 0U;
     const std::uint32_t multiSize = static_cast<std::uint32_t>(192 + multiDashCount * 4 +
         (path.gradient.stops.size() + path.strokeGradientPaint.stops.size()) * 20);
@@ -394,7 +396,9 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         appendU16(bytes_, static_cast<std::uint16_t>(multiDashCount));
         bytes_.push_back(static_cast<std::uint8_t>(path.gradient.stops.size()));
         bytes_.push_back(static_cast<std::uint8_t>(path.strokeGradientPaint.stops.size()));
-        appendU32(bytes_, 0);
+        bytes_.push_back(static_cast<std::uint8_t>(path.gradient.spread));
+        bytes_.push_back(static_cast<std::uint8_t>(path.strokeGradientPaint.spread));
+        appendU16(bytes_, 0);
         if (dashArray) {
             for (float length : path.dashPattern) appendFloat(bytes_, length);
         } else if (dashed) {
@@ -847,10 +851,15 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const auto validStopCount = [](std::uint8_t count) {
         return count == 0U || (count >= 2U && count <= 8U);
     };
-    const bool validMultiSize = multiGradient && command.payloadSize >= 232U &&
+    const std::uint8_t fillSpread = multiGradient && command.payloadSize >= 192U
+        ? command.payload[188] : 0U;
+    const std::uint8_t strokeSpread = multiGradient && command.payloadSize >= 192U
+        ? command.payload[189] : 0U;
+    const bool validMultiSize = multiGradient && command.payloadSize >= 192U &&
         multiDashCount <= 32U && (multiDashCount == 0U || multiDashCount % 2U == 0U) &&
         validStopCount(fillStopCount) && validStopCount(strokeStopCount) &&
-        (fillStopCount > 2U || strokeStopCount > 2U) &&
+        (fillStopCount > 2U || strokeStopCount > 2U || fillSpread != 0U || strokeSpread != 0U) &&
+        fillSpread <= 2U && strokeSpread <= 2U && readU16(command.payload + 190) == 0U &&
         command.payloadSize == 192U + multiDashCount * 4U +
             (fillStopCount + strokeStopCount) * 20U;
     if ((!dashed && !extended && !styled && !dashArray && !multiGradient && command.opcode != Opcode::drawPath) ||
@@ -885,14 +894,16 @@ bool decodePath(const CommandView& command, PathCommand& path) {
                      {readFloat(command.payload + 96), readFloat(command.payload + 100),
                       readFloat(command.payload + 104), readFloat(command.payload + 108)},
                      {readFloat(command.payload + 112), readFloat(command.payload + 116),
-                      readFloat(command.payload + 120), readFloat(command.payload + 124)}, {}};
+                      readFloat(command.payload + 120), readFloat(command.payload + 124)}, {},
+                     PathGradient::Spread::pad};
     if (extended || styled || dashArray || multiGradient) {
         path.strokeGradientPaint = {readFloat(command.payload + 128), readFloat(command.payload + 132),
             readFloat(command.payload + 136), readFloat(command.payload + 140),
             {readFloat(command.payload + 144), readFloat(command.payload + 148),
              readFloat(command.payload + 152), readFloat(command.payload + 156)},
             {readFloat(command.payload + 160), readFloat(command.payload + 164),
-             readFloat(command.payload + 168), readFloat(command.payload + 172)}, {}};
+             readFloat(command.payload + 168), readFloat(command.payload + 172)}, {},
+            PathGradient::Spread::pad};
     }
     const std::size_t dashOffset = (extended || styled) ? 176U : 128U;
     const bool styledDash = styled && (readFloat(command.payload + dashOffset) != 0.0F ||
@@ -927,7 +938,9 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         path.dashOffset = readFloat(command.payload + 180);
         if (!std::isfinite(path.miterLimit) || path.miterLimit < 1.0F ||
             path.miterLimit > 1000.0F || !std::isfinite(path.dashOffset) ||
-            readU32(command.payload + 188) != 0U) return false;
+            readU16(command.payload + 190) != 0U) return false;
+        path.gradient.spread = static_cast<PathGradient::Spread>(fillSpread);
+        path.strokeGradientPaint.spread = static_cast<PathGradient::Spread>(strokeSpread);
         std::size_t offset = 192U;
         path.dashPattern.reserve(multiDashCount);
         for (std::uint16_t index = 0; index < multiDashCount; ++index, offset += 4U) {

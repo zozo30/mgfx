@@ -43,12 +43,14 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
     readonly startColor: Color; readonly endColor: Color;
-    readonly stops?: readonly { readonly offset: number; readonly color: Color }[] };
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+    readonly spread?: "pad" | "repeat" | "reflect" };
   readonly strokeColor?: Color;
   readonly strokeGradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
     readonly startColor: Color; readonly endColor: Color;
-    readonly stops?: readonly { readonly offset: number; readonly color: Color }[] };
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+    readonly spread?: "pad" | "repeat" | "reflect" };
   readonly strokeWidth?: number; readonly viewBox?: { x: number; y: number;
     width: number; height: number }; readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round" | "square";

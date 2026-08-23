@@ -236,6 +236,7 @@ struct MeshCommand {
 };
 
 struct PathGradient {
+    enum class Spread : std::uint8_t { pad = 0, repeat = 1, reflect = 2 };
     float startX;
     float startY;
     float endX;
@@ -244,6 +245,7 @@ struct PathGradient {
     Color endColor;
     struct Stop { float offset; Color color; };
     std::vector<Stop> stops;
+    Spread spread = Spread::pad;
 };
 
 struct PathCommand {

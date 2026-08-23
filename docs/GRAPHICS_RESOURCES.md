@@ -90,6 +90,8 @@ segments.
 stroke, or both. The server clips cached triangles at stop boundaries before
 assigning vertex colors, preserving exact piecewise-linear interpolation even
 for a large rectangle whose original mesh has only corner vertices.
+The same server clipping implements SVG `pad`, `repeat`, and `reflect` spread
+modes, assigning independent colors to coincident seam vertices so cycles do not smear.
 
 Stroke caps are encoded as butt (`0`), round (`1`), or square (`2`), and joins
 as bevel (`0`), round (`1`), or miter (`2`). Square-cap extension and miter

@@ -124,6 +124,8 @@ Fill and stroke gradients are independent, so an SVG primitive may combine a
 gradient interior with a differently oriented gradient outline.
 Multi-stop gradients stay native: the protocol carries ordered colors and the
 graphics server splits cached triangles at stop boundaries for exact interpolation.
+SVG `spreadMethod="repeat"` and `"reflect"` use the same server path, including
+hard cycle seams without client-generated triangles.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

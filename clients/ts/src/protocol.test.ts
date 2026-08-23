@@ -39,7 +39,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
   const completeCapabilities = allCapabilities | ExtendedServerCapability.ExtendedPathStrokeStyles |
     ExtendedServerCapability.CustomPathMiterLimits |
     ExtendedServerCapability.ArbitraryPathDashArrays |
-    ExtendedServerCapability.MultiStopPathGradients;
+    ExtendedServerCapability.MultiStopPathGradients |
+    ExtendedServerCapability.PathGradientSpreadModes;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -425,7 +426,7 @@ test("canonical paths upload once and frames reference server-side vector geomet
           { offset: 0, color: { red: 0, green: 0.4, blue: 0.8, alpha: 1 } },
           { offset: 0.5, color: { red: 0.2, green: 1, blue: 0.6, alpha: 1 } },
           { offset: 1, color: { red: 0.8, green: 0.2, blue: 1, alpha: 1 } },
-        ] },
+        ], spread: "reflect" },
       lineCap: "square", lineJoin: "miter",
       miterLimit: 6,
       strokeGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 24 },
@@ -448,6 +449,7 @@ test("canonical paths upload once and frames reference server-side vector geomet
   assert.equal(bytes.readUInt16LE(24 + 184), 4);
   assert.equal(bytes.readUInt8(24 + 186), 3);
   assert.equal(bytes.readUInt8(24 + 187), 0);
+  assert.equal(bytes.readUInt8(24 + 188), 2);
   assert.deepEqual([0, 1, 2, 3].map((index) => bytes.readFloatLE(24 + 192 + index * 4)),
     [7, 4, 2, 4]);
   assert.equal(bytes.readFloatLE(24 + 208 + 20), 0.5);

@@ -26,6 +26,7 @@ export interface LinearGradientPaint {
   readonly startColor: Color;
   readonly endColor: Color;
   readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
+  readonly spread?: "pad" | "repeat" | "reflect";
 }
 
 export interface SvgVectorDocument {
@@ -60,6 +61,7 @@ interface GradientDefinition {
   readonly y2: string;
   readonly transform: Matrix;
   readonly stops: readonly { readonly offset: number; readonly color: Color }[];
+  readonly spread: "pad" | "repeat" | "reflect";
 }
 
 interface RawGradientDefinition {
@@ -248,6 +250,8 @@ function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<
       transform: item.attributes.gradientTransform !== undefined
         ? parseTransform(item.attributes.gradientTransform) : base?.transform ?? identity,
       stops,
+      spread: item.attributes.spreadMethod === "repeat" ? "repeat" :
+        item.attributes.spreadMethod === "reflect" ? "reflect" : base?.spread ?? "pad",
     };
     definitions.set(id, definition);
     return definition;
@@ -282,7 +286,8 @@ function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, i
   const stops = definition.stops.map((stop) => ({ offset: stop.offset,
     color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
   return { start, end, startColor: stops[0]!.color,
-    endColor: stops[stops.length - 1]!.color, ...(stops.length > 2 ? { stops } : {}) };
+    endColor: stops[stops.length - 1]!.color, ...(stops.length > 2 ? { stops } : {}),
+    ...(definition.spread !== "pad" ? { spread: definition.spread } : {}) };
 }
 
 function transformPoint(matrix: Matrix, point: { readonly x: number; readonly y: number }) {

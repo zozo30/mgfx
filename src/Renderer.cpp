@@ -1253,33 +1253,49 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                                gfx::Color color,
                                                const gfx::PathGradient* gradient) {
                 if (points.empty()) return;
-                const auto amountAt = [](const gfx::PathPoint& point,
-                                         const gfx::PathGradient& paint) {
+                const auto rawAmountAt = [](const gfx::PathPoint& point,
+                                            const gfx::PathGradient& paint) {
                     const float dx = paint.endX - paint.startX;
                     const float dy = paint.endY - paint.startY;
                     const float lengthSquared = dx * dx + dy * dy;
                     return lengthSquared > 0.0F
-                        ? std::clamp(((point[0] - paint.startX) * dx +
-                                      (point[1] - paint.startY) * dy) / lengthSquared,
-                                     0.0F, 1.0F) : 0.0F;
+                        ? ((point[0] - paint.startX) * dx +
+                           (point[1] - paint.startY) * dy) / lengthSquared : 0.0F;
                 };
-                std::vector<gfx::PathPoint> splitPoints;
-                const std::vector<gfx::PathPoint>* renderedPoints = &points;
-                if (gradient != nullptr && gradient->stops.size() > 2) {
-                    std::vector<float> boundaries{0.0F};
-                    for (const auto& stop : gradient->stops) {
-                        if (stop.offset > 0.0F && stop.offset < 1.0F &&
-                            stop.offset != boundaries.back()) boundaries.push_back(stop.offset);
+                const auto mappedAmount = [](float raw, const gfx::PathGradient& paint,
+                                             float intervalMidpoint) {
+                    if (paint.spread == gfx::PathGradient::Spread::pad)
+                        return std::clamp(raw, 0.0F, 1.0F);
+                    const float cycle = std::floor(intervalMidpoint);
+                    const float local = std::clamp(raw - cycle, 0.0F, 1.0F);
+                    if (paint.spread == gfx::PathGradient::Spread::repeat) return local;
+                    const auto cycleIndex = static_cast<long long>(cycle);
+                    return cycleIndex % 2LL == 0LL ? local : 1.0F - local;
+                };
+                struct PaintedPoint { gfx::PathPoint point; float amount; };
+                std::vector<PaintedPoint> renderedPoints;
+                if (gradient == nullptr || (gradient->stops.size() <= 2 &&
+                    gradient->spread == gfx::PathGradient::Spread::pad)) {
+                    renderedPoints.reserve(points.size());
+                    for (const gfx::PathPoint& point : points) {
+                        renderedPoints.push_back({point, gradient == nullptr ? 0.0F :
+                            mappedAmount(rawAmountAt(point, *gradient), *gradient, 0.0F)});
                     }
-                    if (boundaries.back() != 1.0F) boundaries.push_back(1.0F);
+                } else {
+                    std::vector<float> stopOffsets{0.0F, 1.0F};
+                    if (!gradient->stops.empty()) {
+                        stopOffsets.clear();
+                        for (const auto& stop : gradient->stops) stopOffsets.push_back(stop.offset);
+                        stopOffsets.push_back(0.0F); stopOffsets.push_back(1.0F);
+                    }
                     const auto clip = [&](std::vector<gfx::PathPoint> polygon, float boundary,
                                           bool keepGreater) {
                         std::vector<gfx::PathPoint> result;
                         for (std::size_t index = 0; index < polygon.size(); ++index) {
                             const gfx::PathPoint& start = polygon[index];
                             const gfx::PathPoint& end = polygon[(index + 1) % polygon.size()];
-                            const float startAmount = amountAt(start, *gradient);
-                            const float endAmount = amountAt(end, *gradient);
+                            const float startAmount = rawAmountAt(start, *gradient);
+                            const float endAmount = rawAmountAt(end, *gradient);
                             const bool startInside = keepGreater ? startAmount >= boundary : startAmount <= boundary;
                             const bool endInside = keepGreater ? endAmount >= boundary : endAmount <= boundary;
                             if (startInside) result.push_back(start);
@@ -1292,19 +1308,49 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                         return result;
                     };
                     for (std::size_t triangle = 0; triangle + 2 < points.size(); triangle += 3) {
+                        float minimum = rawAmountAt(points[triangle], *gradient);
+                        float maximum = minimum;
+                        for (std::size_t index = 1; index < 3; ++index) {
+                            const float amount = rawAmountAt(points[triangle + index], *gradient);
+                            minimum = std::min(minimum, amount); maximum = std::max(maximum, amount);
+                        }
+                        std::vector<float> boundaries{minimum, maximum};
+                        if (gradient->spread == gfx::PathGradient::Spread::pad) {
+                            boundaries.insert(boundaries.end(), stopOffsets.begin(), stopOffsets.end());
+                        } else if (maximum - minimum <= 128.0F) {
+                            const int firstCycle = static_cast<int>(std::floor(minimum)) - 1;
+                            const int lastCycle = static_cast<int>(std::ceil(maximum)) + 1;
+                            for (int cycle = firstCycle; cycle <= lastCycle; ++cycle) {
+                                boundaries.push_back(static_cast<float>(cycle));
+                                for (float stop : stopOffsets) {
+                                    const bool reflected = gradient->spread == gfx::PathGradient::Spread::reflect &&
+                                        cycle % 2 != 0;
+                                    boundaries.push_back(static_cast<float>(cycle) +
+                                        (reflected ? 1.0F - stop : stop));
+                                }
+                            }
+                        }
+                        std::sort(boundaries.begin(), boundaries.end());
+                        boundaries.erase(std::unique(boundaries.begin(), boundaries.end(),
+                            [](float left, float right) { return std::fabs(left - right) < 0.000001F; }),
+                            boundaries.end());
                         for (std::size_t interval = 0; interval + 1 < boundaries.size(); ++interval) {
+                            if (boundaries[interval + 1] <= minimum || boundaries[interval] >= maximum) continue;
                             std::vector<gfx::PathPoint> polygon = {
                                 points[triangle], points[triangle + 1], points[triangle + 2]};
                             polygon = clip(std::move(polygon), boundaries[interval], true);
                             if (polygon.size() < 3) continue;
                             polygon = clip(std::move(polygon), boundaries[interval + 1], false);
                             for (std::size_t index = 1; index + 1 < polygon.size(); ++index) {
-                                splitPoints.insert(splitPoints.end(),
-                                    {polygon[0], polygon[index], polygon[index + 1]});
+                                const float midpoint = (boundaries[interval] + boundaries[interval + 1]) * 0.5F;
+                                for (const gfx::PathPoint& point :
+                                    {polygon[0], polygon[index], polygon[index + 1]}) {
+                                    renderedPoints.push_back({point, mappedAmount(
+                                        rawAmountAt(point, *gradient), *gradient, midpoint)});
+                                }
                             }
                         }
                     }
-                    renderedPoints = &splitPoints;
                 }
                 if (encoder == nullptr) {
                     encoder = commandBuffer->renderCommandEncoder(renderPass);
@@ -1314,16 +1360,17 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 constexpr std::size_t maxInlineBytes = 4096;
                 constexpr std::size_t maxVertices =
                     (maxInlineBytes / sizeof(gfx::Vertex) / 3) * 3;
-                for (std::size_t first = 0; first < renderedPoints->size();) {
-                    const std::size_t count = std::min(maxVertices, renderedPoints->size() - first);
+                for (std::size_t first = 0; first < renderedPoints.size();) {
+                    const std::size_t count = std::min(maxVertices, renderedPoints.size() - first);
                     std::vector<gfx::Vertex> vertices;
                     vertices.reserve(count);
                     for (std::size_t index = 0; index < count; ++index) {
-                        const gfx::PathPoint& point = (*renderedPoints)[first + index];
+                        const PaintedPoint& painted = renderedPoints[first + index];
+                        const gfx::PathPoint& point = painted.point;
                         std::array<float, 4> vertexColor = {
                             color.red, color.green, color.blue, color.alpha};
                         if (gradient != nullptr) {
-                            const float amount = amountAt(point, *gradient);
+                            const float amount = painted.amount;
                             gfx::PathGradient::Stop start{0.0F, gradient->startColor};
                             gfx::PathGradient::Stop end{1.0F, gradient->endColor};
                             if (!gradient->stops.empty()) {
