@@ -19,6 +19,12 @@ int main() {
         std::cerr << "Monospaced system font metrics are implausible\n";
         return 1;
     }
+    const gfx::ShapedText bold = gfx::shapeSystemText(
+        "Readable", gfx::FontFamily::systemSans, gfx::FontWeight::bold);
+    if (bold.triangles.empty() || bold.advance <= 0.0F) {
+        std::cerr << "Bold system font produced no shaped geometry\n";
+        return 1;
+    }
     for (const gfx::PathPoint& point : sans.triangles) {
         if (!std::isfinite(point[0]) || !std::isfinite(point[1])) {
             std::cerr << "System glyph outline contains non-finite geometry\n";

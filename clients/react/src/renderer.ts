@@ -1,7 +1,7 @@
 import { createContext, createElement, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
 import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants.js";
-import { FrameEncoder, type FontFamily, type Key, type KeyEvent, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
+import { FrameEncoder, type FontFamily, type FontWeight, type Key, type KeyEvent, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
   box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
   nativeTextAdvance, nativeTextMetricRuns, row, scrollView, stack, text,
@@ -173,7 +173,8 @@ export class ReactSurface {
               private readonly windowCommands?: NativeWindowCommands,
               private readonly resourceCommands?: {
                 readonly createPath: (id: number, segments: readonly PathSegment[]) => void;
-                readonly measureText?: (family: FontFamily, text: string) => Promise<number>;
+                readonly measureText?: (family: FontFamily, text: string,
+                  weight?: FontWeight) => Promise<number>;
               }) {
     this.container = { children: [], surface: this };
     this.snapshot = new SnapshotComponent(this.container);
@@ -231,16 +232,17 @@ export class ReactSurface {
       if (child.kind !== "host") continue;
       if (child.type === "mgfx-text") {
         const family = child.props.textStyle?.fontFamily;
+        const weight = child.props.textStyle?.fontWeight ?? "regular";
         const value = child.props.value ?? child.children
           .filter((item): item is TextNode => item.kind === "text").map((item) => item.value).join("");
         if (family === "system" || family === "monospace") {
           for (const run of nativeTextMetricRuns(value, child.props.textStyle ?? {})) {
-            if (nativeTextAdvance(family, run) !== undefined) continue;
-            const key = `${family}\0${run}`;
+            if (nativeTextAdvance(family, run, weight) !== undefined) continue;
+            const key = `${family}\0${weight}\0${run}`;
             if (!this.requestedTextMetrics.has(key) && this.resourceCommands?.measureText) {
               this.requestedTextMetrics.add(key);
-              void this.resourceCommands.measureText(family, run).then((advance) => {
-                cacheNativeTextAdvance(family, run, advance);
+              void this.resourceCommands.measureText(family, run, weight).then((advance) => {
+                cacheNativeTextAdvance(family, run, advance, weight);
                 if (!this.metricRelayoutScheduled) {
                   this.metricRelayoutScheduled = true;
                   queueMicrotask(() => {

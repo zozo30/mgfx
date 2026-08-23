@@ -65,7 +65,7 @@ export function DiagonalPattern({ time }: { readonly time: number }) {
       background: rgba(0.035, 0.045, 0.07), borderWidth: 1,
       borderColor: rgba(0.22, 0.28, 0.40), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="DIAGONAL AREA PATTERN" style={{ fontSize: 22,
+        <Text value="DIAGONAL AREA PATTERN" style={{ fontSize: 22, fontWeight: "bold",
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Box style={{ preferredSize: { height: 64 }, flexGrow: 1,
@@ -89,7 +89,7 @@ function ImagePreview({ sourceSize }: {
     <Row style={{ preferredSize: { height: 126 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="PERSISTENT IMAGE / SVG" style={{ fontSize: 22,
+        <Text value="PERSISTENT IMAGE / SVG" style={{ fontSize: 22, fontWeight: "bold",
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Image textureId={1} sourceWidth={sourceSize.width} sourceHeight={sourceSize.height}
@@ -105,7 +105,7 @@ function ServerVectorPath({ time }: { readonly time: number }) {
     <Row style={{ preferredSize: { height: 94 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="SERVER PATH CACHE" style={{ fontSize: 22,
+        <Text value="SERVER PATH CACHE" style={{ fontSize: 22, fontWeight: "bold",
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Path
@@ -128,7 +128,7 @@ function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
     <Row style={{ preferredSize: { height: 112 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="LUCIDE VECTOR STROKES" style={{ fontSize: 22,
+        <Text value="LUCIDE VECTOR STROKES" style={{ fontSize: 22, fontWeight: "bold",
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
       <Row style={{ gap: 22, flexGrow: 1, mainAxisAlignment: "center",
@@ -188,7 +188,7 @@ function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons
         },
         mainAxisAlignment: "spaceBetween",
         crossAxisAlignment: "center" }}>
-        <Text value="MGFX React" style={{ fontSize: 32, fontFamily: "system",
+        <Text value="MGFX React" style={{ fontSize: 32, fontFamily: "system", fontWeight: "bold",
           color: rgba(0.9, 0.96, 1) }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
           <Image textureId={1} sourceWidth={headerImageSize.width}
@@ -271,6 +271,7 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
               end: rgba(0.28, 0.12, 0.68), direction: "horizontal" },
             mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
             <Text value="Graphics Route — native glyph outlines" style={{ fontSize: 32,
+              fontWeight: "bold",
               fontFamily: "system", color: rgba(0.9, 1, 0.97) }} />
             <Button label="BACK" onPress={router.back} background={rgba(0.08, 0.12, 0.20)}
               style={{ preferredSize: { width: 120, height: 42 } }} />
@@ -289,7 +290,8 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
           <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,
             background: rgba(0.055, 0.07, 0.11), borderWidth: 1,
             borderColor: rgba(0.22, 0.30, 0.46) }}>
-            <Text value="HISTORY ROUTER" style={{ fontSize: 26, color: rgba(0.62, 0.88, 1) }} />
+            <Text value="HISTORY ROUTER" style={{ fontSize: 26, fontWeight: "bold",
+              color: rgba(0.62, 0.88, 1) }} />
             <Text value="THIS SCREEN REPLACED THE ACTIVE REACT SUBTREE"
               style={{ fontSize: 22, color: rgba(0.68, 0.72, 0.82) }} />
             <Text value={`ROUTE ${router.route}  BACK ${router.canGoBack ? "READY" : "EMPTY"}`}

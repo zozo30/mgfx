@@ -56,7 +56,7 @@ premultiplied RGBA8, giving vector and image draws the same blending result.
 
 The built-in 5×7 font remains a bootstrap and diagnostic path. The implemented
 `DrawText` command carries UTF-8, a portable system-family choice, position,
-size, and color. The macOS server shapes it with CoreText, converts glyph
+regular/bold weight, size, and color. The macOS server shapes it with CoreText, converts glyph
 outlines through the shared path tessellator, and caches geometry by family and
 string. Metal therefore receives compact cached vector text instead of one
 rectangle pair per lit pixel. Other native hosts can execute the same command
@@ -82,6 +82,11 @@ greedily fits words using cached native word and space advances, then emits only
 the resulting lines. Start, center, and end alignment use those same widths, so
 the graphics server remains a display-list executor rather than a UI layout
 engine.
+
+Font weight is part of both draw and measurement cache identity. React uses
+bold native faces for titles, section labels, dialog headings, and buttons while
+body text remains regular; measurement therefore always matches the geometry
+that is eventually drawn.
 
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and

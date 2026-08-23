@@ -15,7 +15,9 @@ struct ShapedText {
 
 // Shapes UTF-8 with the platform text engine and returns glyph outlines in em
 // units, with (0, 0) at the top-left and positive Y moving downward.
-ShapedText shapeSystemText(const std::string& utf8, FontFamily family);
-float measureSystemText(const std::string& utf8, FontFamily family);
+ShapedText shapeSystemText(const std::string& utf8, FontFamily family,
+                            FontWeight weight = FontWeight::regular);
+float measureSystemText(const std::string& utf8, FontFamily family,
+                        FontWeight weight = FontWeight::regular);
 
 } // namespace gfx

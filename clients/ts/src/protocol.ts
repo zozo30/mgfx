@@ -140,13 +140,16 @@ export interface PathPaint {
 }
 
 export type FontFamily = "system" | "monospace";
+export type FontWeight = "regular" | "bold";
 
-export function encodeTextMeasure(family: FontFamily, text: string): Buffer {
+export function encodeTextMeasure(family: FontFamily, text: string,
+  weight: FontWeight = "regular"): Buffer {
   const utf8 = Buffer.from(text, "utf8");
   if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
     throw new RangeError("Text measurement requires 1 through 65536 non-NUL UTF-8 bytes");
   const payload = Buffer.alloc(4 + utf8.length);
   payload.writeUInt8(family === "monospace" ? 1 : 0, 0);
+  payload.writeUInt8(weight === "bold" ? 1 : 0, 1);
   utf8.copy(payload, 4);
   return payload;
 }
@@ -166,8 +169,8 @@ export class TextMetricsClient {
 
   constructor(private readonly sendRequest: (payload: Buffer, sequence: number) => void) {}
 
-  measure(family: FontFamily, text: string): Promise<number> {
-    const payload = encodeTextMeasure(family, text);
+  measure(family: FontFamily, text: string, weight: FontWeight = "regular"): Promise<number> {
+    const payload = encodeTextMeasure(family, text, weight);
     const sequence = this.nextSequence;
     this.nextSequence = sequence === 0xffff_ffff ? 1 : sequence + 1;
     this.sendRequest(payload, sequence);
@@ -562,12 +565,13 @@ export class FrameEncoder {
   }
 
   systemText(text: string, left: number, top: number, fontSize: number,
-    color: Color, family: FontFamily = "system"): void {
+    color: Color, family: FontFamily = "system", weight: FontWeight = "regular"): void {
     const utf8 = Buffer.from(text, "utf8");
     if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
       throw new RangeError("System text must contain 1 through 65536 non-NUL UTF-8 bytes");
     const payload = Buffer.alloc(32 + utf8.length);
     payload.writeUInt8(family === "monospace" ? 1 : 0, 0);
+    payload.writeUInt8(weight === "bold" ? 1 : 0, 1);
     [left, top, fontSize, color.red, color.green, color.blue, color.alpha]
       .forEach((value, index) => {
         if (!Number.isFinite(value)) throw new RangeError("System text values must be finite");

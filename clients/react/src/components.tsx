@@ -91,7 +91,7 @@ export function Button({ label, onPress, style = {}, textStyle, background = rgb
   return (
     <mgfx-stack {...handlers} style={{ preferredSize: { height: 48 }, padding: all(12),
       cornerRadius: 10, clip: true, ...style, background: color }}>
-      <Text value={label} style={textStyle ?? {}} />
+      <Text value={label} style={{ fontWeight: "bold", ...textStyle }} />
     </mgfx-stack>
   );
 }

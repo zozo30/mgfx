@@ -65,21 +65,28 @@ void appendPathElement(void* context, const CGPathElement* element) {
     }
 }
 
-CTFontRef createFont(FontFamily family) {
+CTFontRef createFont(FontFamily family, FontWeight weight) {
     const CTFontUIFontType type = family == FontFamily::systemMonospace
-        ? kCTFontUIFontUserFixedPitch : kCTFontUIFontSystem;
-    return CTFontCreateUIFontForLanguage(type, designSize, nullptr);
+        ? kCTFontUIFontUserFixedPitch
+        : weight == FontWeight::bold ? kCTFontUIFontEmphasizedSystem : kCTFontUIFontSystem;
+    CTFontRef font = CTFontCreateUIFontForLanguage(type, designSize, nullptr);
+    if (font != nullptr && family == FontFamily::systemMonospace && weight == FontWeight::bold) {
+        CTFontRef bold = CTFontCreateCopyWithSymbolicTraits(
+            font, designSize, nullptr, kCTFontBoldTrait, kCTFontBoldTrait);
+        if (bold != nullptr) { CFRelease(font); font = bold; }
+    }
+    return font;
 }
 
 } // namespace
 
-ShapedText shapeSystemText(const std::string& utf8, FontFamily family) {
+ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeight weight) {
     ShapedText shaped;
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
                                             encoding:NSUTF8StringEncoding];
     if (string == nil || string.length == 0) return shaped;
-    CTFontRef baseFont = createFont(family);
+    CTFontRef baseFont = createFont(family, weight);
     if (baseFont == nullptr) return shaped;
     NSDictionary* attributes = @{(__bridge id)kCTFontAttributeName: (__bridge id)baseFont};
     NSAttributedString* attributed = [[NSAttributedString alloc] initWithString:string
@@ -129,12 +136,12 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family) {
     return shaped;
 }
 
-float measureSystemText(const std::string& utf8, FontFamily family) {
+float measureSystemText(const std::string& utf8, FontFamily family, FontWeight weight) {
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
                                             encoding:NSUTF8StringEncoding];
     if (string == nil || string.length == 0) return 0.0F;
-    CTFontRef font = createFont(family);
+    CTFontRef font = createFont(family, weight);
     if (font == nullptr) return 0.0F;
     NSDictionary* attributes = @{(__bridge id)kCTFontAttributeName: (__bridge id)font};
     NSAttributedString* attributed = [[NSAttributedString alloc] initWithString:string

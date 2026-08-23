@@ -71,7 +71,7 @@ created or shown a drawable surface.
 | 25 | `TextureDestroy` | client → server | Nonzero `u32` resource ID |
 | 26 | `PathCreate` | client → server | Nonzero `u32` ID, segment count, reserved fields, canonical path segments |
 | 27 | `PathDestroy` | client → server | Nonzero `u32` resource ID |
-| 28 | `TextMeasure` | client → server | `u8 family`, three reserved zero bytes, UTF-8 text; nonzero sequence |
+| 28 | `TextMeasure` | client → server | `u8 family`, `u8 weight`, two reserved zero bytes, UTF-8 text; nonzero sequence |
 | 29 | `TextMetrics` | server → client | `f32 advance` in em units; echoes request sequence |
 
 Backend is `1` Metal, `2` Vulkan, or `3` DirectX. Capability bits are client
@@ -174,7 +174,7 @@ clip stack. `PushClip` carries four `f32` values—left, top, right, bottom—in
 normalized top-left coordinates from `0` to `1`. Backends intersect nested clips
 and apply them before draw commands.
 
-MGFX opcode `8` (`DrawText`) carries a portable system-font family, normalized
+MGFX opcode `8` (`DrawText`) carries a portable system-font family and weight, normalized
 top-left position and font height, straight RGBA color, and validated UTF-8.
 The backend shapes Unicode and caches tessellated glyph outlines; strings no
 longer expand into a triangle command for every pixel-font cell.

@@ -433,7 +433,9 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
                 const gfx::FontFamily family = measure.family ==
                     mgfx::ipc::TextFamily::systemMonospace
                     ? gfx::FontFamily::systemMonospace : gfx::FontFamily::systemSans;
-                const float advance = gfx::measureSystemText(measure.text, family);
+                const gfx::FontWeight weight = measure.weight == mgfx::ipc::TextWeight::bold
+                    ? gfx::FontWeight::bold : gfx::FontWeight::regular;
+                const float advance = gfx::measureSystemText(measure.text, family, weight);
                 active->send(mgfx::ipc::MessageType::textMetrics,
                              mgfx::ipc::encodeTextMetrics(advance), message.sequence);
             }

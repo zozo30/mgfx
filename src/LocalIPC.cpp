@@ -560,6 +560,7 @@ bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& i
 std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure) {
     std::vector<std::uint8_t> payload(4 + measure.text.size());
     payload[0] = static_cast<std::uint8_t>(measure.family);
+    payload[1] = static_cast<std::uint8_t>(measure.weight);
     std::copy(measure.text.begin(), measure.text.end(), payload.begin() + 4);
     return payload;
 }
@@ -567,8 +568,10 @@ std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure) {
 bool decodeTextMeasure(const std::vector<std::uint8_t>& payload, TextMeasure& measure) {
     if (payload.size() <= 4 || payload.size() > 65'540 ||
         payload[0] > static_cast<std::uint8_t>(TextFamily::systemMonospace) ||
-        payload[1] != 0 || payload[2] != 0 || payload[3] != 0) return false;
+        payload[1] > static_cast<std::uint8_t>(TextWeight::bold) ||
+        payload[2] != 0 || payload[3] != 0) return false;
     measure.family = static_cast<TextFamily>(payload[0]);
+    measure.weight = static_cast<TextWeight>(payload[1]);
     measure.text.assign(payload.begin() + 4, payload.end());
     return measure.text.find('\0') == std::string::npos;
 }

@@ -164,19 +164,20 @@ test("canonical paths upload once and frames reference server-side vector geomet
 test("system Unicode text is a compact skippable display-list command", () => {
   const frame = new FrameEncoder();
   frame.systemText("Hello — Ω", -0.8, 0.6, 0.08,
-    { red: 0.7, green: 0.9, blue: 1, alpha: 1 }, "monospace");
+    { red: 0.7, green: 0.9, blue: 1, alpha: 1 }, "monospace", "bold");
   frame.endFrame();
   const bytes = frame.finish();
   assert.equal(bytes.readUInt16LE(16), 8);
   assert.equal(bytes.readUInt8(24), 1);
+  assert.equal(bytes.readUInt8(25), 1);
   assert.equal(bytes.subarray(56, 56 + Buffer.byteLength("Hello — Ω")).toString(), "Hello — Ω");
 });
 
 test("native text metrics correlate asynchronous measurement replies", async () => {
   const sent: Array<{ payload: Buffer; sequence: number }> = [];
   const metrics = new TextMetricsClient((payload, sequence) => sent.push({ payload, sequence }));
-  const pending = metrics.measure("system", "Árvíztűrő — Ω");
-  assert.deepEqual(sent[0]?.payload, encodeTextMeasure("system", "Árvíztűrő — Ω"));
+  const pending = metrics.measure("system", "Árvíztűrő — Ω", "bold");
+  assert.deepEqual(sent[0]?.payload, encodeTextMeasure("system", "Árvíztűrő — Ω", "bold"));
   const payload = Buffer.alloc(4); payload.writeFloatLE(6.25);
   metrics.receive(sent[0]!.sequence + 1, 99);
   metrics.receive(sent[0]!.sequence, decodeTextMetrics(payload));

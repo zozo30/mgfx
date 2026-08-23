@@ -68,9 +68,11 @@ enum ServerCapability : std::uint32_t {
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
+enum class TextWeight : std::uint8_t { regular = 0, bold = 1 };
 
 struct TextMeasure {
     TextFamily family;
+    TextWeight weight;
     std::string text;
 };
 
