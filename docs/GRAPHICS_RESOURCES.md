@@ -154,7 +154,9 @@ contains compact style records and UTF-8 slices; the graphics server shapes each
 slice, advances one native pen, and batches the resulting colored glyph geometry.
 React exposes the same model through declarative `<RichText spans={...}>` and
 direct SVG `<tspan>` children. Native rich-text placement anchors the full shaped
-advance and aligns mixed fonts on a shared alphabetic baseline.
+advance and aligns mixed fonts on a shared alphabetic baseline. Explicit numeric
+`x` positions split an SVG label into compact native run groups; `y/dx/dy` adjust
+each restarted pen without asking the client to measure or construct glyphs.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is

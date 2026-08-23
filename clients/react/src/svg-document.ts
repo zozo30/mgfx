@@ -307,22 +307,38 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const closingMatch = closingText.exec(expandedSource);
       if (!closingMatch) throw new Error("SVG text element is not closed");
       const body = expandedSource.slice(bodyStart, closingMatch.index);
+      const baseX = finiteNumber(attributes.x, 0);
+      const baseY = finiteNumber(attributes.y, 0);
+      let currentY = baseY;
       const spanPattern = /<tspan\b([^>]*)>([\s\S]*?)<\/tspan\s*>/gi;
-      const pieces: { value: string; state: PaintState }[] = [];
+      const pieces: { value: string; state: PaintState; x?: number; y?: number }[] = [];
       let bodyOffset = 0;
       for (const span of body.matchAll(spanPattern)) {
         const before = body.slice(bodyOffset, span.index);
         if (/<[^>]*>/.test(before)) throw new Error("SVG text supports direct tspan children only");
         if (before) pieces.push({ value: decodeSvgText(before), state });
         const spanAttributes = styledAttributes(span[1]!, "tspan", cssRules);
-        if (["x", "y", "dx", "dy", "rotate", "transform"].some((key) => spanAttributes[key] !== undefined))
-          throw new Error("SVG tspan positioning requires a separate native text command");
+        if (["rotate", "transform"].some((key) => spanAttributes[key] !== undefined))
+          throw new Error("SVG tspan rotation requires a separate transform scope");
+        const positioned = ["x", "y", "dx", "dy"].some((key) => spanAttributes[key] !== undefined);
+        if (positioned && spanAttributes.x === undefined)
+          throw new Error("Positioned SVG tspans require an explicit x coordinate");
+        const coordinate = (name: "x" | "y" | "dx" | "dy", fallback: number) => {
+          const raw = spanAttributes[name];
+          if (raw === undefined) return fallback;
+          const parsed = Number(raw);
+          if (!Number.isFinite(parsed)) throw new Error(`SVG tspan ${name} must be one finite number`);
+          return parsed;
+        };
         const spanState = inherit(state, spanAttributes, clipPaths);
         if (Math.abs(spanState.fontSize - state.fontSize) > 1e-6 ||
             spanState.textAnchor !== state.textAnchor)
           throw new Error("SVG tspan font-size and text-anchor changes require run metrics");
         if (/<[^>]*>/.test(span[2]!)) throw new Error("Nested SVG tspans are not supported");
-        pieces.push({ value: decodeSvgText(span[2]!), state: spanState });
+        if (spanAttributes.y !== undefined) currentY = coordinate("y", currentY);
+        currentY += coordinate("dy", 0);
+        pieces.push({ value: decodeSvgText(span[2]!), state: spanState,
+          ...(positioned ? { x: coordinate("x", baseX) + coordinate("dx", 0), y: currentY } : {}) });
         bodyOffset = span.index + span[0].length;
       }
       const after = body.slice(bodyOffset);
@@ -349,30 +365,42 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
         if (piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0)
           throw new Error(`SVG ${hasSpans ? "tspan" : "text"} stroke is not supported natively`);
       }
-      const visiblePieces = drawablePieces.filter((piece) =>
-        piece.state.fill && piece.state.fill.alpha > 0);
+      const visiblePieces = drawablePieces.filter((piece) => piece.state.fill && piece.state.fill.alpha > 0);
       const value = visiblePieces.map((piece) => piece.value).join("");
       if (!value) continue;
       const placement = {
-        x: finiteNumber(attributes.x, 0), y: finiteNumber(attributes.y, 0), fontSize: state.fontSize,
+        x: baseX, y: baseY, fontSize: state.fontSize,
         ...(state.textAnchor !== "start" ? { anchor: state.textAnchor } : {}),
         ...(state.transform.a !== 1 || state.transform.b !== 0 || state.transform.c !== 0 ||
           state.transform.d !== 1 || state.transform.e !== 0 || state.transform.f !== 0
           ? { sourceTransform: state.transform } : {}) };
-      layers.push({ ...(state.clip ? { clip: state.clip } : {}),
-        ...(hasSpans ? { richText: { ...placement, runs: visiblePieces.map((piece) => ({
-          text: piece.value, color: multiplyAlpha(piece.state.fill!,
-            piece.state.opacity * piece.state.fillOpacity), family: piece.state.fontFamily,
-          weight: piece.state.fontWeight, style: piece.state.fontStyle,
+      const commonLayer = { ...(state.clip ? { clip: state.clip } : {}), strokeWidth: 0,
+        fillRule: state.fillRule, lineCap: state.lineCap, lineJoin: state.lineJoin } as const;
+      if (!hasSpans) {
+        layers.push({ ...commonLayer, text: { ...placement, value,
+          color: multiplyAlpha(state.fill!, state.opacity * state.fillOpacity),
+          family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
+          ...(state.letterSpacing !== 0
+            ? { letterSpacing: state.letterSpacing / state.fontSize } : {}) } });
+        continue;
+      }
+      const groups: { x: number; y: number; runs: RichTextRun[] }[] =
+        [{ x: baseX, y: baseY, runs: [] }];
+      for (const piece of normalized) {
+        if (piece.x !== undefined) groups.push({ x: piece.x, y: piece.y!, runs: [] });
+        if (!piece.value || !piece.state.displayed || !piece.state.visible ||
+            !piece.state.fill || piece.state.fill.alpha <= 0) continue;
+        groups[groups.length - 1]!.runs.push({ text: piece.value,
+          color: multiplyAlpha(piece.state.fill, piece.state.opacity * piece.state.fillOpacity),
+          family: piece.state.fontFamily, weight: piece.state.fontWeight, style: piece.state.fontStyle,
           ...(piece.state.letterSpacing !== 0
-            ? { letterSpacing: piece.state.letterSpacing / state.fontSize } : {}) })) } }
-          : { text: { ...placement, value,
-            color: multiplyAlpha(state.fill!, state.opacity * state.fillOpacity),
-            family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
-            ...(state.letterSpacing !== 0
-              ? { letterSpacing: state.letterSpacing / state.fontSize } : {}) } }),
-        strokeWidth: 0, fillRule: state.fillRule, lineCap: state.lineCap,
-        lineJoin: state.lineJoin });
+            ? { letterSpacing: piece.state.letterSpacing / state.fontSize } : {}) });
+      }
+      for (const group of groups) {
+        if (group.runs.length === 0) continue;
+        layers.push({ ...commonLayer, richText: { ...placement, x: group.x, y: group.y,
+          runs: group.runs } });
+      }
       continue;
     }
     if (!primitiveTags.has(name)) continue;

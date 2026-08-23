@@ -196,11 +196,28 @@ test("SVG text lowers styled tspans to native rich-text runs", () => {
 test("SVG text rejects unsupported positioned spans, strokes, and entities", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text><tspan dx="2">nested</tspan></text></svg>`),
-  /positioning requires/);
+  /require an explicit x/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text stroke="red">outlined</text></svg>`), /stroke is not supported/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text>bad &unknown;</text></svg>`), /Unsupported SVG text entity/);
+});
+
+test("SVG positioned tspans restart compact native run groups without glyph geometry", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 50">
+    <text x="4" y="8" font-size="10">first
+      <tspan x="12" y="25" dx="2" dy="3" fill="#20d890">second</tspan> tail
+      <tspan x="20" dy="12" font-weight="700">third</tspan>
+    </text></svg>`);
+  assert.equal(document.layers.length, 3);
+  assert.deepEqual(document.layers.map((layer) => ({ x: layer.richText?.x, y: layer.richText?.y,
+    text: layer.richText?.runs.map((run) => run.text).join("") })), [
+    { x: 4, y: 8, text: "first " },
+    { x: 14, y: 28, text: "second tail " },
+    { x: 20, y: 40, text: "third" },
+  ]);
+  assert.equal(document.layers[1]?.richText?.runs[0]?.color.green, 0.8470588235294118);
+  assert.equal(document.layers[2]?.richText?.runs[0]?.weight, "bold");
 });
 
 test("SVG text preserves rotation, skew, and nonuniform scaling as affine display state", () => {
