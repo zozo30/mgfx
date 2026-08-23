@@ -121,6 +121,13 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
     CGFloat ascent = 0.0, descent = 0.0, leading = 0.0;
     shaped.advance = static_cast<float>(CTLineGetTypographicBounds(
         line, &ascent, &descent, &leading) / designSize);
+    shaped.underlinePosition = static_cast<float>(
+        (ascent - CTFontGetUnderlinePosition(baseFont)) / designSize);
+    shaped.underlineThickness = static_cast<float>(
+        CTFontGetUnderlineThickness(baseFont) / designSize);
+    shaped.strikeThroughPosition = static_cast<float>(
+        (ascent - CTFontGetXHeight(baseFont) * 0.5) / designSize);
+    shaped.strikeThroughThickness = shaped.underlineThickness;
     const CFArrayRef runs = CTLineGetGlyphRuns(line);
     for (CFIndex runIndex = 0; runIndex < CFArrayGetCount(runs); ++runIndex) {
         CTRunRef run = static_cast<CTRunRef>(const_cast<void*>(

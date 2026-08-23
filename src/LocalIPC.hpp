@@ -82,6 +82,7 @@ enum ServerCapability : std::uint32_t {
     conicGradients = 1U << 25U,
     typographyStyles = 1U << 26U,
     textLetterSpacing = 1U << 27U,
+    textDecorations = 1U << 28U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };

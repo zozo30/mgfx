@@ -1174,11 +1174,30 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                  static_cast<char>(text.style)};
             cacheKey.append(reinterpret_cast<const char*>(&text.letterSpacing),
                             sizeof(text.letterSpacing));
+            cacheKey.push_back(static_cast<char>(text.decoration));
             cacheKey += text.text;
             auto [found, inserted] = textCache_.try_emplace(cacheKey);
-            if (inserted) found->second = gfx::shapeSystemText(
-                text.text, text.family, text.weight, text.style, text.letterSpacing);
-            const std::vector<gfx::PathPoint>& points = found->second.triangles;
+            gfx::ShapedText& shaped = found->second;
+            if (inserted) {
+                shaped = gfx::shapeSystemText(
+                    text.text, text.family, text.weight, text.style, text.letterSpacing);
+                const auto appendDecoration = [&](float position, float thickness) {
+                    const float half = std::max(thickness, 0.04F) * 0.5F;
+                    const float left = 0.0F, right = shaped.advance;
+                    const float top = position - half, bottom = position + half;
+                    shaped.triangles.insert(shaped.triangles.end(), {
+                        {left, top}, {left, bottom}, {right, bottom},
+                        {left, top}, {right, bottom}, {right, top}});
+                };
+                if ((text.decoration & gfx::underlineText) != 0) {
+                    appendDecoration(shaped.underlinePosition, shaped.underlineThickness);
+                }
+                if ((text.decoration & gfx::strikeThroughText) != 0) {
+                    appendDecoration(shaped.strikeThroughPosition,
+                                     shaped.strikeThroughThickness);
+                }
+            }
+            const std::vector<gfx::PathPoint>& points = shaped.triangles;
             if (points.empty() || clipEmpty()) continue;
             if (encoder == nullptr) {
                 encoder = commandBuffer->renderCommandEncoder(renderPass);

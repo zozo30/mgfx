@@ -11,6 +11,10 @@ namespace gfx {
 struct ShapedText {
     std::vector<PathPoint> triangles;
     float advance = 0.0F;
+    float underlinePosition = 0.0F;
+    float underlineThickness = 0.0F;
+    float strikeThroughPosition = 0.0F;
+    float strikeThroughThickness = 0.0F;
 };
 
 // Shapes UTF-8 with the platform text engine and returns glyph outlines in em

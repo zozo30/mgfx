@@ -75,6 +75,10 @@ Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is
 part of shaping, measurement, and geometry cache identity.
 
+Underline and line-through are compact paint flags. The backend obtains their
+positions and thicknesses from the selected native font and emits them with the
+cached glyph geometry, keeping decoration correct for every face and size.
+
 Clients request the exact native advance once per unique family/string through
 correlated `TextMeasure`/`TextMetrics` MGIP messages. React first lays out with a
 nonblocking estimate, caches the em-unit reply, and performs one corrected

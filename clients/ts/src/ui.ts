@@ -1,4 +1,5 @@
-import { FrameEncoder, Key, type ClipRect, type Color, type PathSegment, type Vertex } from "./protocol.js";
+import { FrameEncoder, Key, TextDecoration,
+  type ClipRect, type Color, type PathSegment, type Vertex } from "./protocol.js";
 
 export interface Point { readonly x: number; readonly y: number }
 export interface Size { readonly width: number; readonly height: number }
@@ -84,6 +85,7 @@ export interface TextStyle {
   fontWeight?: "regular" | "medium" | "semibold" | "bold";
   fontStyle?: "regular" | "italic";
   letterSpacing?: number;
+  textDecoration?: "none" | "underline" | "line-through" | "underline line-through";
   lineHeight?: number;
   wrap?: boolean;
   textAlign?: "start" | "center" | "end";
@@ -908,11 +910,16 @@ function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: Te
   if (style.fontFamily && style.fontFamily !== "pixel") {
     const family = style.fontFamily;
     const tracking = (style.letterSpacing ?? 0) / fontSize;
+    const decoration = style.textDecoration === "underline" ? TextDecoration.Underline
+      : style.textDecoration === "line-through" ? TextDecoration.LineThrough
+      : style.textDecoration === "underline line-through"
+        ? TextDecoration.Underline | TextDecoration.LineThrough : TextDecoration.None;
     lines.forEach((line, index) => {
       if (line.value.length === 0) return;
       encoder.systemText(line.value, lineX(line.width) / viewport.width * 2 - 1,
         1 - (bounds.y + index * lineHeight) / viewport.height * 2,
-        fontSize / viewport.height * 2, color, family, style.fontWeight, style.fontStyle, tracking);
+        fontSize / viewport.height * 2, color, family, style.fontWeight, style.fontStyle,
+        tracking, decoration);
     });
     return;
   }

@@ -289,6 +289,7 @@ function GraphicsRoute({ chromeMetrics, vectorIcons }: AppProps) {
             background: rgba(0.055, 0.07, 0.11), borderWidth: 1,
             borderColor: rgba(0.22, 0.30, 0.46) }}>
             <Text value="HISTORY ROUTER" style={{ fontSize: 26, fontWeight: "bold",
+              textDecoration: "underline",
               color: rgba(0.62, 0.88, 1) }} />
             <Text value="THIS SCREEN REPLACED THE ACTIVE REACT SUBTREE"
               style={{ fontSize: 22, color: rgba(0.68, 0.72, 0.82) }} />

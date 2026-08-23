@@ -342,7 +342,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::meshResources |
             mgfx::ipc::ServerCapability::conicGradients |
             mgfx::ipc::ServerCapability::typographyStyles |
-            mgfx::ipc::ServerCapability::textLetterSpacing;
+            mgfx::ipc::ServerCapability::textLetterSpacing |
+            mgfx::ipc::ServerCapability::textDecorations;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

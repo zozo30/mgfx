@@ -284,6 +284,11 @@ normalized to em units on the wire. CoreText applies the tracking while shaping;
 the same value participates in exact measurement and both client/server cache
 keys. Zero spacing retains the original compact text payload for compatibility.
 
+`textDecoration` supports underline, line-through, or both. The wire command
+contains only decoration flags; the graphics server derives placement and
+thickness from native font metrics and adds the lines to cached text geometry.
+This is advertised independently through the `textDecorations` capability bit.
+
 ## Requirements
 
 - macOS

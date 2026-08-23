@@ -69,6 +69,7 @@ export enum ServerCapability {
   ConicGradients = 1 << 25,
   TypographyStyles = 1 << 26,
   TextLetterSpacing = 1 << 27,
+  TextDecorations = 1 << 28,
 }
 export interface ServerHello {
   readonly version: number;
@@ -212,6 +213,7 @@ export interface PathPaint {
 export type FontFamily = "system" | "monospace";
 export type FontWeight = "regular" | "medium" | "semibold" | "bold";
 export type FontStyle = "regular" | "italic";
+export enum TextDecoration { None = 0, Underline = 1, LineThrough = 2 }
 const fontWeightCode = (weight: FontWeight): number =>
   weight === "bold" ? 1 : weight === "medium" ? 2 : weight === "semibold" ? 3 : 0;
 
@@ -690,25 +692,29 @@ export class FrameEncoder {
 
   systemText(text: string, left: number, top: number, fontSize: number,
     color: Color, family: FontFamily = "system", weight: FontWeight = "regular",
-    style: FontStyle = "regular", letterSpacing = 0): void {
+    style: FontStyle = "regular", letterSpacing = 0,
+    decoration: TextDecoration = TextDecoration.None): void {
     const utf8 = Buffer.from(text, "utf8");
     if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0))
       throw new RangeError("System text must contain 1 through 65536 non-NUL UTF-8 bytes");
     if (!Number.isFinite(letterSpacing) || Math.abs(letterSpacing) > 10)
       throw new RangeError("Text letter spacing must be finite and within -10 through 10 em");
-    const hasLetterSpacing = letterSpacing !== 0;
-    const headerSize = hasLetterSpacing ? 36 : 32;
+    if (!Number.isInteger(decoration) || decoration < 0 || decoration > 3)
+      throw new RangeError("Text decoration must contain only underline and line-through flags");
+    const extension = decoration !== TextDecoration.None ? 2 : letterSpacing !== 0 ? 1 : 0;
+    const headerSize = extension === 2 ? 40 : extension === 1 ? 36 : 32;
     const payload = Buffer.alloc(headerSize + utf8.length);
     payload.writeUInt8(family === "monospace" ? 1 : 0, 0);
     payload.writeUInt8(fontWeightCode(weight), 1);
     payload.writeUInt8(style === "italic" ? 1 : 0, 2);
-    payload.writeUInt8(hasLetterSpacing ? 1 : 0, 3);
+    payload.writeUInt8(extension, 3);
     [left, top, fontSize, color.red, color.green, color.blue, color.alpha]
       .forEach((value, index) => {
         if (!Number.isFinite(value)) throw new RangeError("System text values must be finite");
         payload.writeFloatLE(value, 4 + index * 4);
       });
-    if (hasLetterSpacing) payload.writeFloatLE(letterSpacing, 32);
+    if (extension >= 1) payload.writeFloatLE(letterSpacing, 32);
+    if (extension === 2) payload.writeUInt8(decoration, 36);
     utf8.copy(payload, headerSize);
     this.command(8, payload);
   }

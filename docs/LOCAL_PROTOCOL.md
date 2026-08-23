@@ -91,6 +91,7 @@ Persistent canonical path resources are advertised by `1 << 11`.
 Correlated native text measurement is advertised by `1 << 12`.
 Native medium/semibold/italic typography is advertised by `1 << 26`, and
 native letter spacing by `1 << 27`.
+Native font-metric underline and line-through are advertised by `1 << 28`.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.
@@ -178,7 +179,8 @@ clip stack. `PushClip` carries four `f32` values—left, top, right, bottom—in
 normalized top-left coordinates from `0` to `1`. Backends intersect nested clips
 and apply them before draw commands.
 
-MGFX opcode `8` (`DrawText`) carries a portable system-font family and weight, normalized
+MGFX opcode `8` (`DrawText`) carries a portable system-font family, weight,
+style, optional em letter spacing, underline/line-through flags, normalized
 top-left position and font height, straight RGBA color, and validated UTF-8.
 The backend shapes Unicode and caches tessellated glyph outlines; strings no
 longer expand into a triangle command for every pixel-font cell.

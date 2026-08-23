@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextMetricsClient } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -392,16 +392,18 @@ test("indexed meshes upload once and frames reference their resource", () => {
 test("system Unicode text is a compact skippable display-list command", () => {
   const frame = new FrameEncoder();
   frame.systemText("Hello — Ω", -0.8, 0.6, 0.08,
-    { red: 0.7, green: 0.9, blue: 1, alpha: 1 }, "monospace", "semibold", "italic", 0.075);
+    { red: 0.7, green: 0.9, blue: 1, alpha: 1 }, "monospace", "semibold", "italic", 0.075,
+    TextDecoration.Underline | TextDecoration.LineThrough);
   frame.endFrame();
   const bytes = frame.finish();
   assert.equal(bytes.readUInt16LE(16), 8);
   assert.equal(bytes.readUInt8(24), 1);
   assert.equal(bytes.readUInt8(25), 3);
   assert.equal(bytes.readUInt8(26), 1);
-  assert.equal(bytes.readUInt8(27), 1);
+  assert.equal(bytes.readUInt8(27), 2);
   assert.ok(Math.abs(bytes.readFloatLE(56) - 0.075) < 0.00001);
-  assert.equal(bytes.subarray(60, 60 + Buffer.byteLength("Hello — Ω")).toString(), "Hello — Ω");
+  assert.equal(bytes.readUInt8(60), 3);
+  assert.equal(bytes.subarray(64, 64 + Buffer.byteLength("Hello — Ω")).toString(), "Hello — Ω");
 });
 
 test("native text metrics correlate asynchronous measurement replies", async () => {

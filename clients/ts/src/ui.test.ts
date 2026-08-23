@@ -202,6 +202,7 @@ test("system text lowers to one server-shaped UTF-8 command", () => {
       return text("Árvíztűrő — Ω", { fontSize: 20, fontFamily: "system",
         fontWeight: "semibold", fontStyle: "italic",
         letterSpacing: 1,
+        textDecoration: "underline line-through",
         color: { red: 0.6, green: 0.9, blue: 1, alpha: 1 } });
     }
   }
@@ -215,9 +216,10 @@ test("system text lowers to one server-shaped UTF-8 command", () => {
   assert.equal(frame.readUInt16LE(16), 8);
   assert.equal(frame.readUInt8(25), 3);
   assert.equal(frame.readUInt8(26), 1);
-  assert.equal(frame.readUInt8(27), 1);
+  assert.equal(frame.readUInt8(27), 2);
   assert.ok(Math.abs(frame.readFloatLE(56) - 0.05) < 0.00001);
-  assert.equal(frame.subarray(60, 60 + Buffer.byteLength("Árvíztűrő — Ω")).toString(),
+  assert.equal(frame.readUInt8(60), 3);
+  assert.equal(frame.subarray(64, 64 + Buffer.byteLength("Árvíztűrő — Ω")).toString(),
     "Árvíztűrő — Ω");
 });
 

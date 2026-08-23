@@ -43,6 +43,13 @@ int main() {
         std::cerr << "Letter spacing did not increase native text advance\n";
         return 1;
     }
+    if (semiboldItalic.underlineThickness <= 0.0F ||
+        semiboldItalic.underlinePosition <= 0.0F ||
+        semiboldItalic.strikeThroughThickness <= 0.0F ||
+        semiboldItalic.strikeThroughPosition <= 0.0F) {
+        std::cerr << "Native text decoration metrics are invalid\n";
+        return 1;
+    }
     for (const gfx::PathPoint& point : sans.triangles) {
         if (!std::isfinite(point[0]) || !std::isfinite(point[1])) {
             std::cerr << "System glyph outline contains non-finite geometry\n";
