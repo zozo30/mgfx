@@ -38,6 +38,9 @@ int main() {
     encoder.drawRadialGradient({{-0.8F, 0.8F, 0.8F, -0.8F}, 0.3F, 0.4F, 120.0F, 16.0F,
                                 {1.0F, 0.8F, 0.2F, 1.0F},
                                 {0.1F, 0.0F, 0.4F, 0.8F}});
+    encoder.drawRoundedRect({{-0.7F, 0.5F, 0.7F, -0.5F}, 18.0F, 3.0F,
+                             {0.1F, 0.2F, 0.5F, 1.0F},
+                             {0.5F, 0.8F, 1.0F, 0.9F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -98,6 +101,13 @@ int main() {
         !nearlyEqual(radial.radius, 120.0F) || !nearlyEqual(radial.outerColor.blue, 0.4F) ||
         !decoder.next(command)) {
         return fail("Radial-gradient decoding failed");
+    }
+    gfx::RoundedRectCommand rectangle{};
+    if (!gfx::decodeRoundedRect(command, rectangle) ||
+        !nearlyEqual(rectangle.cornerRadius, 18.0F) ||
+        !nearlyEqual(rectangle.borderWidth, 3.0F) ||
+        !nearlyEqual(rectangle.borderColor.green, 0.8F) || !decoder.next(command)) {
+        return fail("Rounded-rectangle decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

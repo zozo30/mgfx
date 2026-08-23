@@ -497,16 +497,25 @@ class Node {
     } else if ((this.style.cornerRadius ?? 0) > 0) {
       if (radial) {
         paintRadialGradient(encoder, this.bounds, radial, this.style.cornerRadius ?? 0, viewport);
-        paintRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined, undefined,
+        paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined,
           this.style.borderWidth ?? 0, this.style.borderColor, viewport);
-      } else paintRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background, gradient,
+      } else if (gradient) {
+        paintRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined, gradient,
+          0, undefined, viewport);
+        paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, undefined,
+          this.style.borderWidth ?? 0, this.style.borderColor, viewport);
+      } else paintServerRoundedRect(encoder, this.bounds, this.style.cornerRadius ?? 0, background,
         this.style.borderWidth ?? 0, this.style.borderColor, viewport);
     } else {
+      let combinedBorder = false;
       if (this.bounds.width > 0 && this.bounds.height > 0) {
         if (radial) paintRadialGradient(encoder, this.bounds, radial, 0, viewport);
         else if (gradient) encoder.triangles(gradientRectangleVertices(this.bounds, gradient, viewport));
-        else if (background && background.alpha > 0)
-          encoder.triangles(rectangleVertices(this.bounds, background, viewport));
+        else if (!this.style.backgroundImage && !this.style.backgroundPattern) {
+          paintServerRoundedRect(encoder, this.bounds, 0, background,
+            this.style.borderWidth ?? 0, this.style.borderColor, viewport);
+          combinedBorder = true;
+        } else paintServerRoundedRect(encoder, this.bounds, 0, background, 0, undefined, viewport);
         if (this.style.backgroundImage) {
           const image = imageGeometry(this.bounds, this.style.backgroundImage);
           encoder.image(this.style.backgroundImage.textureId, normalizedRect(image.destination, viewport),
@@ -514,7 +523,8 @@ class Node {
         }
       }
       paintDiagonalStripes(encoder, this.bounds, this.style.backgroundPattern, viewport);
-      paintBorder(encoder, this.bounds, this.style.borderWidth ?? 0, this.style.borderColor, viewport);
+      if (!combinedBorder) paintServerRoundedRect(encoder, this.bounds, 0, undefined,
+        this.style.borderWidth ?? 0, this.style.borderColor, viewport);
     }
     if (this.type === "text") paintText(encoder, this.bounds, this.value, this.textStyle, viewport);
     for (const child of this.paintOrder()) child.paint(encoder, viewport);
@@ -615,6 +625,16 @@ function paintRadialGradient(encoder: FrameEncoder, bounds: Rect, gradient: Radi
     centerX: gradient.centerX ?? 0.5, centerY: gradient.centerY ?? 0.5,
     radius: gradient.radius ?? Math.hypot(bounds.width, bounds.height) / 2,
     cornerRadius, innerColor: gradient.inner, outerColor: gradient.outer });
+}
+
+function paintServerRoundedRect(encoder: FrameEncoder, bounds: Rect, cornerRadius: number,
+  fill: Color | undefined, borderWidth: number, border: Color | undefined,
+  viewport: Size): void {
+  if (bounds.width <= 0 || bounds.height <= 0 ||
+      ((!fill || fill.alpha <= 0) && (!border || border.alpha <= 0 || borderWidth <= 0))) return;
+  const transparent = { red: 0, green: 0, blue: 0, alpha: 0 };
+  encoder.roundedRect({ destination: normalizedRect(bounds, viewport), cornerRadius, borderWidth,
+    fillColor: fill ?? transparent, borderColor: border ?? transparent });
 }
 
 function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefined,

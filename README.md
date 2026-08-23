@@ -171,6 +171,10 @@ Radial backgrounds follow the same model: one command carries focal position,
 pixel radius, rounded-corner mask, and inner/outer colors. Metal evaluates the
 falloff per fragment, so React and future VM clients never generate gradient fans.
 
+Solid boxes and borders now use one `DrawRoundedRect` record backed by an
+antialiased rounded-box SDF. This replaces the old 32-segment client fan/ring,
+shrinks animated frames, and eliminates polygon seam and one-pixel border overlap.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,

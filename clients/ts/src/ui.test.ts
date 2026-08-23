@@ -274,8 +274,8 @@ test("cached native advance participates in row measurement", () => {
   encoder.endFrame();
   const frame = encoder.finish();
   const secondCommand = 16 + 8 + 32 + Buffer.byteLength("METRIC");
-  assert.equal(frame.readUInt16LE(secondCommand), 2);
-  assert.ok(Math.abs(frame.readFloatLE(secondCommand + 8 + 8) - -0.6) < 0.0001);
+  assert.equal(frame.readUInt16LE(secondCommand), 15);
+  assert.ok(Math.abs(frame.readFloatLE(secondCommand + 8) - -0.6) < 0.0001);
 });
 
 test("filled and bordered circles emit portable triangle meshes", () => {
@@ -310,7 +310,9 @@ test("rounded rectangle fill and border are independently drawable", () => {
   const encoder = new FrameEncoder();
   host.paint(encoder, { width: 80, height: 40 });
   encoder.endFrame();
-  assert.equal(encoder.finish().readUInt32LE(12), 3);
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 15);
 });
 
 test("linear gradients lower to interpolated portable vertex colors", () => {

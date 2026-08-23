@@ -56,6 +56,7 @@ export enum ServerCapability {
   OpacityStack = 1 << 14,
   SoftShadows = 1 << 15,
   RadialGradients = 1 << 16,
+  RoundedRectangles = 1 << 17,
 }
 export interface ServerHello {
   readonly version: number;
@@ -133,6 +134,10 @@ export interface RadialGradientPaint {
   readonly destination: ClipRect; readonly centerX: number; readonly centerY: number;
   readonly radius: number; readonly cornerRadius: number;
   readonly innerColor: Color; readonly outerColor: Color;
+}
+export interface RoundedRectPaint {
+  readonly destination: ClipRect; readonly cornerRadius: number; readonly borderWidth: number;
+  readonly fillColor: Color; readonly borderColor: Color;
 }
 
 export type PathSegment =
@@ -657,6 +662,19 @@ export class FrameEncoder {
     const payload = Buffer.alloc(64);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(14, payload);
+  }
+
+  roundedRect(value: RoundedRectPaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.cornerRadius, value.borderWidth,
+      value.fillColor.red, value.fillColor.green, value.fillColor.blue, value.fillColor.alpha,
+      value.borderColor.red, value.borderColor.green, value.borderColor.blue, value.borderColor.alpha];
+    if (values.some((item) => !Number.isFinite(item)) || value.cornerRadius < 0 ||
+        value.borderWidth < 0 || value.cornerRadius > 8192 || value.borderWidth > 8192)
+      throw new RangeError("Rounded rectangle values are outside supported bounds");
+    const payload = Buffer.alloc(56);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(15, payload);
   }
 
   finish(): Buffer {

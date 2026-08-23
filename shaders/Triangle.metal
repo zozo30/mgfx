@@ -124,3 +124,56 @@ fragment float4 radialFragmentMain(RadialVertexOut in [[stage_in]]) {
     const float alpha = color.a * coverage;
     return float4(color.rgb * alpha, alpha);
 }
+
+struct RoundedRectVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    float radius;
+    float borderWidth;
+    packed_float4 fillColor;
+    packed_float4 borderColor;
+};
+
+struct RoundedRectVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float radius;
+    float borderWidth;
+    float4 fillColor;
+    float4 borderColor;
+};
+
+vertex RoundedRectVertexOut roundedRectVertexMain(
+    const device RoundedRectVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const RoundedRectVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size,
+            value.radius, value.borderWidth, value.fillColor, value.borderColor};
+}
+
+fragment float4 roundedRectFragmentMain(RoundedRectVertexOut in [[stage_in]]) {
+    const float2 halfSize = in.size * 0.5;
+    const float radius = min(in.radius, min(halfSize.x, halfSize.y));
+    const float2 centered = in.local - halfSize;
+    const float2 outerQ = abs(centered) - halfSize + radius;
+    const float outerDistance = length(max(outerQ, 0.0)) +
+        min(max(outerQ.x, outerQ.y), 0.0) - radius;
+    const float outerAA = max(fwidth(outerDistance), 0.75);
+    const float outerCoverage = 1.0 - smoothstep(0.0, outerAA, outerDistance);
+
+    const float border = min(in.borderWidth, min(halfSize.x, halfSize.y));
+    const float2 innerHalf = max(halfSize - border, 0.0);
+    const float innerRadius = max(radius - border, 0.0);
+    const float2 innerQ = abs(centered) - innerHalf + innerRadius;
+    const float innerDistance = length(max(innerQ, 0.0)) +
+        min(max(innerQ.x, innerQ.y), 0.0) - innerRadius;
+    const float innerAA = max(fwidth(innerDistance), 0.75);
+    const float innerCoverage = border > 0.0
+        ? 1.0 - smoothstep(0.0, innerAA, innerDistance) : outerCoverage;
+    const float borderCoverage = max(0.0, outerCoverage - innerCoverage);
+    const float4 fill = float4(in.fillColor.rgb * in.fillColor.a, in.fillColor.a) * innerCoverage;
+    const float4 stroke = float4(in.borderColor.rgb * in.borderColor.a,
+                                 in.borderColor.a) * borderCoverage;
+    return fill + stroke;
+}

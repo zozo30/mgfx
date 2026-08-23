@@ -168,6 +168,19 @@ void CommandEncoder::drawRadialGradient(const RadialGradientCommand& gradient) {
     }
 }
 
+void CommandEncoder::drawRoundedRect(const RoundedRectCommand& rectangle) {
+    beginCommand(Opcode::drawRoundedRect, 14 * sizeof(float));
+    for (float value : {rectangle.destination.left, rectangle.destination.top,
+                        rectangle.destination.right, rectangle.destination.bottom,
+                        rectangle.cornerRadius, rectangle.borderWidth,
+                        rectangle.fillColor.red, rectangle.fillColor.green,
+                        rectangle.fillColor.blue, rectangle.fillColor.alpha,
+                        rectangle.borderColor.red, rectangle.borderColor.green,
+                        rectangle.borderColor.blue, rectangle.borderColor.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -367,6 +380,19 @@ bool decodeRadialGradient(const CommandView& command, RadialGradientCommand& gra
                            readFloat(command.payload + 40), readFloat(command.payload + 44)};
     gradient.outerColor = {readFloat(command.payload + 48), readFloat(command.payload + 52),
                            readFloat(command.payload + 56), readFloat(command.payload + 60)};
+    return true;
+}
+
+bool decodeRoundedRect(const CommandView& command, RoundedRectCommand& rectangle) {
+    if (command.opcode != Opcode::drawRoundedRect || command.payloadSize != 56) return false;
+    rectangle.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                             readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    rectangle.cornerRadius = readFloat(command.payload + 16);
+    rectangle.borderWidth = readFloat(command.payload + 20);
+    rectangle.fillColor = {readFloat(command.payload + 24), readFloat(command.payload + 28),
+                           readFloat(command.payload + 32), readFloat(command.payload + 36)};
+    rectangle.borderColor = {readFloat(command.payload + 40), readFloat(command.payload + 44),
+                             readFloat(command.payload + 48), readFloat(command.payload + 52)};
     return true;
 }
 

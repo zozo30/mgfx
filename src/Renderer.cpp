@@ -82,9 +82,14 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto shadowFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("shadowFragmentMain")));
     auto radialVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("radialVertexMain")));
     auto radialFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("radialFragmentMain")));
+    auto roundedRectVertexFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("roundedRectVertexMain")));
+    auto roundedRectFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("roundedRectFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
-        !radialVertexFunction || !radialFragmentFunction) {
+        !radialVertexFunction || !radialFragmentFunction ||
+        !roundedRectVertexFunction || !roundedRectFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -153,6 +158,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(radialDescriptor.get(), &error));
     if (!radialPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the radial-gradient pipeline", error));
+    }
+
+    auto roundedDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    roundedDescriptor->setVertexFunction(roundedRectVertexFunction.get());
+    roundedDescriptor->setFragmentFunction(roundedRectFragmentFunction.get());
+    roundedDescriptor->setRasterSampleCount(sampleCount);
+    auto* roundedColor = roundedDescriptor->colorAttachments()->object(0);
+    roundedColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    roundedColor->setBlendingEnabled(true);
+    roundedColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    roundedColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    roundedColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    roundedColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    roundedRectPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(roundedDescriptor.get(), &error));
+    if (!roundedRectPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the rounded-rectangle pipeline", error));
     }
 }
 
@@ -431,6 +453,56 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(radialPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawRoundedRect) {
+            gfx::RoundedRectCommand rectangle{};
+            if (!gfx::decodeRoundedRect(command, rectangle) ||
+                !std::isfinite(rectangle.cornerRadius) ||
+                !std::isfinite(rectangle.borderWidth) || rectangle.cornerRadius < 0.0F ||
+                rectangle.borderWidth < 0.0F || rectangle.cornerRadius > 8192.0F ||
+                rectangle.borderWidth > 8192.0F) {
+                throw std::runtime_error("Malformed rounded-rectangle command");
+            }
+            if (clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (rectangle.destination.right - rectangle.destination.left) * drawableWidth * 0.5F,
+                (rectangle.destination.top - rectangle.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct RoundedRectVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float radius;
+                float borderWidth;
+                std::array<float, 4> fillColor;
+                std::array<float, 4> borderColor;
+            };
+            const std::array<float, 4> fill = {rectangle.fillColor.red, rectangle.fillColor.green,
+                rectangle.fillColor.blue, rectangle.fillColor.alpha * opacityStack.back()};
+            const std::array<float, 4> border = {rectangle.borderColor.red,
+                rectangle.borderColor.green, rectangle.borderColor.blue,
+                rectangle.borderColor.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return RoundedRectVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, rectangle.cornerRadius, rectangle.borderWidth,
+                    fill, border};
+            };
+            const RoundedRectVertex vertices[] = {
+                vertex(rectangle.destination.left, rectangle.destination.top, 0.0F, 0.0F),
+                vertex(rectangle.destination.left, rectangle.destination.bottom, 0.0F, size[1]),
+                vertex(rectangle.destination.right, rectangle.destination.bottom, size[0], size[1]),
+                vertex(rectangle.destination.left, rectangle.destination.top, 0.0F, 0.0F),
+                vertex(rectangle.destination.right, rectangle.destination.bottom, size[0], size[1]),
+                vertex(rectangle.destination.right, rectangle.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(roundedRectPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

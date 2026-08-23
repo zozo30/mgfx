@@ -131,6 +131,14 @@ pipeline calculates smooth radial falloff and an antialiased rounded mask. It
 inherits transforms, opacity, and clipping and is advertised by
 `radialGradients`.
 
+## Rounded rectangles
+
+`DrawRoundedRect` combines destination, pixel corner radius and border width,
+plus fill and border colors. Its fragment shader evaluates outer and inner SDFs
+with derivative antialiasing, replacing client-generated 32-segment fill and
+border meshes. The command inherits all display-list state and is advertised by
+`roundedRectangles`.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility
