@@ -66,6 +66,10 @@ sequences of up to 32 values plus
 to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
 masks, text, and embedded images deliberately continue through the high-quality raster fallback.
 Missing, cyclic, or external gradient references are rejected rather than partially rendered.
+Local `<use>` references to primitive, group, or symbol definitions expand before
+canonicalization. Each instance retains its own paint and transform while the
+definition itself remains non-rendering; external, missing, duplicate, cyclic,
+or expansion-bomb references are rejected.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the

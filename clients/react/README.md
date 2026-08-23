@@ -139,6 +139,10 @@ emits two draws sharing the same persistent path resource.
 Radial strokes also retain SVG dash arrays, signed dash offset, caps, joins, and
 custom miter limits. The server performs dash splitting and stroke tessellation;
 React sends the original path, paint, and style values only.
+Same-document SVG `<use href="#...">` and `xlink:href` instances resolve local
+primitive, group, and symbol definitions before path upload. Instance position,
+paint, and transforms are preserved, while unsafe external or cyclic references
+are rejected.
 Direct React `Path` components also accept `conicGradient` and
 `strokeConicGradient`. Two through eight angular stops, a source-space center,
 and a radian rotation lower to one native path command; rotation animation does

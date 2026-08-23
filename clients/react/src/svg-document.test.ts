@@ -28,6 +28,34 @@ test("SVG vector lowering rejects executable or external document content", () =
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><image href="https://example.com/a.png"/></svg>`),
   /external or executable/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><use href="https://example.com/a.svg#shape"/></svg>`),
+  /local fragment/);
+});
+
+test("SVG local use instances expand symbols into independently transformed native paths", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 80 30" fill="none">
+    <defs><symbol id="mark" fill="currentColor"><path d="M0 0H10V8H0Z"/></symbol>
+      <g id="nested"><g transform="translate(1 1)"><circle cx="3" cy="3" r="2"/></g></g>
+    </defs>
+    <use href="#mark" x="5" y="4" color="#20d890"/>
+    <use xlink:href="#mark" x="30" y="2" color="#4cc9ff" transform="scale(1.5)"/>
+    <use href="#nested" x="60" y="4" fill="#ff8020"/>
+  </svg>`);
+  assert.equal(document.layers.length, 3);
+  assert.match(document.layers[0]?.path ?? "", /M5 4/);
+  assert.match(document.layers[1]?.path ?? "", /M45 3/);
+  assert.ok((document.layers[0]?.fill?.green ?? 0) > 0.8);
+  assert.ok((document.layers[1]?.fill?.blue ?? 0) > 0.9);
+  assert.match(document.layers[2]?.path ?? "", /M62 8/);
+});
+
+test("SVG local use rejects unresolved and cyclic references", () => {
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><use href="#missing"/></svg>`), /missing #missing/);
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 10 10"><defs>
+    <symbol id="a"><use href="#b"/></symbol><symbol id="b"><use href="#a"/></symbol>
+    </defs><use href="#a"/></svg>`), /reference cycle/);
 });
 
 test("SVG documents lower user-space linear gradients to native path paint", () => {

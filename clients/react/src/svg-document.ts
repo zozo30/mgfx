@@ -102,28 +102,103 @@ const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 const white: Color = { red: 1, green: 1, blue: 1, alpha: 1 };
 const primitiveTags = new Set(["path", "line", "polyline", "polygon", "rect", "circle", "ellipse"]);
 
+interface LocalSvgReference {
+  readonly tag: string;
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly body?: string;
+}
+
+function expandLocalUses(source: string): string {
+  const references = new Map<string, LocalSvgReference>();
+  const remember = (tag: string, attributeSource: string, body?: string) => {
+    const attributes = svgAttributes(attributeSource);
+    const id = attributes.id?.trim();
+    if (!id) return;
+    if (references.has(id)) throw new Error(`SVG contains duplicate local id #${id}`);
+    references.set(id, { tag: tag.toLowerCase(), attributes, ...(body !== undefined ? { body } : {}) });
+  };
+  const containers: { tag: string; attributes: string; bodyStart: number }[] = [];
+  const tagPattern = /<\/?\s*([A-Za-z][\w:-]*)\b[^>]*>/g;
+  for (let match = tagPattern.exec(source); match; match = tagPattern.exec(source)) {
+    const tag = match[1]!.toLowerCase();
+    if (tag !== "symbol" && tag !== "g") continue;
+    if (/^<\//.test(match[0])) {
+      const opened = containers.pop();
+      if (opened?.tag !== tag) throw new Error("SVG contains mismatched local definition tags");
+      remember(tag, opened.attributes, source.slice(opened.bodyStart, match.index));
+    } else if (!/\/\s*>$/.test(match[0])) {
+      containers.push({ tag,
+        attributes: match[0].replace(/^<\s*[\w:-]+|\s*>$/g, ""),
+        bodyStart: match.index + match[0].length });
+    }
+  }
+  if (containers.length > 0) throw new Error("SVG contains unclosed local definition tags");
+  for (const match of source.matchAll(
+    /<(path|line|polyline|polygon|rect|circle|ellipse)\b([^>]*?)(?:\/\s*>|>\s*<\/\1\s*>)/gi))
+    remember(match[1]!, match[2]!);
+
+  const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const serialize = (attributes: Readonly<Record<string, string>>, excluded: ReadonlySet<string>) =>
+    Object.entries(attributes).filter(([name]) => !excluded.has(name))
+      .map(([name, value]) => `${name}="${escape(value)}"`).join(" ");
+  const definitionExcluded = new Set(["id", "viewBox", "width", "height"]);
+  const useExcluded = new Set(["href", "xlink:href", "x", "y", "transform"]);
+  const usePattern = /<use\b([^>]*?)(?:\/\s*>|>\s*<\/use\s*>)/gi;
+  let expansionCount = 0;
+  const expandFragment = (fragment: string, stack: readonly string[]): string =>
+    fragment.replace(usePattern, (_token, attributeSource: string) => {
+      if (++expansionCount > 4096) throw new RangeError("SVG exceeds 4096 local use instances");
+      const attributes = withInlineStyle(svgAttributes(attributeSource));
+      const href = attributes.href ?? attributes["xlink:href"];
+      const match = href?.match(/^#([^\s]+)$/);
+      if (!match) throw new Error("SVG use requires a local fragment reference");
+      const id = match[1]!;
+      if (stack.includes(id)) throw new Error(`SVG use reference cycle at #${id}`);
+      const definition = references.get(id);
+      if (!definition) throw new Error(`SVG use references missing #${id}`);
+      const definitionAttributes = serialize(definition.attributes, definitionExcluded);
+      const referenced = definition.body === undefined
+        ? `<${definition.tag}${definitionAttributes ? ` ${definitionAttributes}` : ""}/>`
+        : `<g${definitionAttributes ? ` ${definitionAttributes}` : ""}>${definition.body}</g>`;
+      const expanded = expandFragment(referenced, [...stack, id]);
+      const x = Number(attributes.x ?? 0), y = Number(attributes.y ?? 0);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("SVG use position must be finite");
+      const presentation = serialize(attributes, useExcluded);
+      const transform = `${attributes.transform ? `${attributes.transform} ` : ""}translate(${x} ${y})`;
+      return `<g${presentation ? ` ${presentation}` : ""} transform="${escape(transform)}">${expanded}</g>`;
+    });
+  const expanded = expandFragment(source, []);
+  if (Buffer.byteLength(expanded, "utf8") > 4 * 1024 * 1024)
+    throw new RangeError("Expanded SVG exceeds 4 MiB");
+  return expanded;
+}
+
 export function parseSvgVectorDocument(source: string, defaultColor: Color = white): SvgVectorDocument {
   if (Buffer.byteLength(source, "utf8") > 1024 * 1024) throw new RangeError("SVG exceeds 1 MiB");
-  if (/<(?:script|image|foreignObject|use)\b/i.test(source))
+  if (/<(?:script|image|foreignObject)\b|<!\s*(?:doctype|entity)\b/i.test(source))
     throw new Error("SVG contains external or executable content");
-  const svgMatch = source.match(/<svg\b([^>]*)>/i);
+  const expandedSource = expandLocalUses(source.replace(/<!--[\s\S]*?-->/g, ""));
+  const svgMatch = expandedSource.match(/<svg\b([^>]*)>/i);
   if (!svgMatch) throw new Error("SVG document has no root element");
   const rootAttributes = withInlineStyle(svgAttributes(svgMatch[1]!));
   const viewBox = parseViewBox(rootAttributes);
-  const gradients = parseLinearGradients(source, defaultColor);
-  const radialGradients = parseRadialGradients(source, defaultColor);
+  const gradients = parseLinearGradients(expandedSource, defaultColor);
+  const radialGradients = parseRadialGradients(expandedSource, defaultColor);
   const initial: PaintState = { fill: { red: 0, green: 0, blue: 0, alpha: 1 },
     strokeWidth: 1, opacity: 1, fillOpacity: 1, strokeOpacity: 1,
     fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
     currentColor: defaultColor, transform: identity };
   const stack: PaintState[] = [initial];
   const layers: SvgVectorLayer[] = [];
-  const tokens = source.match(/<\/?[A-Za-z][^>]*>/g) ?? [];
+  const tokens = expandedSource.match(/<\/?[A-Za-z][^>]*>/g) ?? [];
+  let hiddenDepth = 0;
   for (const token of tokens) {
     const closing = /^<\//.test(token);
     const name = token.match(/^<\/?\s*([\w:-]+)/)?.[1]?.toLowerCase();
     if (!name) continue;
     if (closing) {
+      if (name === "defs" || name === "symbol") hiddenDepth = Math.max(0, hiddenDepth - 1);
       if ((name === "svg" || name === "g") && stack.length > 1) stack.pop();
       continue;
     }
@@ -131,11 +206,16 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     const attributes = withInlineStyle(svgAttributes(attributeSource));
     const parent = stack[stack.length - 1]!;
     const state = inherit(parent, attributes);
+    if (name === "defs" || name === "symbol") {
+      if (!/\/\s*>$/.test(token)) hiddenDepth += 1;
+      continue;
+    }
     if (name === "svg" || name === "g") {
       stack.push(state);
       if (/\/\s*>$/.test(token)) stack.pop();
       continue;
     }
+    if (hiddenDepth > 0) continue;
     if (!primitiveTags.has(name)) continue;
     const rawPath = svgPrimitivePath(name, attributes);
     if (!rawPath) continue;
