@@ -99,6 +99,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("linearGradientVertexMain")));
     auto linearGradientFragmentFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("linearGradientFragmentMain")));
+    auto linearGradientCircleFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("linearGradientCircleFragmentMain")));
     auto dotGridVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("dotGridVertexMain")));
     auto dotGridFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("dotGridFragmentMain")));
     auto waveDotsVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("waveDotsVertexMain")));
@@ -115,6 +117,7 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         !circleVertexFunction || !circleFragmentFunction ||
         !patternVertexFunction || !patternFragmentFunction ||
         !linearGradientVertexFunction || !linearGradientFragmentFunction ||
+        !linearGradientCircleFragmentFunction ||
         !dotGridVertexFunction || !dotGridFragmentFunction ||
         !waveDotsVertexFunction || !waveDotsFragmentFunction ||
         !conicGradientVertexFunction || !conicGradientFragmentFunction) {
@@ -271,6 +274,13 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(linearGradientDescriptor.get(), &error));
     if (!linearGradientPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the linear-gradient pipeline", error));
+    }
+    linearGradientDescriptor->setFragmentFunction(linearGradientCircleFragmentFunction.get());
+    linearGradientCirclePipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(linearGradientDescriptor.get(), &error));
+    if (!linearGradientCirclePipelineState_) {
+        throw std::runtime_error(errorMessage(
+            "Could not create the linear-gradient circle pipeline", error));
     }
 
     auto dotGridDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -816,9 +826,20 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
-        } else if (command.opcode == gfx::Opcode::drawLinearGradient) {
+        } else if (command.opcode == gfx::Opcode::drawLinearGradient ||
+                   command.opcode == gfx::Opcode::drawLinearGradientCircle) {
+            const bool circleMask = command.opcode == gfx::Opcode::drawLinearGradientCircle;
             gfx::LinearGradientCommand gradient{};
-            if (!gfx::decodeLinearGradient(command, gradient) ||
+            bool decoded = false;
+            if (circleMask) {
+                gfx::LinearGradientCircleCommand circle{};
+                decoded = gfx::decodeLinearGradientCircle(command, circle);
+                if (decoded) gradient = {circle.destination, 0.0F, circle.direction,
+                                         circle.startColor, circle.endColor};
+            } else {
+                decoded = gfx::decodeLinearGradient(command, gradient);
+            }
+            if (!decoded ||
                 !std::isfinite(gradient.cornerRadius) || gradient.cornerRadius < 0.0F ||
                 gradient.cornerRadius > 8192.0F) {
                 throw std::runtime_error("Malformed linear-gradient command");
@@ -857,7 +878,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 vertex(gradient.destination.right, gradient.destination.top, size[0], 0.0F),
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
-            encoder->setRenderPipelineState(linearGradientPipelineState_.get());
+            encoder->setRenderPipelineState(circleMask
+                ? linearGradientCirclePipelineState_.get() : linearGradientPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

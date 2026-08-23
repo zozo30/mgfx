@@ -363,7 +363,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::fontResources |
             mgfx::ipc::ServerCapability::richTextRuns |
             mgfx::ipc::ServerCapability::capabilityWords64 |
-            mgfx::ipc::ServerCapability::resourceStatusEvents;
+            mgfx::ipc::ServerCapability::resourceStatusEvents |
+            mgfx::ipc::ServerCapability::linearGradientCircles;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

@@ -81,6 +81,7 @@ export enum ServerCapability {
 export const ExtendedServerCapability = {
   CapabilityWords64: 1n << 32n,
   ResourceStatusEvents: 1n << 33n,
+  LinearGradientCircles: 1n << 34n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -184,6 +185,11 @@ export interface DiagonalPatternPaint {
 }
 export interface LinearGradientPaint {
   readonly destination: ClipRect; readonly cornerRadius: number;
+  readonly direction: "horizontal" | "vertical" | "diagonal";
+  readonly startColor: Color; readonly endColor: Color;
+}
+export interface LinearGradientCirclePaint {
+  readonly destination: ClipRect;
   readonly direction: "horizontal" | "vertical" | "diagonal";
   readonly startColor: Color; readonly endColor: Color;
 }
@@ -933,6 +939,19 @@ export class FrameEncoder {
     const payload = Buffer.alloc(56);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(18, payload);
+  }
+
+  linearGradientCircle(value: LinearGradientCirclePaint): void {
+    const directions = { horizontal: 0, vertical: 1, diagonal: 2 } as const;
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, directions[value.direction],
+      value.startColor.red, value.startColor.green, value.startColor.blue, value.startColor.alpha,
+      value.endColor.red, value.endColor.green, value.endColor.blue, value.endColor.alpha];
+    if (values.some((item) => !Number.isFinite(item)))
+      throw new RangeError("Linear gradient circle values must be finite");
+    const payload = Buffer.alloc(52);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(25, payload);
   }
 
   conicGradient(value: ConicGradientPaint): void {

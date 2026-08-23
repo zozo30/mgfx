@@ -50,6 +50,10 @@ int main() {
                                 gfx::GradientDirection::diagonal,
                                 {0.2F, 0.8F, 1.0F, 1.0F},
                                 {0.7F, 0.2F, 1.0F, 0.75F}});
+    encoder.drawLinearGradientCircle({{-0.4F, 0.4F, 0.4F, -0.4F},
+                                      gfx::GradientDirection::vertical,
+                                      {0.1F, 0.9F, 0.7F, 1.0F},
+                                      {0.5F, 0.2F, 1.0F, 0.8F}});
     encoder.drawConicGradient({{-0.3F, 0.3F, 0.3F, -0.3F}, 0.5F, 0.5F, 1.25F, 30.0F,
                                {0.1F, 0.8F, 1.0F, 1.0F}, {0.7F, 0.2F, 1.0F, 1.0F},
                                {0.1F, 0.8F, 1.0F, 1.0F}});
@@ -165,6 +169,13 @@ int main() {
         !nearlyEqual(linear.startColor.green, 0.8F) ||
         !nearlyEqual(linear.endColor.alpha, 0.75F) || !decoder.next(command)) {
         return fail("Linear-gradient decoding failed");
+    }
+    gfx::LinearGradientCircleCommand linearCircle{};
+    if (!gfx::decodeLinearGradientCircle(command, linearCircle) ||
+        linearCircle.direction != gfx::GradientDirection::vertical ||
+        !nearlyEqual(linearCircle.startColor.green, 0.9F) ||
+        !nearlyEqual(linearCircle.endColor.alpha, 0.8F) || !decoder.next(command)) {
+        return fail("Linear-gradient circle decoding failed");
     }
     gfx::ConicGradientCommand conic{};
     if (!gfx::decodeConicGradient(command, conic) ||

@@ -232,9 +232,10 @@ Cards, list rows, panels, and fields demonstrate it.
 
 TypeScript styles also accept horizontal, vertical, or diagonal linear gradients.
 Rectangle and rounded-rectangle backgrounds lower to a constant-size
-`DrawLinearGradient` command; explicit circle gradients retain the colored-mesh
-fallback until a gradient-circle variant is added. The React demo combines these
-fills with a native-clock-driven wave pattern.
+`DrawLinearGradient` command. Circle gradients use the corresponding
+`DrawLinearGradientCircle` server primitive and an antialiased radial mask, so
+they no longer generate a 32-segment client triangle fan. The React demo combines
+these fills with native-clock-driven badges and wave patterns.
 
 Rectangular areas can additionally use an animated diagonal stripe pattern with
 configurable color, stripe width, gap, direction, and phase offset. One

@@ -92,6 +92,7 @@ enum ServerCapability : std::uint64_t {
     richTextRuns = 1ULL << 31U,
     capabilityWords64 = 1ULL << 32U,
     resourceStatusEvents = 1ULL << 33U,
+    linearGradientCircles = 1ULL << 34U,
 };
 
 enum class ResourceKind : std::uint8_t {

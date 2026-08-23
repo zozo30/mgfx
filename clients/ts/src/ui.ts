@@ -920,44 +920,16 @@ function rectangleVertices(r: Rect, color: Color, v: Size): Vertex[] {
 function paintCircle(encoder: FrameEncoder, r: Rect, fill: Color | undefined,
   gradient: LinearGradient | undefined,
   borderWidth: number, border: Color | undefined, viewport: Size): void {
-  const segments = 32, radius = Math.min(r.width, r.height) / 2;
+  const radius = Math.min(r.width, r.height) / 2;
   if (radius <= 0) return;
-  const center = { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-  if (gradient) {
-    const vertices: Vertex[] = [];
-    const vertex = (point: Point) => pointVertex(point, gradientColor(point, r, gradient), viewport);
-    for (let index = 0; index < segments; index++) vertices.push(vertex(center),
-      vertex(circlePoint(center, radius, index, segments)),
-      vertex(circlePoint(center, radius, index + 1, segments)));
-    encoder.triangles(vertices);
-  }
+  if (gradient) encoder.linearGradientCircle({ destination: normalizedRect(r, viewport),
+    direction: gradient.direction ?? "horizontal",
+    startColor: gradient.start, endColor: gradient.end });
   const transparent = { red: 0, green: 0, blue: 0, alpha: 0 };
   if ((!gradient && fill && fill.alpha > 0) || (border && border.alpha > 0 && borderWidth > 0))
     encoder.circle({ destination: normalizedRect(r, viewport), borderWidth,
       fillColor: gradient ? transparent : fill ?? transparent,
       borderColor: border ?? transparent });
-}
-
-function gradientColor(point: Point, bounds: Rect, gradient: LinearGradient): Color {
-  const x = bounds.width <= 0 ? 0 : (point.x - bounds.x) / bounds.width;
-  const y = bounds.height <= 0 ? 0 : (point.y - bounds.y) / bounds.height;
-  const amount = clamp(gradient.direction === "vertical" ? y :
-    gradient.direction === "diagonal" ? (x + y) / 2 : x, 0, 1);
-  return {
-    red: gradient.start.red + (gradient.end.red - gradient.start.red) * amount,
-    green: gradient.start.green + (gradient.end.green - gradient.start.green) * amount,
-    blue: gradient.start.blue + (gradient.end.blue - gradient.start.blue) * amount,
-    alpha: gradient.start.alpha + (gradient.end.alpha - gradient.start.alpha) * amount,
-  };
-}
-
-function circlePoint(center: Point, radius: number, index: number, segments: number): Point {
-  const angle = index / segments * Math.PI * 2;
-  return { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
-}
-
-function pointVertex(point: Point, color: Color, viewport: Size): Vertex {
-  return { x: point.x / viewport.width * 2 - 1, y: 1 - point.y / viewport.height * 2, color };
 }
 
 const glyphs: Readonly<Record<string, readonly number[]>> = {

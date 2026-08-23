@@ -342,6 +342,25 @@ test("filled and bordered circles emit one server SDF command", () => {
   assert.equal(frame.readUInt16LE(16), 16);
 });
 
+test("gradient circles emit one server SDF command instead of a triangle fan", () => {
+  class GradientCircle extends Component {
+    build(): Element {
+      return circle({ preferredSize: { width: 60, height: 60 }, backgroundGradient: {
+        start: { red: 0.1, green: 0.9, blue: 0.7, alpha: 1 },
+        end: { red: 0.5, green: 0.2, blue: 1, alpha: 1 }, direction: "diagonal",
+      } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new GradientCircle());
+  host.layout({ width: 60, height: 60 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 60, height: 60 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 25);
+  assert.equal(frame.readUInt32LE(20), 52);
+});
+
 test("rounded rectangle fill and border are independently drawable", () => {
   class RoundedComponent extends Component {
     build(): Element {

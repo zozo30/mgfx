@@ -45,6 +45,7 @@ private:
     NS::SharedPtr<MTL::RenderPipelineState> circlePipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> patternPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> linearGradientPipelineState_;
+    NS::SharedPtr<MTL::RenderPipelineState> linearGradientCirclePipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> dotGridPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> waveDotsPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> conicGradientPipelineState_;

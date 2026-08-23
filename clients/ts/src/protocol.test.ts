@@ -33,7 +33,7 @@ test("server hello identifies backend and portable capabilities", () => {
 test("extended capabilities preserve bits beyond the legacy hello word", () => {
   const payload = Buffer.alloc(8);
   const capabilities = 0xffff_ffffn | ExtendedServerCapability.CapabilityWords64 |
-    ExtendedServerCapability.ResourceStatusEvents;
+    ExtendedServerCapability.ResourceStatusEvents | ExtendedServerCapability.LinearGradientCircles;
   payload.writeBigUInt64LE(capabilities);
   assert.equal(decodeServerCapabilities(payload), capabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -184,6 +184,20 @@ test("MGFX linear gradient is one fixed server command", () => {
     destination: { left: -1, top: 1, right: 1, bottom: -1 }, cornerRadius: -1,
     direction: "horizontal", startColor: { red: 0, green: 0, blue: 0, alpha: 1 },
     endColor: { red: 1, green: 1, blue: 1, alpha: 1 } }));
+});
+
+test("MGFX linear-gradient circle is one fixed server command", () => {
+  const frame = new FrameEncoder();
+  frame.linearGradientCircle({ destination: { left: -0.5, top: 0.5, right: 0.5, bottom: -0.5 },
+    direction: "vertical",
+    startColor: { red: 0.1, green: 0.9, blue: 0.7, alpha: 1 },
+    endColor: { red: 0.5, green: 0.2, blue: 1, alpha: 0.8 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 25);
+  assert.equal(bytes.readUInt32LE(20), 52);
+  assert.equal(bytes.readFloatLE(40), 1);
+  assert.ok(Math.abs(bytes.readFloatLE(72) - 0.8) < 0.0001);
 });
 
 test("MGFX conic gradient is one fixed server command", () => {

@@ -220,6 +220,19 @@ void CommandEncoder::drawLinearGradient(const LinearGradientCommand& gradient) {
     }
 }
 
+void CommandEncoder::drawLinearGradientCircle(const LinearGradientCircleCommand& gradient) {
+    beginCommand(Opcode::drawLinearGradientCircle, 13 * sizeof(float));
+    for (float value : {gradient.destination.left, gradient.destination.top,
+                        gradient.destination.right, gradient.destination.bottom,
+                        static_cast<float>(gradient.direction),
+                        gradient.startColor.red, gradient.startColor.green,
+                        gradient.startColor.blue, gradient.startColor.alpha,
+                        gradient.endColor.red, gradient.endColor.green,
+                        gradient.endColor.blue, gradient.endColor.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawConicGradient(const ConicGradientCommand& gradient) {
     beginCommand(Opcode::drawConicGradient, 20 * sizeof(float));
     for (float value : {gradient.destination.left, gradient.destination.top,
@@ -591,6 +604,21 @@ bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gra
                            readFloat(command.payload + 32), readFloat(command.payload + 36)};
     gradient.endColor = {readFloat(command.payload + 40), readFloat(command.payload + 44),
                          readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    return true;
+}
+
+bool decodeLinearGradientCircle(const CommandView& command,
+                                LinearGradientCircleCommand& gradient) {
+    if (command.opcode != Opcode::drawLinearGradientCircle || command.payloadSize != 52) return false;
+    gradient.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                            readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    const float direction = readFloat(command.payload + 16);
+    if (direction < 0.0F || direction > 2.0F || std::floor(direction) != direction) return false;
+    gradient.direction = static_cast<GradientDirection>(static_cast<std::uint8_t>(direction));
+    gradient.startColor = {readFloat(command.payload + 20), readFloat(command.payload + 24),
+                           readFloat(command.payload + 28), readFloat(command.payload + 32)};
+    gradient.endColor = {readFloat(command.payload + 36), readFloat(command.payload + 40),
+                         readFloat(command.payload + 44), readFloat(command.payload + 48)};
     return true;
 }
 

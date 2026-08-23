@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Column, Image, Path, RichText, Row, Stack, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Circle, Column, Image, Path, RichText, Row, Stack, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -29,6 +29,15 @@ export function ConicBadge({ time }: { readonly time: number }) {
       middle: rgba(0.74, 0.2, 1), end: rgba(0.15, 0.85, 1), rotation: time / 20 },
     borderWidth: 2, borderColor: rgba(0.78, 0.95, 1, 0.9),
     shadow: { color: rgba(0.1, 0.65, 1, 0.35), blur: 10, spread: 1 } }} />;
+}
+
+export function GradientCircleBadge({ time }: { readonly time: number }) {
+  const pulse = Math.sin(time / 420) * 0.08;
+  return <Circle style={{ preferredSize: { width: 52, height: 52 },
+    backgroundGradient: { start: rgba(0.12, 0.92, 0.66),
+      end: rgba(0.58 + pulse, 0.20, 1), direction: "diagonal" },
+    borderWidth: 2, borderColor: rgba(0.82, 1, 0.94, 0.9),
+    shadow: { color: rgba(0.3, 0.45, 1, 0.3), blur: 10, spread: 1 } }} />;
 }
 
 export function WavePattern({ time }: { readonly time: number }) {
@@ -185,6 +194,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
           ...(customFontResourceId === undefined ? {} : { fontResourceId: customFontResourceId }),
           color: rgba(0.9, 0.96, 1) }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
+          <GradientCircleBadge time={animationTime} />
           <ConicBadge time={animationTime} />
           <Image textureId={1} sourceWidth={headerImageSize.width}
             sourceHeight={headerImageSize.height} fit="cover"

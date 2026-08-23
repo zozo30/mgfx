@@ -208,6 +208,18 @@ fragment float4 linearGradientFragmentMain(LinearGradientVertexOut in [[stage_in
     return float4(color.rgb * alpha, alpha);
 }
 
+fragment float4 linearGradientCircleFragmentMain(LinearGradientVertexOut in [[stage_in]]) {
+    const float2 normalized = in.local / max(in.size, float2(0.0001));
+    const float amount = clamp(in.direction < 0.5 ? normalized.x :
+        (in.direction < 1.5 ? normalized.y : (normalized.x + normalized.y) * 0.5), 0.0, 1.0);
+    const float4 color = mix(in.startColor, in.endColor, amount);
+    const float radius = min(in.size.x, in.size.y) * 0.5;
+    const float edge = distance(in.local, in.size * 0.5) - radius;
+    const float coverage = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
+    const float alpha = color.a * coverage;
+    return float4(color.rgb * alpha, alpha);
+}
+
 struct ConicGradientVertex {
     packed_float2 position;
     packed_float2 local;

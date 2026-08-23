@@ -176,6 +176,12 @@ straight-alpha colors and applies an antialiased rounded mask per fragment. The
 command inherits clipping, transforms, and opacity and is advertised by
 `linearGradients`.
 
+`DrawLinearGradientCircle` carries the same portable direction and two colors
+without client geometry. Metal evaluates a centered radius from the shorter
+destination axis and masks the gradient with derivative antialiasing. Non-square
+bounds therefore match the existing solid-circle semantics rather than becoming
+a rounded rectangle. Support is advertised by `linearGradientCircles`.
+
 ## Conic gradients
 
 `DrawConicGradient` carries a destination, normalized center, radian rotation,
