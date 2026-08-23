@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Button, Path, Text, TextField } from "./components.js";
+import { Button, Mesh, Path, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -49,6 +49,28 @@ test("React Path uploads canonical curves once and emits DrawPath instead of tri
   assert.equal(uploads, 1);
   assert.ok(frame);
   assert.equal(frame.readUInt16LE(40), 7);
+});
+
+test("React Mesh uploads indexed geometry once and draws its resource ID", () => {
+  let uploads = 0;
+  let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  const surface = new ReactSurface((value) => { frame = value; }, undefined, {
+    createPath: () => {},
+    createMesh: (id, vertices, indices) => {
+      uploads += 1; assert.equal(id, 31); assert.equal(vertices.length, 3);
+      assert.deepEqual(indices, [0, 1, 2]);
+    },
+  });
+  const color = { red: 1, green: 0.4, blue: 0.1, alpha: 1 };
+  const data = { resourceId: 31,
+    positions: [{ x: 0.5, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }],
+    indices: [0, 1, 2], color };
+  surface.render(<Mesh data={data} style={{ preferredSize: { width: 100, height: 50 } }} />);
+  surface.resize({ width: 100, height: 50 });
+  surface.resize({ width: 120, height: 60 });
+  assert.equal(uploads, 1);
+  assert.equal(frame.readUInt16LE(40), 22);
+  assert.equal(frame.readUInt32LE(48), 31);
 });
 
 test("React requests wrapping metrics per unique text run and relayouts once", async () => {

@@ -73,6 +73,8 @@ created or shown a drawable surface.
 | 27 | `PathDestroy` | client → server | Nonzero `u32` resource ID |
 | 28 | `TextMeasure` | client → server | `u8 family`, `u8 weight`, two reserved zero bytes, UTF-8 text; nonzero sequence |
 | 29 | `TextMetrics` | server → client | `f32 advance` in em units; echoes request sequence |
+| 30 | `MeshCreate` | client → server | Nonzero `u32` ID, vertex/index counts, colored vertices, triangle indices |
+| 31 | `MeshDestroy` | client → server | Nonzero `u32` resource ID |
 
 Backend is `1` Metal, `2` Vulkan, or `3` DirectX. Capability bits are client
 window lifecycle (`1 << 0`), pointer input (`1 << 1`), keyboard input (`1 << 2`),

@@ -546,6 +546,58 @@ bool decodePathUpload(const std::vector<std::uint8_t>& payload, PathUpload& path
     return true;
 }
 
+std::vector<std::uint8_t> encodeMeshUpload(const MeshUpload& mesh) {
+    constexpr std::size_t vertexBytes = 24;
+    std::vector<std::uint8_t> payload(16 + mesh.vertices.size() * vertexBytes +
+                                      mesh.indices.size() * sizeof(std::uint32_t));
+    writeU32(payload.data(), mesh.id);
+    writeU32(payload.data() + 4, static_cast<std::uint32_t>(mesh.vertices.size()));
+    writeU32(payload.data() + 8, static_cast<std::uint32_t>(mesh.indices.size()));
+    std::uint8_t* target = payload.data() + 16;
+    for (const MeshVertex& vertex : mesh.vertices) {
+        writeFloat(target, vertex.position[0]);
+        writeFloat(target + 4, vertex.position[1]);
+        for (std::size_t index = 0; index < vertex.color.size(); ++index)
+            writeFloat(target + 8 + index * 4, vertex.color[index]);
+        target += vertexBytes;
+    }
+    for (const std::uint32_t index : mesh.indices) {
+        writeU32(target, index);
+        target += sizeof(std::uint32_t);
+    }
+    return payload;
+}
+
+bool decodeMeshUpload(const std::vector<std::uint8_t>& payload, MeshUpload& mesh) {
+    constexpr std::size_t vertexBytes = 24;
+    if (payload.size() < 16 || readU32(payload.data() + 12) != 0U) return false;
+    const std::uint32_t id = readU32(payload.data());
+    const std::uint32_t vertexCount = readU32(payload.data() + 4);
+    const std::uint32_t indexCount = readU32(payload.data() + 8);
+    const std::size_t expected = 16 + static_cast<std::size_t>(vertexCount) * vertexBytes +
+                                 static_cast<std::size_t>(indexCount) * sizeof(std::uint32_t);
+    if (id == 0 || vertexCount == 0 || vertexCount > 262'144 || indexCount == 0 ||
+        indexCount > 1'048'576 || indexCount % 3 != 0 || payload.size() != expected) return false;
+    std::vector<MeshVertex> vertices(vertexCount);
+    const std::uint8_t* source = payload.data() + 16;
+    for (MeshVertex& vertex : vertices) {
+        vertex.position = {readFloat(source), readFloat(source + 4)};
+        for (std::size_t index = 0; index < vertex.color.size(); ++index)
+            vertex.color[index] = readFloat(source + 8 + index * 4);
+        for (const float value : vertex.position) if (!std::isfinite(value)) return false;
+        for (const float value : vertex.color) if (!std::isfinite(value)) return false;
+        source += vertexBytes;
+    }
+    std::vector<std::uint32_t> indices(indexCount);
+    for (std::uint32_t& index : indices) {
+        index = readU32(source);
+        if (index >= vertexCount) return false;
+        source += sizeof(std::uint32_t);
+    }
+    mesh = {id, std::move(vertices), std::move(indices)};
+    return true;
+}
+
 std::vector<std::uint8_t> encodeResourceId(std::uint32_t id) {
     std::vector<std::uint8_t> payload(4);
     writeU32(payload.data(), id);

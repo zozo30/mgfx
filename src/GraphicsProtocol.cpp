@@ -282,6 +282,16 @@ void CommandEncoder::drawImageSurface(const ImageSurfaceCommand& image) {
     }
 }
 
+void CommandEncoder::drawMesh(const MeshCommand& mesh) {
+    beginCommand(Opcode::drawMesh, 40);
+    appendU32(bytes_, mesh.meshId);
+    appendU32(bytes_, 0);
+    for (float value : {mesh.destination.left, mesh.destination.top,
+                        mesh.destination.right, mesh.destination.bottom,
+                        mesh.viewBox.x, mesh.viewBox.y,
+                        mesh.viewBox.width, mesh.viewBox.height}) appendFloat(bytes_, value);
+}
+
 void CommandEncoder::drawPath(const PathCommand& path) {
     beginCommand(Opcode::drawPath, 128);
     appendU32(bytes_, path.pathId);
@@ -600,6 +610,17 @@ bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image) 
                   readFloat(command.payload + 48), readFloat(command.payload + 52)};
     image.cornerRadius = readFloat(command.payload + 56);
     return image.textureId != 0;
+}
+
+bool decodeMesh(const CommandView& command, MeshCommand& mesh) {
+    if (command.opcode != Opcode::drawMesh || command.payloadSize != 40 ||
+        readU32(command.payload + 4) != 0U) return false;
+    mesh.meshId = readU32(command.payload);
+    mesh.destination = {readFloat(command.payload + 8), readFloat(command.payload + 12),
+                        readFloat(command.payload + 16), readFloat(command.payload + 20)};
+    mesh.viewBox = {readFloat(command.payload + 24), readFloat(command.payload + 28),
+                    readFloat(command.payload + 32), readFloat(command.payload + 36)};
+    return mesh.meshId != 0;
 }
 
 bool decodePath(const CommandView& command, PathCommand& path) {

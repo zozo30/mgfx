@@ -115,6 +115,20 @@ int main() {
         return 1;
     }
 
+    const mgfx::ipc::MeshUpload sourceMesh{31, {
+        {{0.5F, 0.0F}, {1.0F, 0.0F, 0.0F, 1.0F}},
+        {{0.0F, 1.0F}, {0.0F, 1.0F, 0.0F, 1.0F}},
+        {{1.0F, 1.0F}, {0.0F, 0.0F, 1.0F, 1.0F}},
+    }, {0, 1, 2}};
+    mgfx::ipc::MeshUpload decodedMesh{};
+    if (!mgfx::ipc::decodeMeshUpload(mgfx::ipc::encodeMeshUpload(sourceMesh), decodedMesh) ||
+        decodedMesh.id != 31 || decodedMesh.vertices.size() != 3 ||
+        decodedMesh.indices != std::vector<std::uint32_t>({0, 1, 2}) ||
+        decodedMesh.vertices[2].color[2] != 1.0F) {
+        std::cerr << "Mesh upload payload round trip failed\n";
+        return 1;
+    }
+
     std::string decodedText;
     if (!mgfx::ipc::decodeText(mgfx::ipc::encodeText("hello"), decodedText) ||
         decodedText != "hello") {

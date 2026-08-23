@@ -188,6 +188,7 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     if (_graphicsServer->takeClientDisconnected()) {
         _renderer->clearTextures();
         _renderer->clearPaths();
+        _renderer->clearMeshes();
         if (_window != nil) {
             _clientWindowVisible = false;
             _metalView.paused = YES;
@@ -212,6 +213,12 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     }
     for (const std::uint32_t id : _graphicsServer->takePathDestroys()) {
         _renderer->destroyPath(id);
+    }
+    for (mgfx::ipc::MeshUpload& mesh : _graphicsServer->takeMeshUploads()) {
+        _renderer->createMesh(mesh.id, mesh.vertices, mesh.indices);
+    }
+    for (const std::uint32_t id : _graphicsServer->takeMeshDestroys()) {
+        _renderer->destroyMesh(id);
     }
 
     if (const std::optional<std::string> title = _graphicsServer->takeWindowTitle()) {

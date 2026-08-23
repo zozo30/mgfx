@@ -426,10 +426,11 @@ test("animated wave dots lower to one constant-size server command", () => {
   assert.equal(frame.readUInt32LE(20), 128);
 });
 
-test("indexed normalized meshes lower to backend-neutral colored triangles", () => {
+test("indexed meshes lower to a persistent server resource reference", () => {
   class MeshComponent extends Component {
     build(): Element {
-      return mesh({ positions: [{ x: 0.5, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }],
+      return mesh({ resourceId: 31,
+        positions: [{ x: 0.5, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }],
         indices: [0, 1, 2], color: { red: 1, green: 0.4, blue: 0.1, alpha: 1 } },
       { preferredSize: { width: 100, height: 50 } });
     }
@@ -442,7 +443,8 @@ test("indexed normalized meshes lower to backend-neutral colored triangles", () 
   encoder.endFrame();
   const frame = encoder.finish();
   assert.equal(frame.readUInt32LE(12), 2);
-  assert.equal(frame.readUInt32LE(28), 3);
+  assert.equal(frame.readUInt16LE(16), 22);
+  assert.equal(frame.readUInt32LE(24), 31);
 });
 
 test("absolute layers use stable z-index order for hit testing", () => {

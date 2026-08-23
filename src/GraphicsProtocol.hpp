@@ -32,6 +32,7 @@ enum class Opcode : std::uint16_t {
     drawImageSurface = 19,
     drawDotGrid = 20,
     drawWaveDots = 21,
+    drawMesh = 22,
 };
 
 enum class Primitive : std::uint8_t {
@@ -188,6 +189,12 @@ struct PathRect {
     float height;
 };
 
+struct MeshCommand {
+    std::uint32_t meshId;
+    ClipRect destination;
+    PathRect viewBox;
+};
+
 struct PathGradient {
     float startX;
     float startY;
@@ -238,6 +245,7 @@ public:
     void popClip();
     void drawImage(const ImageCommand& image);
     void drawImageSurface(const ImageSurfaceCommand& image);
+    void drawMesh(const MeshCommand& mesh);
     void drawPath(const PathCommand& path);
     void drawText(const TextCommand& text);
     void pushTransform(AffineTransform transform);
@@ -284,6 +292,7 @@ bool decodeDraw(const CommandView& command, DrawCommand& draw);
 bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
 bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image);
+bool decodeMesh(const CommandView& command, MeshCommand& mesh);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);
 bool decodePushTransform(const CommandView& command, AffineTransform& transform);

@@ -329,6 +329,22 @@ void Renderer::createPath(std::uint32_t id, std::vector<mgfx::ipc::PathSegment> 
 void Renderer::destroyPath(std::uint32_t id) { paths_.erase(id); }
 void Renderer::clearPaths() { paths_.clear(); }
 
+void Renderer::createMesh(std::uint32_t id, const std::vector<mgfx::ipc::MeshVertex>& vertices,
+                          const std::vector<std::uint32_t>& indices) {
+    if (id == 0 || vertices.empty() || indices.empty() || indices.size() % 3 != 0) return;
+    std::vector<gfx::Vertex> triangles;
+    triangles.reserve(indices.size());
+    for (const std::uint32_t index : indices) {
+        if (index >= vertices.size()) return;
+        const auto& source = vertices[index];
+        triangles.push_back({source.position, source.color});
+    }
+    meshes_[id] = std::move(triangles);
+}
+
+void Renderer::destroyMesh(std::uint32_t id) { meshes_.erase(id); }
+void Renderer::clearMeshes() { meshes_.clear(); }
+
 MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStream,
                                      MTL::RenderPassDescriptor* renderPass,
                                      CA::MetalDrawable* drawable) {
@@ -947,6 +963,44 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawMesh) {
+            gfx::MeshCommand mesh{};
+            if (!gfx::decodeMesh(command, mesh) || !std::isfinite(mesh.viewBox.x) ||
+                !std::isfinite(mesh.viewBox.y) || !std::isfinite(mesh.viewBox.width) ||
+                !std::isfinite(mesh.viewBox.height) || mesh.viewBox.width <= 0.0F ||
+                mesh.viewBox.height <= 0.0F) {
+                throw std::runtime_error("Malformed mesh command");
+            }
+            const auto found = meshes_.find(mesh.meshId);
+            if (found == meshes_.end() || clipEmpty()) continue;
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(pipelineState_.get());
+            applyClip();
+            constexpr std::size_t maxInlineBytes = 4096;
+            constexpr std::size_t maxVertices = (maxInlineBytes / sizeof(gfx::Vertex) / 3) * 3;
+            for (std::size_t first = 0; first < found->second.size();) {
+                const std::size_t count = std::min(maxVertices, found->second.size() - first);
+                std::vector<gfx::Vertex> vertices;
+                vertices.reserve(count);
+                for (std::size_t index = 0; index < count; ++index) {
+                    gfx::Vertex vertex = found->second[first + index];
+                    vertex.position = {
+                        mesh.destination.left +
+                            (vertex.position[0] - mesh.viewBox.x) / mesh.viewBox.width *
+                            (mesh.destination.right - mesh.destination.left),
+                        mesh.destination.top +
+                            (vertex.position[1] - mesh.viewBox.y) / mesh.viewBox.height *
+                            (mesh.destination.bottom - mesh.destination.top)};
+                    vertex.position = transformPoint(currentTransform(), vertex.position);
+                    vertex.color[3] *= opacityStack.back();
+                    vertices.push_back(vertex);
+                }
+                encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
+                encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                        static_cast<NS::UInteger>(0),
+                                        static_cast<NS::UInteger>(vertices.size()));
+                first += count;
+            }
         } else if (command.opcode == gfx::Opcode::drawPath) {
             gfx::PathCommand path{};
             if (!gfx::decodePath(command, path) || !std::isfinite(path.strokeWidth) ||

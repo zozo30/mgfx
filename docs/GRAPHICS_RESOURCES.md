@@ -44,8 +44,11 @@ flattens curves and tessellates fills/strokes into cached geometry shared by
 Metal, Vulkan, or DirectX backends, avoiding duplicated tessellators in every
 language client without embedding a complete SVG engine in the server.
 
-Reusable `Mesh` resources contain positions, optional UVs, vertex colors, and
-indices. Gradient stops become either vertex colors for simple gradients or a
+Reusable `Mesh` resources now contain positions, vertex colors, and triangle
+indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the
+ID plus destination and view box, so resizing and animation do not retransmit
+geometry. The server caches the expanded triangle list and applies display-list
+transforms and opacity. Optional UVs remain a future extension. Gradient stops become either vertex colors for simple gradients or a
 small sampled texture for complex gradients. Raster fallback is allowed for SVG
 features that the vector path does not yet support.
 
@@ -190,8 +193,8 @@ color glyph atlases remain available for small text and emoji.
    tessellation with geometry caching. Stroke contours are triangulated as one
    outline, so translucent segment joins do not darken from overlapping quads.
    Direct `<Mesh>` remains available.
-   Next add persistent mesh resources and selective lowering of complete
-   `<Svg>` documents.
+   Persistent colored mesh resources are also implemented. Next add selective
+   lowering of complete `<Svg>` documents.
 4. **Partially implemented:** compact Unicode `DrawText`, native shaping, and
    cached glyph-outline geometry, plus exact asynchronous advance metrics. Next
    add font uploads, multiline/rich-text runs, and atlas caching.

@@ -43,6 +43,8 @@ enum class MessageType : std::uint16_t {
     pathDestroy = 27,
     textMeasure = 28,
     textMetrics = 29,
+    meshCreate = 30,
+    meshDestroy = 31,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -76,6 +78,7 @@ enum ServerCapability : std::uint32_t {
     imageSurfaces = 1U << 21U,
     dotGrids = 1U << 22U,
     waveDots = 1U << 23U,
+    meshResources = 1U << 24U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
@@ -124,6 +127,17 @@ struct PathSegment {
 struct PathUpload {
     std::uint32_t id;
     std::vector<PathSegment> segments;
+};
+
+struct MeshVertex {
+    std::array<float, 2> position;
+    std::array<float, 4> color;
+};
+
+struct MeshUpload {
+    std::uint32_t id;
+    std::vector<MeshVertex> vertices;
+    std::vector<std::uint32_t> indices;
 };
 
 enum class CursorShape : std::uint8_t {
@@ -269,6 +283,8 @@ std::vector<std::uint8_t> encodeTextureUpload(const TextureUpload& texture);
 bool decodeTextureUpload(const std::vector<std::uint8_t>& payload, TextureUpload& texture);
 std::vector<std::uint8_t> encodePathUpload(const PathUpload& path);
 bool decodePathUpload(const std::vector<std::uint8_t>& payload, PathUpload& path);
+std::vector<std::uint8_t> encodeMeshUpload(const MeshUpload& mesh);
+bool decodeMeshUpload(const std::vector<std::uint8_t>& payload, MeshUpload& mesh);
 std::vector<std::uint8_t> encodeResourceId(std::uint32_t id);
 bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& id);
 std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure);

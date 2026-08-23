@@ -1,7 +1,8 @@
 import { createContext, createElement, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
 import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants.js";
-import { FrameEncoder, type FontFamily, type FontWeight, type Key, type KeyEvent, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
+import { FrameEncoder, type FontFamily, type FontWeight, type Key, type KeyEvent,
+  type MeshUploadVertex, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
   box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
   nativeTextAdvance, nativeTextMetricRuns, row, scrollView, stack, text,
@@ -176,6 +177,7 @@ export class ReactSurface {
   private readonly snapshot: SnapshotComponent;
   private viewport: Size = { width: 0, height: 0 };
   private readonly uploadedPaths = new Set<number>();
+  private readonly uploadedMeshes = new Set<number>();
   private readonly requestedTextMetrics = new Set<string>();
   private metricRelayoutScheduled = false;
 
@@ -183,6 +185,8 @@ export class ReactSurface {
               private readonly windowCommands?: NativeWindowCommands,
               private readonly resourceCommands?: {
                 readonly createPath: (id: number, segments: readonly PathSegment[]) => void;
+                readonly createMesh?: (id: number, vertices: readonly MeshUploadVertex[],
+                  indices: readonly number[]) => void;
                 readonly measureText?: (family: FontFamily, text: string,
                   weight?: FontWeight) => Promise<number>;
               }) {
@@ -218,6 +222,7 @@ export class ReactSurface {
   private submit(): void {
     if (this.viewport.width <= 0 || this.viewport.height <= 0 || this.container.children.length === 0) return;
     this.uploadPaths(this.container.children);
+    this.uploadMeshes(this.container.children);
     this.requestMetrics(this.container.children);
     this.host.rebuild(this.snapshot);
     this.host.layout(this.viewport);
@@ -236,6 +241,19 @@ export class ReactSurface {
         this.uploadedPaths.add(path.resourceId);
       }
       this.uploadPaths(child.children);
+    }
+  }
+  private uploadMeshes(children: readonly HostChild[]): void {
+    for (const child of children) {
+      if (child.kind !== "host") continue;
+      const mesh = child.props.mesh;
+      if (mesh && !this.uploadedMeshes.has(mesh.resourceId)) {
+        const vertices = mesh.positions.map((position, index) => ({ position,
+          color: mesh.colors?.[index] ?? mesh.color }));
+        this.resourceCommands?.createMesh?.(mesh.resourceId, vertices, mesh.indices);
+        this.uploadedMeshes.add(mesh.resourceId);
+      }
+      this.uploadMeshes(child.children);
     }
   }
   private requestMetrics(children: readonly HostChild[]): void {

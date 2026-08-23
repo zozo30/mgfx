@@ -7,7 +7,7 @@ import { decodeImageFile, type DecodedImage } from "./image-codec.js";
 import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
   decodeServerHello, decodeSize, decodeText, decodeTextMetrics, decodeWindowChromeMetrics,
-  encodeCursor, encodePathCreate, encodeText,
+  encodeCursor, encodeMeshCreate, encodePathCreate, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
   MessageType, sendMessage, TextMetricsClient } from "@mgfx/demo-client/protocol";
 
@@ -53,6 +53,8 @@ const surface = new ReactSurface(
   {
     createPath: (id, segments) => sendMessage(socket, MessageType.PathCreate,
       encodePathCreate(id, segments)),
+    createMesh: (id, vertices, indices) => sendMessage(socket, MessageType.MeshCreate,
+      encodeMeshCreate(id, vertices, indices)),
     measureText: (family, text, weight) => textMetrics.measure(family, text, weight),
   },
 );

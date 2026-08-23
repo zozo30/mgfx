@@ -222,6 +222,20 @@ std::vector<std::uint32_t> GraphicsServer::takePathDestroys() {
     return result;
 }
 
+std::vector<mgfx::ipc::MeshUpload> GraphicsServer::takeMeshUploads() {
+    const std::lock_guard<std::mutex> lock(resourceMutex_);
+    std::vector<mgfx::ipc::MeshUpload> result;
+    result.swap(pendingMeshUploads_);
+    return result;
+}
+
+std::vector<std::uint32_t> GraphicsServer::takeMeshDestroys() {
+    const std::lock_guard<std::mutex> lock(resourceMutex_);
+    std::vector<std::uint32_t> result;
+    result.swap(pendingMeshDestroys_);
+    return result;
+}
+
 void GraphicsServer::sendClipboardText(std::uint64_t connectionGeneration,
                                        std::uint32_t sequence,
                                        const std::string& text) {
@@ -296,6 +310,8 @@ void GraphicsServer::run() {
             pendingTextureDestroys_.clear();
             pendingPathUploads_.clear();
             pendingPathDestroys_.clear();
+            pendingMeshUploads_.clear();
+            pendingMeshDestroys_.clear();
         }
         clientDisconnected_ = false;
         constexpr std::uint32_t capabilities =
@@ -322,7 +338,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::linearGradients |
             mgfx::ipc::ServerCapability::imageSurfaces |
             mgfx::ipc::ServerCapability::dotGrids |
-            mgfx::ipc::ServerCapability::waveDots;
+            mgfx::ipc::ServerCapability::waveDots |
+            mgfx::ipc::ServerCapability::meshResources;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -436,6 +453,18 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
             if (mgfx::ipc::decodeResourceId(message.payload, id)) {
                 const std::lock_guard<std::mutex> lock(resourceMutex_);
                 pendingPathDestroys_.push_back(id);
+            }
+        } else if (message.type == mgfx::ipc::MessageType::meshCreate) {
+            mgfx::ipc::MeshUpload mesh{};
+            if (mgfx::ipc::decodeMeshUpload(message.payload, mesh)) {
+                const std::lock_guard<std::mutex> lock(resourceMutex_);
+                pendingMeshUploads_.push_back(std::move(mesh));
+            }
+        } else if (message.type == mgfx::ipc::MessageType::meshDestroy) {
+            std::uint32_t id = 0;
+            if (mgfx::ipc::decodeResourceId(message.payload, id)) {
+                const std::lock_guard<std::mutex> lock(resourceMutex_);
+                pendingMeshDestroys_.push_back(id);
             }
         } else if (message.type == mgfx::ipc::MessageType::textMeasure &&
                    message.sequence != 0) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextMetricsClient } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -352,6 +352,26 @@ test("canonical paths upload once and frames reference server-side vector geomet
   assert.equal(bytes.readUInt32LE(24), 12);
   assert.equal(bytes.readUInt8(28), 7);
   assert.equal(bytes.readFloatLE(24 + 124), 1);
+});
+
+test("indexed meshes upload once and frames reference their resource", () => {
+  const color = { red: 1, green: 0.4, blue: 0.1, alpha: 1 };
+  const upload = encodeMeshCreate(31, [
+    { position: { x: 0.5, y: 0 }, color },
+    { position: { x: 0, y: 1 }, color },
+    { position: { x: 1, y: 1 }, color },
+  ], [0, 1, 2]);
+  assert.equal(upload.readUInt32LE(0), 31);
+  assert.equal(upload.readUInt32LE(4), 3);
+  assert.equal(upload.readUInt32LE(8), 3);
+  const frame = new FrameEncoder();
+  frame.meshResource(31, { left: -1, top: 1, right: 1, bottom: -1 },
+    { x: 0, y: 0, width: 1, height: 1 });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 22);
+  assert.equal(bytes.readUInt32LE(20), 40);
+  assert.equal(bytes.readUInt32LE(24), 31);
 });
 
 test("system Unicode text is a compact skippable display-list command", () => {

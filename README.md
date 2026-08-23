@@ -46,10 +46,11 @@ SVG currently uses a client-side high-quality raster fallback, including vector
 paths, gradients, masks, transforms, and system-font text; Metal still receives
 only the same portable texture resource and `DrawImage` command.
 
-React can also submit indexed normalized `Mesh` geometry directly. The retained
-layout runtime maps mesh coordinates into measured component bounds and lowers
-indices plus per-vertex colors to ordinary MGFX triangle lists. `Mesh` remains
-the explicit low-level escape hatch for application-owned geometry.
+React can also submit indexed normalized `Mesh` geometry directly. Positions,
+per-vertex colors, and indices upload once as a connection-scoped mesh resource;
+frames carry only `DrawMesh`, its destination, and source view box. The server
+caches expanded triangle geometry and applies layout, transforms, and opacity.
+`Mesh` remains the explicit low-level escape hatch for application-owned geometry.
 
 The React `Path` component now directly accepts SVG path data. Relative and
 absolute commands are normalized, arcs and quadratic segments become cubics,

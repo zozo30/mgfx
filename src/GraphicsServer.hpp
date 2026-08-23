@@ -55,6 +55,8 @@ public:
     std::vector<std::uint32_t> takeTextureDestroys();
     std::vector<mgfx::ipc::PathUpload> takePathUploads();
     std::vector<std::uint32_t> takePathDestroys();
+    std::vector<mgfx::ipc::MeshUpload> takeMeshUploads();
+    std::vector<std::uint32_t> takeMeshDestroys();
     void sendClipboardText(std::uint64_t connectionGeneration,
                            std::uint32_t sequence,
                            const std::string& text);
@@ -106,4 +108,6 @@ private:
     std::vector<std::uint32_t> pendingTextureDestroys_;
     std::vector<mgfx::ipc::PathUpload> pendingPathUploads_;
     std::vector<std::uint32_t> pendingPathDestroys_;
+    std::vector<mgfx::ipc::MeshUpload> pendingMeshUploads_;
+    std::vector<std::uint32_t> pendingMeshDestroys_;
 };

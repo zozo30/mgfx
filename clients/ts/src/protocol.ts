@@ -35,6 +35,8 @@ export enum MessageType {
   PathDestroy = 27,
   TextMeasure = 28,
   TextMetrics = 29,
+  MeshCreate = 30,
+  MeshDestroy = 31,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -63,6 +65,7 @@ export enum ServerCapability {
   ImageSurfaces = 1 << 21,
   DotGrids = 1 << 22,
   WaveDots = 1 << 23,
+  MeshResources = 1 << 24,
 }
 export interface ServerHello {
   readonly version: number;
@@ -122,6 +125,10 @@ export interface Color {
 export interface Vertex {
   readonly x: number;
   readonly y: number;
+  readonly color: Color;
+}
+export interface MeshUploadVertex {
+  readonly position: { readonly x: number; readonly y: number };
   readonly color: Color;
 }
 
@@ -279,6 +286,31 @@ export function encodePathCreate(id: number, segments: readonly PathSegment[]): 
       if (!Number.isFinite(value)) throw new RangeError("Path coordinates must be finite");
       payload.writeFloatLE(value, offset + 4 + valueIndex * 4);
     });
+  });
+  return payload;
+}
+
+export function encodeMeshCreate(id: number, vertices: readonly MeshUploadVertex[],
+  indices: readonly number[]): Buffer {
+  if (!Number.isSafeInteger(id) || id <= 0 || id > 0xffff_ffff || vertices.length === 0 ||
+      vertices.length > 262_144 || indices.length === 0 || indices.length > 1_048_576 ||
+      indices.length % 3 !== 0)
+    throw new RangeError("Mesh must have a nonzero ID and indexed triangle geometry");
+  const payload = Buffer.alloc(16 + vertices.length * 24 + indices.length * 4);
+  payload.writeUInt32LE(id, 0); payload.writeUInt32LE(vertices.length, 4);
+  payload.writeUInt32LE(indices.length, 8);
+  vertices.forEach((vertex, index) => {
+    const values = [vertex.position.x, vertex.position.y, vertex.color.red,
+      vertex.color.green, vertex.color.blue, vertex.color.alpha];
+    if (values.some((value) => !Number.isFinite(value)))
+      throw new RangeError("Mesh vertex values must be finite");
+    values.forEach((value, component) => payload.writeFloatLE(value, 16 + index * 24 + component * 4));
+  });
+  const indexOffset = 16 + vertices.length * 24;
+  indices.forEach((value, index) => {
+    if (!Number.isSafeInteger(value) || value < 0 || value >= vertices.length)
+      throw new RangeError("Mesh indices must reference uploaded vertices");
+    payload.writeUInt32LE(value, indexOffset + index * 4);
   });
   return payload;
 }
@@ -816,6 +848,20 @@ export class FrameEncoder {
       ...colors.flatMap((color) => [color.red, color.green, color.blue, color.alpha])]
       .forEach((item, index) => payload.writeFloatLE(item, 24 + index * 4));
     this.command(21, payload);
+  }
+
+  meshResource(meshId: number, destination: ClipRect,
+    viewBox: { readonly x: number; readonly y: number; readonly width: number;
+      readonly height: number }): void {
+    const values = [destination.left, destination.top, destination.right, destination.bottom,
+      viewBox.x, viewBox.y, viewBox.width, viewBox.height];
+    if (!Number.isSafeInteger(meshId) || meshId <= 0 || meshId > 0xffff_ffff ||
+        values.some((value) => !Number.isFinite(value)) || viewBox.width <= 0 || viewBox.height <= 0)
+      throw new RangeError("Mesh draw requires an ID and positive finite view box");
+    const payload = Buffer.alloc(40);
+    payload.writeUInt32LE(meshId, 0);
+    values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
+    this.command(22, payload);
   }
 
   finish(): Buffer {

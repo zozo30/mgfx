@@ -63,6 +63,7 @@ int main() {
                           {0.22F, 0.36F, 1.0F, 1.0F}, {0.16F, 1.0F, 0.62F, 1.0F},
                           {0.56F, 0.36F, 1.0F, 1.0F}, {0.16F, 1.0F, 0.82F, 1.0F},
                           {0.72F, 0.94F, 1.0F, 0.65F}});
+    encoder.drawMesh({31, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -172,6 +173,12 @@ int main() {
         !nearlyEqual(wave.frequency, 0.56F) ||
         !nearlyEqual(wave.crestEndColor.blue, 0.82F) || !decoder.next(command)) {
         return fail("Wave-dots decoding failed");
+    }
+    gfx::MeshCommand mesh{};
+    if (!gfx::decodeMesh(command, mesh) || mesh.meshId != 31 ||
+        !nearlyEqual(mesh.destination.left, -0.5F) ||
+        !nearlyEqual(mesh.viewBox.width, 1.0F) || !decoder.next(command)) {
+        return fail("Mesh decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

@@ -148,6 +148,7 @@ function layoutTextLines(value: string, style: TextStyle, maximumWidth: number):
   return result;
 }
 export interface MeshData {
+  readonly resourceId: number;
   readonly positions: readonly Point[];
   readonly indices: readonly number[];
   readonly color: Color;
@@ -700,7 +701,6 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
 function paintMesh(encoder: FrameEncoder, bounds: Rect, mesh: MeshData | undefined,
   viewport: Size): void {
   if (!mesh || mesh.indices.length === 0 || mesh.indices.length % 3 !== 0) return;
-  const vertices: Vertex[] = [];
   const source = mesh.viewBox ?? { x: 0, y: 0, width: 1, height: 1 };
   if (source.width <= 0 || source.height <= 0) return;
   let destination = bounds;
@@ -715,16 +715,7 @@ function paintMesh(encoder: FrameEncoder, bounds: Rect, mesh: MeshData | undefin
       destination = { ...bounds, x: bounds.x + (bounds.width - width) / 2, width };
     }
   }
-  for (const index of mesh.indices) {
-    const position = mesh.positions[index];
-    if (!position) return;
-    const color = mesh.colors?.[index] ?? mesh.color;
-    vertices.push(pointVertex({
-      x: destination.x + (position.x - source.x) / source.width * destination.width,
-      y: destination.y + (position.y - source.y) / source.height * destination.height,
-    }, color, viewport));
-  }
-  encoder.triangles(vertices);
+  encoder.meshResource(mesh.resourceId, normalizedRect(destination, viewport), source);
 }
 
 function normalizedRect(r: Rect, viewport: Size): ClipRect {

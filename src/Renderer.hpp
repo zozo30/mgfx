@@ -28,6 +28,10 @@ public:
     void createPath(std::uint32_t id, std::vector<mgfx::ipc::PathSegment> segments);
     void destroyPath(std::uint32_t id);
     void clearPaths();
+    void createMesh(std::uint32_t id, const std::vector<mgfx::ipc::MeshVertex>& vertices,
+                    const std::vector<std::uint32_t>& indices);
+    void destroyMesh(std::uint32_t id);
+    void clearMeshes();
 
 private:
     NS::SharedPtr<MTL::Device> device_;
@@ -59,5 +63,6 @@ private:
         std::vector<CachedPath> cache;
     };
     std::unordered_map<std::uint32_t, PathResource> paths_;
+    std::unordered_map<std::uint32_t, std::vector<gfx::Vertex>> meshes_;
     std::unordered_map<std::string, gfx::ShapedText> textCache_;
 };
