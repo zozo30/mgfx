@@ -108,10 +108,14 @@ function ServerVectorPath({ time }: { readonly time: number }) {
       <Path
         data="M18 4H302L316 18V82L302 96H18L4 82V18Z M28 20H292L300 28V72L292 80H28L20 72V28Z"
         viewBox={{ x: 0, y: 0, width: 320, height: 100 }} fillRule="evenodd"
-        gradient={{ start: { x: 4, y: 50 }, end: { x: 316, y: 50 },
-          startColor: rgba(0.04, 0.32 + pulse * 0.2, 0.44 + pulse * 0.18,
-            0.48 + pulse * 0.28),
-          endColor: rgba(0.54 + pulse * 0.18, 0.18, 0.92, 0.82) }}
+        conicGradient={{ center: { x: 160, y: 50 }, rotation: (time / 900) % (Math.PI * 2),
+          stops: [
+            { offset: 0, color: rgba(0.10, 0.82, 1, 0.9) },
+            { offset: 0.25, color: rgba(0.22, 0.95, 0.62, 0.86) },
+            { offset: 0.5, color: rgba(0.72 + pulse * 0.16, 0.20, 1, 0.9) },
+            { offset: 0.75, color: rgba(1, 0.36, 0.08, 0.9) },
+            { offset: 1, color: rgba(0.10, 0.82, 1, 0.9) },
+          ] }}
         strokeColor={rgba(1, 0.42 + pulse * 0.3, 0.06, 0.88)} strokeWidth={2.5}
         style={{ preferredSize: { height: 68 }, flexGrow: 1 }} />
     </Row>

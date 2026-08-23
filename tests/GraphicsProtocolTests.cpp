@@ -124,6 +124,23 @@ int main() {
         {1.0F, {0.1F, 0.8F, 0.5F, 1.0F}},
     };
     encoder.drawPath(styledRadialStrokePath);
+    gfx::PathCommand conicPath{};
+    conicPath.pathId = 12;
+    conicPath.stroke = true;
+    conicPath.strokeConicGradient = true;
+    conicPath.strokeWidth = 3.0F;
+    conicPath.tolerance = 0.25F;
+    conicPath.destination = {-0.4F, 0.4F, 0.4F, -0.4F};
+    conicPath.viewBox = {0.0F, 0.0F, 24.0F, 24.0F};
+    conicPath.miterLimit = 7.0F;
+    conicPath.dashOffset = -1.5F;
+    conicPath.dashPattern = {6.0F, 3.0F};
+    conicPath.conicGradient = {12.0F, 12.0F, 0.75F, {
+        {0.0F, {0.1F, 0.8F, 1.0F, 1.0F}},
+        {0.5F, {0.8F, 0.2F, 1.0F, 1.0F}},
+        {1.0F, {0.1F, 0.8F, 1.0F, 1.0F}},
+    }};
+    encoder.drawPath(conicPath);
     gfx::PathCommand multiRadialPath = radialPath;
     multiRadialPath.radialGradient.stops = {
         {0.0F, {1.0F, 1.0F, 1.0F, 1.0F}},
@@ -331,6 +348,18 @@ int main() {
         styledRadialStrokePathDecoded.radialGradient.stops.size() != 3U ||
         !decoder.next(command)) {
         return fail("Styled radial stroke path decoding failed");
+    }
+    gfx::PathCommand conicPathDecoded{};
+    if (!gfx::decodePath(command, conicPathDecoded) ||
+        !conicPathDecoded.strokeConicGradient || conicPathDecoded.fillConicGradient ||
+        conicPathDecoded.conicGradient.stops.size() != 3U ||
+        !nearlyEqual(conicPathDecoded.conicGradient.centerX, 12.0F) ||
+        !nearlyEqual(conicPathDecoded.conicGradient.rotation, 0.75F) ||
+        !nearlyEqual(conicPathDecoded.miterLimit, 7.0F) ||
+        !nearlyEqual(conicPathDecoded.dashOffset, -1.5F) ||
+        conicPathDecoded.dashPattern != std::vector<float>({6.0F, 3.0F}) ||
+        !decoder.next(command)) {
+        return fail("Conic path decoding failed");
     }
     gfx::PathCommand multiRadialPathDecoded{};
     if (!gfx::decodePath(command, multiRadialPathDecoded) ||

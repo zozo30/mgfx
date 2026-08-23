@@ -344,6 +344,7 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         path.gradient.spread != PathGradient::Spread::pad ||
         path.strokeGradientPaint.spread != PathGradient::Spread::pad;
     const bool radialGradient = path.fillRadialGradient || path.strokeRadialGradient;
+    const bool conicGradient = path.fillConicGradient || path.strokeConicGradient;
     const bool styledRadialGradient = radialGradient && (dashed || dashArray || styled);
     const bool twoCircleRadialGradient = radialGradient && path.radialGradient.hasFocalPoint &&
         path.radialGradient.focalRadius > 0.0F;
@@ -357,6 +358,7 @@ void CommandEncoder::drawPath(const PathCommand& path) {
          twoCircleRadialGradient)
         ? (path.radialGradient.stops.empty() ? 2U : path.radialGradient.stops.size()) : 0U;
     const std::size_t multiDashCount = dashArray ? path.dashPattern.size() : dashed ? 2U : 0U;
+    const std::size_t conicStopCount = conicGradient ? path.conicGradient.stops.size() : 0U;
     const std::uint32_t multiSize = static_cast<std::uint32_t>(192 + multiDashCount * 4 +
         (path.gradient.stops.size() + path.strokeGradientPaint.stops.size()) * 20);
     const std::uint32_t multiRadialSize = static_cast<std::uint32_t>(
@@ -367,9 +369,11 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         176 + radialStopCount * 20);
     const std::uint32_t styledRadialSize = static_cast<std::uint32_t>(
         184 + multiDashCount * 4 + radialStopCount * 20);
-    beginCommand(styledRadialGradient ? Opcode::drawStyledRadialPath : twoCircleRadialGradient ? Opcode::drawTwoCircleRadialPath : focalRadialGradient ? Opcode::drawFocalRadialPath : multiRadialGradient ? Opcode::drawMultiRadialPath : radialGradient ? Opcode::drawRadialPath : multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
+    const std::uint32_t conicSize = static_cast<std::uint32_t>(
+        152 + multiDashCount * 4 + conicStopCount * 20);
+    beginCommand(conicGradient ? Opcode::drawConicPath : styledRadialGradient ? Opcode::drawStyledRadialPath : twoCircleRadialGradient ? Opcode::drawTwoCircleRadialPath : focalRadialGradient ? Opcode::drawFocalRadialPath : multiRadialGradient ? Opcode::drawMultiRadialPath : radialGradient ? Opcode::drawRadialPath : multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
                          : dashed ? Opcode::drawDashedPath : Opcode::drawPath,
-                 styledRadialGradient ? styledRadialSize : twoCircleRadialGradient ? twoCircleRadialSize : focalRadialGradient ? focalRadialSize : multiRadialGradient ? multiRadialSize : radialGradient ? 184U : multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
+                 conicGradient ? conicSize : styledRadialGradient ? styledRadialSize : twoCircleRadialGradient ? twoCircleRadialSize : focalRadialGradient ? focalRadialSize : multiRadialGradient ? multiRadialSize : radialGradient ? 184U : multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
                  styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     appendU32(bytes_, path.pathId);
     bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
@@ -377,7 +381,9 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                                                (path.fillGradient ? 4U : 0U) |
                                                (path.strokeGradient ? 8U : 0U) |
                                                (path.fillRadialGradient ? 16U : 0U) |
-                                               (path.strokeRadialGradient ? 32U : 0U)));
+                                               (path.strokeRadialGradient ? 32U : 0U) |
+                                               (path.fillConicGradient ? 64U : 0U) |
+                                               (path.strokeConicGradient ? 128U : 0U)));
     bytes_.push_back(static_cast<std::uint8_t>(path.fillRule));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineCap));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineJoin));
@@ -401,7 +407,25 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                         path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
         appendFloat(bytes_, value);
     }
-    if (styledRadialGradient) {
+    if (conicGradient) {
+        for (float value : {path.conicGradient.centerX, path.conicGradient.centerY,
+                            path.conicGradient.rotation, path.miterLimit, path.dashOffset})
+            appendFloat(bytes_, value);
+        appendU16(bytes_, static_cast<std::uint16_t>(multiDashCount));
+        bytes_.push_back(static_cast<std::uint8_t>(conicStopCount));
+        bytes_.push_back(0);
+        if (dashArray) {
+            for (float value : path.dashPattern) appendFloat(bytes_, value);
+        } else if (dashed) {
+            appendFloat(bytes_, path.dashLength);
+            appendFloat(bytes_, path.gapLength);
+        }
+        for (const PathGradient::Stop& stop : path.conicGradient.stops) {
+            appendFloat(bytes_, stop.offset);
+            for (float value : {stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha})
+                appendFloat(bytes_, value);
+        }
+    } else if (styledRadialGradient) {
         for (float value : {path.radialGradient.centerX, path.radialGradient.centerY,
                             path.radialGradient.axisXX, path.radialGradient.axisXY,
                             path.radialGradient.axisYX, path.radialGradient.axisYY,
@@ -484,7 +508,7 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                             path.strokeGradientPaint.endColor.blue,
                             path.strokeGradientPaint.endColor.alpha}) appendFloat(bytes_, value);
     }
-    if (radialGradient) {
+    if (radialGradient || conicGradient) {
         return;
     } else if (multiGradient) {
         appendFloat(bytes_, path.miterLimit);
@@ -938,6 +962,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const bool focalRadialGradient = command.opcode == Opcode::drawFocalRadialPath;
     const bool twoCircleRadialGradient = command.opcode == Opcode::drawTwoCircleRadialPath;
     const bool styledRadialGradient = command.opcode == Opcode::drawStyledRadialPath;
+    const bool conicGradient = command.opcode == Opcode::drawConicPath;
     const bool anyRadialGradient = radialGradient || multiRadialGradient ||
         focalRadialGradient || twoCircleRadialGradient || styledRadialGradient;
     const bool extendedDashed = extended && command.payloadSize == 192U;
@@ -997,9 +1022,18 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         command.payload[176] <= 2U && command.payload[177] == 0U &&
         readU16(command.payload + 178) == 0U && readU32(command.payload + 180) == 0U &&
         command.payloadSize == 184U + styledRadialDashCount * 4U + radialStopCount * 20U;
+    const std::uint16_t conicDashCount = conicGradient && command.payloadSize >= 152U
+        ? readU16(command.payload + 148) : 0U;
+    const std::uint8_t conicStopCount = conicGradient && command.payloadSize >= 152U
+        ? command.payload[150] : 0U;
+    const bool validConicSize = conicGradient && conicStopCount >= 2U &&
+        conicStopCount <= 8U && conicDashCount <= 32U &&
+        (conicDashCount == 0U || (conicDashCount >= 2U && conicDashCount % 2U == 0U)) &&
+        command.payload[151] == 0U &&
+        command.payloadSize == 152U + conicDashCount * 4U + conicStopCount * 20U;
     if ((!dashed && !extended && !styled && !dashArray && !multiGradient &&
-         !anyRadialGradient && command.opcode != Opcode::drawPath) ||
-        (!dashArray && !multiGradient && !anyRadialGradient &&
+         !anyRadialGradient && !conicGradient && command.opcode != Opcode::drawPath) ||
+        (!dashArray && !multiGradient && !anyRadialGradient && !conicGradient &&
          command.payloadSize != (styled ? 208U : extended ? (extendedDashed ? 192U : 176U)
                                                         : dashed ? 144U : 128U)) ||
         (dashArray && !validDashArraySize) ||
@@ -1009,7 +1043,8 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         (focalRadialGradient && !validFocalRadialSize) ||
         (twoCircleRadialGradient && !validTwoCircleRadialSize) ||
         (styledRadialGradient && !validStyledRadialSize) ||
-        command.payload[4] > (anyRadialGradient ? 63U : 15U) ||
+        (conicGradient && !validConicSize) ||
+        command.payload[4] > (conicGradient ? 255U : anyRadialGradient ? 63U : 15U) ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::square) ||
         command.payload[7] > static_cast<std::uint8_t>(LineJoin::miter)) return false;
@@ -1020,6 +1055,8 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     path.strokeGradient = (command.payload[4] & 8U) != 0;
     path.fillRadialGradient = (command.payload[4] & 16U) != 0;
     path.strokeRadialGradient = (command.payload[4] & 32U) != 0;
+    path.fillConicGradient = (command.payload[4] & 64U) != 0;
+    path.strokeConicGradient = (command.payload[4] & 128U) != 0;
     path.fillRule = static_cast<FillRule>(command.payload[5]);
     path.lineCap = static_cast<LineCap>(command.payload[6]);
     path.lineJoin = static_cast<LineJoin>(command.payload[7]);
@@ -1106,6 +1143,35 @@ bool decodePath(const CommandView& command, PathCommand& path) {
             path.radialGradient.outerColor = path.radialGradient.stops.back().color;
         }
     }
+    if (conicGradient) {
+        path.conicGradient.centerX = readFloat(command.payload + 128);
+        path.conicGradient.centerY = readFloat(command.payload + 132);
+        path.conicGradient.rotation = readFloat(command.payload + 136);
+        path.miterLimit = readFloat(command.payload + 140);
+        path.dashOffset = readFloat(command.payload + 144);
+        if (!std::isfinite(path.conicGradient.centerX) ||
+            !std::isfinite(path.conicGradient.centerY) ||
+            !std::isfinite(path.conicGradient.rotation) ||
+            !std::isfinite(path.miterLimit) || path.miterLimit < 1.0F ||
+            path.miterLimit > 1000.0F || !std::isfinite(path.dashOffset)) return false;
+        std::size_t offset = 152U;
+        path.dashPattern.reserve(conicDashCount);
+        for (std::uint16_t index = 0; index < conicDashCount; ++index, offset += 4U) {
+            const float length = readFloat(command.payload + offset);
+            if (!std::isfinite(length) || length <= 0.0F) return false;
+            path.dashPattern.push_back(length);
+        }
+        float previous = -1.0F;
+        for (std::uint8_t index = 0; index < conicStopCount; ++index, offset += 20U) {
+            PathGradient::Stop stop{readFloat(command.payload + offset),
+                {readFloat(command.payload + offset + 4), readFloat(command.payload + offset + 8),
+                 readFloat(command.payload + offset + 12), readFloat(command.payload + offset + 16)}};
+            if (!std::isfinite(stop.offset) || stop.offset < previous || stop.offset < 0.0F ||
+                stop.offset > 1.0F) return false;
+            previous = stop.offset;
+            path.conicGradient.stops.push_back(stop);
+        }
+    }
     const std::size_t dashOffset = (extended || styled) ? 176U : 128U;
     const bool styledDash = styled && (readFloat(command.payload + dashOffset) != 0.0F ||
         readFloat(command.payload + dashOffset + 4) != 0.0F ||
@@ -1113,10 +1179,10 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const bool hasDash = dashed || extendedDashed || styledDash;
     path.dashLength = hasDash ? readFloat(command.payload + dashOffset) : 0.0F;
     path.gapLength = hasDash ? readFloat(command.payload + dashOffset + 4) : 0.0F;
-    if (!styledRadialGradient)
+    if (!styledRadialGradient && !conicGradient)
         path.dashOffset = hasDash ? readFloat(command.payload + dashOffset + 8) : 0.0F;
     if ((hasDash || styled) && readU32(command.payload + dashOffset + 12) != 0U) return false;
-    if (!styledRadialGradient)
+    if (!styledRadialGradient && !conicGradient)
         path.miterLimit = styled ? readFloat(command.payload + 192) : 4.0F;
     if (styled && (!std::isfinite(path.miterLimit) || path.miterLimit < 1.0F ||
         path.miterLimit > 1000.0F ||
@@ -1173,10 +1239,16 @@ bool decodePath(const CommandView& command, PathCommand& path) {
            (!path.strokeRadialGradient ||
             (anyRadialGradient && path.stroke && !path.strokeGradient)) &&
            (!anyRadialGradient || path.fillRadialGradient || path.strokeRadialGradient) &&
+           (!path.fillConicGradient || (conicGradient && path.fill && !path.fillGradient &&
+                                        !path.fillRadialGradient)) &&
+           (!path.strokeConicGradient || (conicGradient && path.stroke && !path.strokeGradient &&
+                                          !path.strokeRadialGradient)) &&
+           (!conicGradient || path.fillConicGradient || path.strokeConicGradient) &&
            (!extended || path.strokeGradient) &&
            (!path.strokeGradient || ((extended || styled || dashArray || multiGradient) && path.stroke)) &&
            (!(dashArray || (multiGradient && multiDashCount > 0U) ||
               (styledRadialGradient && styledRadialDashCount > 0U)) || path.stroke) &&
+           (!(conicGradient && conicDashCount > 0U) || path.stroke) &&
            (!multiGradient || ((fillStopCount == 0U || path.fillGradient) &&
                                (strokeStopCount == 0U || path.strokeGradient))) &&
            (!hasDash || (path.stroke && path.dashLength > 0.0F && path.gapLength > 0.0F));

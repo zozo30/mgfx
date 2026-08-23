@@ -119,6 +119,7 @@ Offset focal points for radial path gradients are advertised by `1 << 46`.
 Two-circle radial path gradients with nonzero focal radius are advertised by `1 << 47`.
 Radial gradient paint on path strokes is advertised by `1 << 48`.
 Styled and dashed radial path paint is advertised by `1 << 49`.
+Multi-stop conic paint on persistent paths is advertised by `1 << 50`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -310,3 +311,11 @@ two-circle `2`) followed by seven reserved zero bytes. Dash lengths start at byt
 184 and stops follow them. Payload size is
 `184 + dashCount * 4 + stopCount * 20`; dash count is zero or an even 2–32 and
 stop count is 2–8. Capability bit 49 is required.
+
+MGFX opcode `37` (`DrawConicPath`) starts with the 128-byte `DrawPath` base,
+then `f32 centerX`, `f32 centerY`, `f32 rotation` in radians, `f32 miterLimit`,
+`f32 dashOffset`, `u16 dashCount`, `u8 stopCount`, and one reserved zero byte.
+Dash lengths start at byte 152 and stops follow them. Payload size is
+`152 + dashCount * 4 + stopCount * 20`; dash count is zero or an even 2–32 and
+stop count is 2–8. Path flag bit 6 selects conic fill and bit 7 selects conic
+stroke. Capability bit 50 is required.

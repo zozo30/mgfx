@@ -65,6 +65,23 @@ test("React Path uploads canonical curves once and emits DrawPath instead of tri
   assert.equal(frame.readUInt16LE(40), 7);
 });
 
+test("React Path lowers animated conic paint without generating client geometry", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; }, undefined, {
+    createPath: () => {},
+  });
+  surface.render(<Path data="M2 2H22V22H2Z" viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+    conicGradient={{ center: { x: 12, y: 12 }, rotation: 0.5, stops: [
+      { offset: 0, color: { red: 0.1, green: 0.8, blue: 1, alpha: 1 } },
+      { offset: 0.5, color: { red: 0.8, green: 0.2, blue: 1, alpha: 1 } },
+      { offset: 1, color: { red: 0.1, green: 0.8, blue: 1, alpha: 1 } },
+    ] }} style={{ preferredSize: { width: 100, height: 100 } }} />);
+  surface.resize({ width: 100, height: 100 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 37);
+  assert.equal(frame.readFloatLE(40 + 8 + 136), 0.5);
+});
+
 test("React Svg composes a complete document from persistent server paths", () => {
   let uploads = 0;
   let frame: Buffer | undefined;

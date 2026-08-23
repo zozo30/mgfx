@@ -91,6 +91,9 @@ The same radial paint can target cached stroke geometry; independently painted
 radial fill and stroke lower to two small draws sharing one path resource.
 Dash arrays, phase, joins, caps, and custom miter limits remain server-owned when
 that stroke uses radial paint.
+Arbitrary cached paths also accept two- through eight-stop conic fill or stroke
+paint. Their source-space center and rotation are fragment parameters, so a
+rotating angular gradient never re-uploads or retessellates its path.
 The same gradient paint is available for strokes, so changing gradient colors
 does not invalidate tessellation. Two-value dashed strokes use the compact
 `DrawDashedPath` extension, while longer rhythms use `DrawDashArrayPath`: dash

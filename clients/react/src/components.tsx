@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Key, KeyModifier, type Color,
-  type PathRadialGradientPaint } from "@mgfx/demo-client/protocol";
+  type PathConicGradientPaint, type PathRadialGradientPaint } from "@mgfx/demo-client/protocol";
 import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style,
   type RichTextSpan, type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
@@ -38,8 +38,8 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, sampli
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;
 
-export function Path({ data, color, gradient, radialGradient, strokeColor, strokeGradient,
-  strokeRadialGradient, strokeWidth = 0, viewBox, tolerance,
+export function Path({ data, color, gradient, radialGradient, conicGradient, strokeColor, strokeGradient,
+  strokeRadialGradient, strokeConicGradient, strokeWidth = 0, viewBox, tolerance,
   fillRule, lineCap = "round", lineJoin = "round", miterLimit, dash, style }: {
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
@@ -48,6 +48,7 @@ export function Path({ data, color, gradient, radialGradient, strokeColor, strok
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect" };
   readonly radialGradient?: PathRadialGradientPaint;
+  readonly conicGradient?: PathConicGradientPaint;
   readonly strokeColor?: Color;
   readonly strokeGradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
@@ -55,6 +56,7 @@ export function Path({ data, color, gradient, radialGradient, strokeColor, strok
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect" };
   readonly strokeRadialGradient?: PathRadialGradientPaint;
+  readonly strokeConicGradient?: PathConicGradientPaint;
   readonly strokeWidth?: number; readonly viewBox?: { x: number; y: number;
     width: number; height: number }; readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round" | "square";
@@ -68,8 +70,10 @@ export function Path({ data, color, gradient, radialGradient, strokeColor, strok
     viewBox: viewBox ?? resource.bounds, fit: "contain",
     ...(color ? { fill: color } : {}), ...(gradient ? { fillGradient: gradient } : {}),
     ...(radialGradient ? { fillRadialGradient: radialGradient } : {}),
+    ...(conicGradient ? { fillConicGradient: conicGradient } : {}),
     ...(strokeGradient && strokeWidth > 0 ? { strokeGradient, strokeWidth } : {}),
     ...(strokeRadialGradient && strokeWidth > 0 ? { strokeRadialGradient, strokeWidth } : {}),
+    ...(strokeConicGradient && strokeWidth > 0 ? { strokeConicGradient, strokeWidth } : {}),
     ...(strokeColor && strokeWidth > 0
       ? { stroke: strokeColor, strokeWidth } : {}),
     ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),

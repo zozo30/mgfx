@@ -97,6 +97,7 @@ export const ExtendedServerCapability = {
   TwoCircleRadialPathGradients: 1n << 47n,
   RadialPathGradientStrokes: 1n << 48n,
   StyledRadialPathPaint: 1n << 49n,
+  ConicPathGradients: 1n << 50n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -260,13 +261,21 @@ export interface PathRadialGradientPaint {
   readonly focalRadius?: number;
 }
 
+export interface PathConicGradientPaint {
+  readonly center: { readonly x: number; readonly y: number };
+  readonly rotation?: number;
+  readonly stops: readonly { readonly offset: number; readonly color: Color }[];
+}
+
 export interface PathPaint {
   readonly fill?: Color;
   readonly fillGradient?: PathGradientPaint;
   readonly fillRadialGradient?: PathRadialGradientPaint;
+  readonly fillConicGradient?: PathConicGradientPaint;
   readonly stroke?: Color;
   readonly strokeGradient?: PathGradientPaint;
   readonly strokeRadialGradient?: PathRadialGradientPaint;
+  readonly strokeConicGradient?: PathConicGradientPaint;
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
@@ -768,8 +777,9 @@ export class FrameEncoder {
     viewBox: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
     paint: PathPaint): void {
     if (!Number.isSafeInteger(pathId) || pathId <= 0 || pathId > 0xffff_ffff ||
-        (!paint.fill && !paint.fillGradient && !paint.fillRadialGradient &&
-          !paint.stroke && !paint.strokeGradient && !paint.strokeRadialGradient))
+        (!paint.fill && !paint.fillGradient && !paint.fillRadialGradient && !paint.fillConicGradient &&
+          !paint.stroke && !paint.strokeGradient && !paint.strokeRadialGradient &&
+          !paint.strokeConicGradient))
       throw new RangeError("Path draw requires an ID and paint");
     const dashArray = paint.dash !== undefined && "values" in paint.dash;
     const dashed = paint.dash !== undefined && !dashArray;
@@ -777,6 +787,10 @@ export class FrameEncoder {
     const styled = paint.miterLimit !== undefined;
     if (paint.fillRadialGradient && paint.strokeRadialGradient)
       throw new RangeError("One path command can carry only one radial paint");
+    if (paint.fillConicGradient && paint.strokeConicGradient)
+      throw new RangeError("One path command can carry only one conic paint");
+    const conicPaint = paint.fillConicGradient ?? paint.strokeConicGradient;
+    const conicGradient = conicPaint !== undefined;
     const radialPaint = paint.fillRadialGradient ?? paint.strokeRadialGradient;
     const radialGradient = radialPaint !== undefined;
     const radialStops = radialPaint?.stops ?? [];
@@ -804,14 +818,22 @@ export class FrameEncoder {
         (index === 0 || stop.offset >= stops[index - 1]!.offset) &&
         [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha].every(Number.isFinite)));
     if (!validateStops(fillStops) || !validateStops(strokeStops) ||
-        (extendedRadialGradient && !validateStops(encodedRadialStops)))
+        (extendedRadialGradient && !validateStops(encodedRadialStops)) ||
+        (conicGradient && (!validateStops(conicPaint.stops) || conicPaint.stops.length < 2)))
       throw new RangeError("Path gradients require 2 through 8 ordered finite stops");
     const multiGradient = fillStops.length > 2 || strokeStops.length > 2 ||
       (paint.fillGradient?.spread !== undefined && paint.fillGradient.spread !== "pad") ||
       (paint.strokeGradient?.spread !== undefined && paint.strokeGradient.spread !== "pad");
     if ((paint.fillRadialGradient && paint.fillGradient) ||
-        (radialGradient && paint.strokeGradient))
-      throw new RangeError("Radial path paint cannot yet combine with extended stroke paint");
+        (radialGradient && paint.strokeGradient) ||
+        (paint.fillConicGradient && (paint.fillGradient || paint.fillRadialGradient ||
+          paint.strokeGradient)) ||
+        (paint.strokeConicGradient && (paint.strokeGradient || paint.strokeRadialGradient)) ||
+        (conicGradient && radialGradient))
+      throw new RangeError("Path command cannot combine multiple gradient models");
+    if (conicGradient && (!Number.isFinite(conicPaint.center.x) ||
+        !Number.isFinite(conicPaint.center.y) || !Number.isFinite(conicPaint.rotation ?? 0)))
+      throw new RangeError("Conic path center and rotation must be finite");
     if (styled && (!Number.isFinite(paint.miterLimit) || paint.miterLimit < 1 || paint.miterLimit > 1000))
       throw new RangeError("Path miter limit must be between 1 and 1000");
     if (dashArray && (paint.dash.values.length < 2 || paint.dash.values.length > 32 ||
@@ -825,9 +847,11 @@ export class FrameEncoder {
       throw new RangeError("Path dash values must be positive and finite");
     const multiDash = paint.dash === undefined ? [] : "values" in paint.dash
       ? paint.dash.values : [paint.dash.length, paint.dash.gap];
-    if (paint.dash && !paint.stroke && !paint.strokeGradient && !paint.strokeRadialGradient)
+    if (paint.dash && !paint.stroke && !paint.strokeGradient && !paint.strokeRadialGradient &&
+        !paint.strokeConicGradient)
       throw new RangeError("Dashed path requires stroke paint");
-    const payload = Buffer.alloc(styledRadialGradient
+    const payload = Buffer.alloc(conicGradient
+      ? 152 + multiDash.length * 4 + conicPaint.stops.length * 20 : styledRadialGradient
       ? 184 + multiDash.length * 4 + encodedRadialStops.length * 20 :
       twoCircleRadialGradient ? 176 + encodedRadialStops.length * 20 :
       focalRadialGradient ? 168 + encodedRadialStops.length * 20 :
@@ -836,10 +860,13 @@ export class FrameEncoder {
       (fillStops.length + strokeStops.length) * 20 : dashArray ? 192 + paint.dash.values.length * 4 :
       styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     payload.writeUInt32LE(pathId, 0);
-    payload.writeUInt8((paint.fill || paint.fillGradient || paint.fillRadialGradient ? 1 : 0) |
-      (paint.stroke || paint.strokeGradient || paint.strokeRadialGradient ? 2 : 0) |
+    payload.writeUInt8((paint.fill || paint.fillGradient || paint.fillRadialGradient ||
+        paint.fillConicGradient ? 1 : 0) |
+      (paint.stroke || paint.strokeGradient || paint.strokeRadialGradient ||
+        paint.strokeConicGradient ? 2 : 0) |
       (paint.fillGradient ? 4 : 0) | (paint.strokeGradient ? 8 : 0) |
-      (paint.fillRadialGradient ? 16 : 0) | (paint.strokeRadialGradient ? 32 : 0), 4);
+      (paint.fillRadialGradient ? 16 : 0) | (paint.strokeRadialGradient ? 32 : 0) |
+      (paint.fillConicGradient ? 64 : 0) | (paint.strokeConicGradient ? 128 : 0), 4);
     payload.writeUInt8(paint.fillRule === "evenodd" ? 1 : 0, 5);
     payload.writeUInt8(paint.lineCap === "square" ? 2 : paint.lineCap === "round" ? 1 : 0, 6);
     payload.writeUInt8(paint.lineJoin === "miter" ? 2 : paint.lineJoin === "round" ? 1 : 0, 7);
@@ -862,6 +889,23 @@ export class FrameEncoder {
         if (!Number.isFinite(value)) throw new RangeError("Path draw values must be finite");
         payload.writeFloatLE(value, 16 + index * 4);
       });
+    if (conicPaint) {
+      [conicPaint.center.x, conicPaint.center.y, conicPaint.rotation ?? 0,
+        paint.miterLimit ?? 4, paint.dash?.offset ?? 0]
+        .forEach((value, index) => payload.writeFloatLE(value, 128 + index * 4));
+      payload.writeUInt16LE(multiDash.length, 148);
+      payload.writeUInt8(conicPaint.stops.length, 150);
+      multiDash.forEach((value, index) => payload.writeFloatLE(value, 152 + index * 4));
+      const stopsOffset = 152 + multiDash.length * 4;
+      conicPaint.stops.forEach((stop, index) => {
+        const offset = stopsOffset + index * 20;
+        payload.writeFloatLE(stop.offset, offset);
+        [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha]
+          .forEach((value, channel) => payload.writeFloatLE(value, offset + 4 + channel * 4));
+      });
+      this.command(37, payload);
+      return;
+    }
     if (radialPaint) {
       const radial = radialPaint;
       const focal = radial.focal ?? radial.center;

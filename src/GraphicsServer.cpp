@@ -379,7 +379,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::focalRadialPathGradients |
             mgfx::ipc::ServerCapability::twoCircleRadialPathGradients |
             mgfx::ipc::ServerCapability::radialPathGradientStrokes |
-            mgfx::ipc::ServerCapability::styledRadialPathPaint;
+            mgfx::ipc::ServerCapability::styledRadialPathPaint |
+            mgfx::ipc::ServerCapability::conicPathGradients;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

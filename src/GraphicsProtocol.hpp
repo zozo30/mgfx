@@ -47,6 +47,7 @@ enum class Opcode : std::uint16_t {
     drawFocalRadialPath = 34,
     drawTwoCircleRadialPath = 35,
     drawStyledRadialPath = 36,
+    drawConicPath = 37,
 };
 
 enum class Primitive : std::uint8_t {
@@ -288,6 +289,14 @@ struct PathCommand {
     bool fillRadialGradient = false;
     bool strokeRadialGradient = false;
     RadialGradient radialGradient{};
+    struct ConicGradient {
+        float centerX = 0.0F, centerY = 0.0F;
+        float rotation = 0.0F;
+        std::vector<PathGradient::Stop> stops;
+    };
+    bool fillConicGradient = false;
+    bool strokeConicGradient = false;
+    ConicGradient conicGradient{};
 };
 
 enum class FontFamily : std::uint8_t {

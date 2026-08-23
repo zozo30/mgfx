@@ -237,6 +237,12 @@ stroke styles: up to 32 dash lengths, signed phase, caps, joins, and a custom
 miter limit. Geometry-cache keys include stroke style but remain independent of
 the radial stop colors. Support is advertised by `styledRadialPathPaint`.
 
+`DrawConicPath` applies two through eight ordered angular stops around a
+source-space center. Fill and cached stroke geometry share the same fragment
+paint path; dash arrays, signed phase, caps, joins, and miter limits stay in the
+server tessellator. Animating rotation changes paint only. Support is advertised
+by `conicPathGradients`.
+
 ## Linear gradients
 
 `DrawLinearGradient` carries one destination, rounded-corner radius, a portable

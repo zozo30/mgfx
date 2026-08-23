@@ -1215,7 +1215,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                    command.opcode == gfx::Opcode::drawMultiRadialPath ||
                    command.opcode == gfx::Opcode::drawFocalRadialPath ||
                    command.opcode == gfx::Opcode::drawTwoCircleRadialPath ||
-                   command.opcode == gfx::Opcode::drawStyledRadialPath) {
+                   command.opcode == gfx::Opcode::drawStyledRadialPath ||
+                   command.opcode == gfx::Opcode::drawConicPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1279,6 +1280,20 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                           }))) ||
                     std::fabs(path.radialGradient.axisXX * path.radialGradient.axisYY -
                               path.radialGradient.axisXY * path.radialGradient.axisYX) < 0.000001F)) ||
+                ((path.fillConicGradient || path.strokeConicGradient) &&
+                   (!std::isfinite(path.conicGradient.centerX) ||
+                    !std::isfinite(path.conicGradient.centerY) ||
+                    !std::isfinite(path.conicGradient.rotation) ||
+                    path.conicGradient.stops.size() < 2U ||
+                    path.conicGradient.stops.size() > 8U ||
+                    std::any_of(path.conicGradient.stops.begin(), path.conicGradient.stops.end(),
+                        [](const gfx::PathGradient::Stop& stop) {
+                            return !std::isfinite(stop.offset) ||
+                                !std::isfinite(stop.color.red) ||
+                                !std::isfinite(stop.color.green) ||
+                                !std::isfinite(stop.color.blue) ||
+                                !std::isfinite(stop.color.alpha);
+                        }))) ||
                 path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
                 path.viewBox.height <= 0.0F) {
                 throw std::runtime_error("Malformed path command");
@@ -1314,9 +1329,10 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             const auto drawPathTriangles = [&](const std::vector<gfx::PathPoint>& points,
                                                gfx::Color color,
                                                const gfx::PathGradient* gradient,
-                                               const gfx::PathCommand::RadialGradient* radial) {
+                                               const gfx::PathCommand::RadialGradient* radial,
+                                               const gfx::PathCommand::ConicGradient* conic) {
                 if (points.empty()) return;
-                if (radial != nullptr) {
+                if (radial != nullptr || conic != nullptr) {
                     if (encoder == nullptr) {
                         encoder = commandBuffer->renderCommandEncoder(renderPass);
                         applyClip();
@@ -1327,18 +1343,29 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     };
                     struct RadialPathUniforms {
                         std::array<float, 2> center, axisX, axisY, focal;
-                        float focalRadius = 0.0F;
+                        float radiusOrRotation = 0.0F;
                         std::uint32_t stopCount = 0;
                         std::uint32_t spread = 0;
-                        std::uint32_t reserved = 0;
+                        std::uint32_t mode = 0;
                         std::array<std::array<float, 4>, 2> offsets{};
                         std::array<std::array<float, 4>, 8> colors{};
                     };
-                    RadialPathUniforms uniforms{{radial->centerX, radial->centerY},
-                        {radial->axisXX, radial->axisXY},
-                        {radial->axisYX, radial->axisYY}, {0.0F, 0.0F}};
-                    uniforms.focalRadius = radial->focalRadius;
-                    if (radial->hasFocalPoint) {
+                    RadialPathUniforms uniforms{};
+                    if (conic != nullptr) {
+                        uniforms.center = {conic->centerX, conic->centerY};
+                        uniforms.radiusOrRotation = conic->rotation;
+                        uniforms.stopCount = static_cast<std::uint32_t>(conic->stops.size());
+                        uniforms.mode = 1U;
+                    } else {
+                        uniforms.center = {radial->centerX, radial->centerY};
+                        uniforms.axisX = {radial->axisXX, radial->axisXY};
+                        uniforms.axisY = {radial->axisYX, radial->axisYY};
+                        uniforms.radiusOrRotation = radial->focalRadius;
+                        uniforms.stopCount = static_cast<std::uint32_t>(
+                            radial->stops.empty() ? 2U : radial->stops.size());
+                        uniforms.spread = static_cast<std::uint32_t>(radial->spread);
+                    }
+                    if (radial != nullptr && radial->hasFocalPoint) {
                         const float determinant = radial->axisXX * radial->axisYY -
                                                   radial->axisXY * radial->axisYX;
                         const float dx = radial->focalX - radial->centerX;
@@ -1348,18 +1375,18 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                             (radial->axisXX * dy - radial->axisXY * dx) / determinant,
                         };
                         if (std::hypot(uniforms.focal[0], uniforms.focal[1]) +
-                            uniforms.focalRadius >= 1.0F)
+                            uniforms.radiusOrRotation >= 1.0F)
                             throw std::runtime_error("Radial focal circle lies outside its field");
                     }
-                    uniforms.stopCount = static_cast<std::uint32_t>(
-                        radial->stops.empty() ? 2U : radial->stops.size());
-                    uniforms.spread = static_cast<std::uint32_t>(radial->spread);
                     const auto setStop = [&](std::size_t index, float offset, gfx::Color stopColor) {
                         uniforms.offsets[index / 4U][index % 4U] = offset;
                         uniforms.colors[index] = {stopColor.red, stopColor.green, stopColor.blue,
                                                   stopColor.alpha * opacityStack.back()};
                     };
-                    if (radial->stops.empty()) {
+                    if (conic != nullptr) {
+                        for (std::size_t index = 0; index < conic->stops.size(); ++index)
+                            setStop(index, conic->stops[index].offset, conic->stops[index].color);
+                    } else if (radial->stops.empty()) {
                         setStop(0, 0.0F, radial->innerColor);
                         setStop(1, 1.0F, radial->outerColor);
                     } else {
@@ -1549,10 +1576,12 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (path.fill) drawPathTriangles(cached->triangles.fill, path.fillColor,
                 path.fillGradient ? &path.gradient : nullptr,
-                path.fillRadialGradient ? &path.radialGradient : nullptr);
+                path.fillRadialGradient ? &path.radialGradient : nullptr,
+                path.fillConicGradient ? &path.conicGradient : nullptr);
             if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor,
                 path.strokeGradient ? &path.strokeGradientPaint : nullptr,
-                path.strokeRadialGradient ? &path.radialGradient : nullptr);
+                path.strokeRadialGradient ? &path.radialGradient : nullptr,
+                path.strokeConicGradient ? &path.conicGradient : nullptr);
         } else if (command.opcode == gfx::Opcode::drawText) {
             gfx::TextCommand text{};
             if (!gfx::decodeText(command, text) || !std::isfinite(text.left) ||

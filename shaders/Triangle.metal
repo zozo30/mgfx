@@ -38,10 +38,10 @@ struct RadialPathUniforms {
     packed_float2 axisX;
     packed_float2 axisY;
     packed_float2 focal;
-    float focalRadius;
+    float radiusOrRotation;
     uint stopCount;
     uint spread;
-    uint reserved;
+    uint mode;
     packed_float4 offsets[2];
     packed_float4 colors[8];
 };
@@ -54,25 +54,31 @@ vertex RadialPathVertexOut radialPathVertexMain(
 
 fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]],
                                        constant RadialPathUniforms& gradient [[buffer(0)]]) {
-    const float determinant = gradient.axisX.x * gradient.axisY.y -
-                              gradient.axisX.y * gradient.axisY.x;
     const float2 delta = in.source - gradient.center;
-    const float2 radial = abs(determinant) > 0.000001
-        ? float2((delta.x * gradient.axisY.y - delta.y * gradient.axisY.x) / determinant,
-                 (gradient.axisX.x * delta.y - gradient.axisX.y * delta.x) / determinant)
-        : float2(1.0);
-    const float2 focalDelta = radial - gradient.focal;
-    const float radiusDelta = 1.0 - gradient.focalRadius;
-    const float a = dot(gradient.focal, gradient.focal) - radiusDelta * radiusDelta;
-    const float b = 2.0 * (dot(focalDelta, gradient.focal) -
-                           gradient.focalRadius * radiusDelta);
-    const float c = dot(focalDelta, focalDelta) -
-                    gradient.focalRadius * gradient.focalRadius;
-    const float discriminant = max(b * b - 4.0 * a * c, 0.0);
-    const float solvedAmount = abs(a) > 0.000001 ?
-        (-b - sqrt(discriminant)) / (2.0 * a) :
-        abs(b) > 0.000001 ? -c / b : 0.0;
-    const float rawAmount = c <= 0.0 ? 0.0 : max(solvedAmount, 0.0);
+    constexpr float tau = 6.28318530718;
+    float rawAmount;
+    if (gradient.mode == 1) {
+        rawAmount = fract((atan2(delta.y, delta.x) + gradient.radiusOrRotation) / tau + 1.0);
+    } else {
+        const float determinant = gradient.axisX.x * gradient.axisY.y -
+                                  gradient.axisX.y * gradient.axisY.x;
+        const float2 radial = abs(determinant) > 0.000001
+            ? float2((delta.x * gradient.axisY.y - delta.y * gradient.axisY.x) / determinant,
+                     (gradient.axisX.x * delta.y - gradient.axisX.y * delta.x) / determinant)
+            : float2(1.0);
+        const float2 focalDelta = radial - gradient.focal;
+        const float radiusDelta = 1.0 - gradient.radiusOrRotation;
+        const float a = dot(gradient.focal, gradient.focal) - radiusDelta * radiusDelta;
+        const float b = 2.0 * (dot(focalDelta, gradient.focal) -
+                               gradient.radiusOrRotation * radiusDelta);
+        const float c = dot(focalDelta, focalDelta) -
+                        gradient.radiusOrRotation * gradient.radiusOrRotation;
+        const float discriminant = max(b * b - 4.0 * a * c, 0.0);
+        const float solvedAmount = abs(a) > 0.000001 ?
+            (-b - sqrt(discriminant)) / (2.0 * a) :
+            abs(b) > 0.000001 ? -c / b : 0.0;
+        rawAmount = c <= 0.0 ? 0.0 : max(solvedAmount, 0.0);
+    }
     const float repeated = rawAmount - floor(rawAmount);
     const float reflectedCycle = fmod(rawAmount, 2.0);
     const float amount = gradient.spread == 1 ? repeated : gradient.spread == 2 ?
