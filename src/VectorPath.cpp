@@ -273,7 +273,7 @@ PathPoint offsetIntersection(const PathPoint& point, const PathPoint& previousDi
 }
 
 std::vector<PathPoint> offsetSide(const Contour& contour, float side, float halfWidth,
-                                  LineJoin lineJoin) {
+                                  LineJoin lineJoin, float miterLimit) {
     std::vector<PathPoint> result;
     const std::size_t count = contour.points.size();
     if (count < 2) return result;
@@ -300,7 +300,7 @@ std::vector<PathPoint> offsetSide(const Contour& contour, float side, float half
                 const PathPoint intersection = offsetIntersection(
                     point, previousDirection, nextDirection, side, halfWidth);
                 const PathPoint extension = subtract(intersection, point);
-                if (std::hypot(extension[0], extension[1]) <= halfWidth * 4.0F) {
+                if (std::hypot(extension[0], extension[1]) <= halfWidth * miterLimit) {
                     result.back() = intersection;
                 } else {
                     result.push_back(add(point, nextOffset));
@@ -341,12 +341,12 @@ void appendPolygon(const std::vector<std::vector<PathPoint>>& rings,
 
 void appendStroke(const std::vector<Contour>& contours, float width,
                   LineCap lineCap, LineJoin lineJoin,
-                  std::vector<PathPoint>& triangles) {
+                  float miterLimit, std::vector<PathPoint>& triangles) {
     const float half = std::max(0.0F, width) * 0.5F;
     if (half <= 0.0F) return;
     for (const Contour& contour : contours) {
-        std::vector<PathPoint> left = offsetSide(contour, 1.0F, half, lineJoin);
-        std::vector<PathPoint> right = offsetSide(contour, -1.0F, half, lineJoin);
+        std::vector<PathPoint> left = offsetSide(contour, 1.0F, half, lineJoin, miterLimit);
+        std::vector<PathPoint> right = offsetSide(contour, -1.0F, half, lineJoin, miterLimit);
         if (left.size() < 2 || right.size() < 2) continue;
         if (contour.closed) {
             const bool leftIsOuter = signedArea(contour.points) < 0.0;
@@ -445,14 +445,15 @@ PathTriangles tessellatePath(const std::vector<mgfx::ipc::PathSegment>& segments
                              bool fillEnabled, bool strokeEnabled, FillRule fillRule,
                              LineCap lineCap, LineJoin lineJoin,
                              float strokeWidth, float tolerance,
-                             float dashLength, float gapLength, float dashOffset) {
+                             float dashLength, float gapLength, float dashOffset,
+                             float miterLimit) {
     PathTriangles result;
     const std::vector<Contour> contours = flatten(segments, std::max(0.01F, tolerance));
     if (fillEnabled) appendFill(contours, fillRule, result.fill);
     if (strokeEnabled) appendStroke(
         dashLength > 0.0F && gapLength > 0.0F
             ? dashContours(contours, dashLength, gapLength, dashOffset) : contours,
-        strokeWidth, lineCap, lineJoin, result.stroke);
+        strokeWidth, lineCap, lineJoin, miterLimit, result.stroke);
     return result;
 }
 

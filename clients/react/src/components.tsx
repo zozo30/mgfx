@@ -38,7 +38,7 @@ export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?
   <mgfx-mesh mesh={data} style={style ?? {}} />;
 
 export function Path({ data, color, gradient, strokeColor, strokeGradient, strokeWidth = 0, viewBox, tolerance,
-  fillRule, lineCap = "round", lineJoin = "round", dash, style }: {
+  fillRule, lineCap = "round", lineJoin = "round", miterLimit, dash, style }: {
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
@@ -51,6 +51,7 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
     width: number; height: number }; readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round" | "square";
   readonly lineJoin?: "bevel" | "round" | "miter"; readonly style?: Style;
+  readonly miterLimit?: number;
   readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }) {
   const resource = useMemo(() => canonicalPath(data), [data]);
@@ -61,7 +62,8 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
     ...(strokeColor && strokeWidth > 0
       ? { stroke: strokeColor, strokeWidth } : {}),
     ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),
-    ...(dash ? { dash } : {}), lineCap, lineJoin };
+    ...(dash ? { dash } : {}), ...(miterLimit !== undefined ? { miterLimit } : {}),
+    lineCap, lineJoin };
   return <mgfx-path path={path} style={style ?? {}} />;
 }
 
@@ -80,6 +82,7 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
       {...(layer.strokeGradient
         ? { strokeGradient: layer.strokeGradient, strokeWidth: layer.strokeWidth } : {})}
       {...(layer.dash ? { dash: layer.dash } : {})}
+      {...(layer.miterLimit !== undefined ? { miterLimit: layer.miterLimit } : {})}
       fillRule={layer.fillRule} lineCap={layer.lineCap} lineJoin={layer.lineJoin}
       tolerance={tolerance} style={{ position: "absolute", inset: all(0) }} />)}
   </Stack>;

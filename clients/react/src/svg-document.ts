@@ -13,6 +13,7 @@ export interface SvgVectorLayer {
   readonly fillRule: "nonzero" | "evenodd";
   readonly lineCap: "butt" | "round" | "square";
   readonly lineJoin: "bevel" | "round" | "miter";
+  readonly miterLimit?: number;
   readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 
@@ -41,6 +42,7 @@ interface PaintState {
   readonly fillRule: "nonzero" | "evenodd";
   readonly lineCap: "butt" | "round" | "square";
   readonly lineJoin: "bevel" | "round" | "miter";
+  readonly miterLimit?: number;
   readonly currentColor: Color;
   readonly transform: Matrix;
   readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
@@ -111,6 +113,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       ...(stroke ? { stroke } : {}), ...(strokeGradient ? { strokeGradient } : {}),
       strokeWidth: state.strokeWidth * matrixScale(state.transform), fillRule: state.fillRule,
       lineCap: state.lineCap, lineJoin: state.lineJoin,
+      ...(state.miterLimit !== undefined ? { miterLimit: state.miterLimit } : {}),
       ...((stroke || strokeGradient) && state.dash
         ? { dash: scaleDash(state.dash, matrixScale(state.transform)) } : {}) });
     if (layers.length > 1024) throw new RangeError("SVG exceeds 1024 vector layers");
@@ -160,6 +163,9 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   const lineJoin = attributes["stroke-linejoin"] === "round" ? "round" :
     attributes["stroke-linejoin"] === "miter" ? "miter" :
     attributes["stroke-linejoin"] ? "bevel" : parent.lineJoin;
+  const parsedMiterLimit = Number(attributes["stroke-miterlimit"]);
+  const miterLimit = attributes["stroke-miterlimit"] === undefined ? parent.miterLimit :
+    Number.isFinite(parsedMiterLimit) && parsedMiterLimit >= 1 ? parsedMiterLimit : parent.miterLimit;
   const dash = attributes["stroke-dasharray"] === undefined ? parent.dash :
     parseDash(attributes["stroke-dasharray"], attributes["stroke-dashoffset"] ??
       (parent.dash?.offset !== undefined ? String(parent.dash.offset) : undefined));
@@ -169,7 +175,9 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     ...(stroke ? { stroke } : {}),
     ...(inheritedStrokeGradientId ? { strokeGradientId: inheritedStrokeGradientId } : {}),
     strokeWidth, opacity, fillOpacity, strokeOpacity,
-    fillRule, lineCap, lineJoin, currentColor, ...(inheritedDash ? { dash: inheritedDash } : {}),
+    fillRule, lineCap, lineJoin, currentColor,
+    ...(miterLimit !== undefined ? { miterLimit } : {}),
+    ...(inheritedDash ? { dash: inheritedDash } : {}),
     transform: multiply(parent.transform, parseTransform(attributes.transform)) };
 }
 

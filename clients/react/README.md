@@ -127,7 +127,9 @@ the Metal server splits and tessellates the stroke rather than receiving segment
 or triangles from React.
 SVG and `Path` strokes support butt, round, and square caps plus bevel, round,
 and miter joins. The server owns their geometry and applies a four-half-width
-miter limit, falling back to bevel for overly sharp corners.
+miter limit, falling back to bevel for overly sharp corners. `Path` accepts a
+custom `miterLimit`, while inline SVG maps inherited `stroke-miterlimit` into
+the same styled-path protocol command.
 
 ```tsx
 const [name, setName] = useState("");

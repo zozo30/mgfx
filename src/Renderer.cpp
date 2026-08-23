@@ -1185,7 +1185,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
         } else if (command.opcode == gfx::Opcode::drawPath ||
                    command.opcode == gfx::Opcode::drawDashedPath ||
-                   command.opcode == gfx::Opcode::drawExtendedPath) {
+                   command.opcode == gfx::Opcode::drawExtendedPath ||
+                   command.opcode == gfx::Opcode::drawStyledPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1220,18 +1221,20 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                        cached.tolerance == path.tolerance &&
                        cached.dashLength == path.dashLength &&
                        cached.gapLength == path.gapLength &&
-                       cached.dashOffset == path.dashOffset;
+                       cached.dashOffset == path.dashOffset &&
+                       cached.miterLimit == path.miterLimit;
             };
             auto cached = std::find_if(resource.cache.begin(), resource.cache.end(), sameStyle);
             if (cached == resource.cache.end()) {
                 if (resource.cache.size() >= 16) resource.cache.erase(resource.cache.begin());
                 resource.cache.push_back({path.fill, path.stroke, path.fillRule, path.lineCap,
                     path.lineJoin, path.strokeWidth, path.tolerance,
-                    path.dashLength, path.gapLength, path.dashOffset,
+                    path.dashLength, path.gapLength, path.dashOffset, path.miterLimit,
                     gfx::tessellatePath(resource.segments, path.fill, path.stroke,
                         path.fillRule, path.lineCap, path.lineJoin,
                         path.strokeWidth, path.tolerance,
-                        path.dashLength, path.gapLength, path.dashOffset)});
+                        path.dashLength, path.gapLength, path.dashOffset,
+                        path.miterLimit)});
                 cached = std::prev(resource.cache.end());
             }
             const auto drawPathTriangles = [&](const std::vector<gfx::PathPoint>& points,

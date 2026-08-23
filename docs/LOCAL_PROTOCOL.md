@@ -108,6 +108,7 @@ Server-tessellated dashed path strokes are advertised by `1 << 36`.
 Two-stop path stroke gradients are advertised by `1 << 37`.
 Extended path stroke styles (square caps and miter joins) are advertised by
 `1 << 38`.
+Custom path miter limits are advertised by `1 << 39`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -238,3 +239,10 @@ Its join byte is bevel (`0`), round (`1`), or miter (`2`). Backends apply a
 fixed miter limit of four stroke half-widths and fall back to a bevel when the
 intersection exceeds it. Clients must require capability bit 38 before sending
 either value `2` to an older server.
+
+MGFX opcode `29` (`DrawStyledPath`) is a fixed 208-byte extension. It contains
+the 128-byte base path, a reserved-or-active 48-byte stroke gradient, a
+reserved-or-active 16-byte dash block, then `f32 miterLimit` and three reserved
+zero `f32` values. A limit must be finite and between 1 and 1000. Clients omit
+this extension to select the default limit of four; capability bit 39 is
+required before sending opcode 29.

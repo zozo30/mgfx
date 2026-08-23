@@ -62,6 +62,7 @@ private:
         float dashLength;
         float gapLength;
         float dashOffset;
+        float miterLimit;
         gfx::PathTriangles triangles;
     };
     struct PathResource {

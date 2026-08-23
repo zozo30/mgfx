@@ -131,6 +131,14 @@ int main() {
         std::cerr << "Miter join does not meet at the exact outer intersection\n";
         return 1;
     }
+    const gfx::PathTriangles limitedMiterElbow = gfx::tessellatePath(elbow, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::miter, 2, 0.25F,
+        0, 0, 0, 1);
+    if (std::fabs(triangleArea(limitedMiterElbow.stroke) -
+                  triangleArea(bevelElbow.stroke)) > 0.001) {
+        std::cerr << "Miter limit does not fall back to a bevel join\n";
+        return 1;
+    }
 
     const std::vector<mgfx::ipc::PathSegment> closedSquare = {
         point(mgfx::ipc::PathVerb::moveTo, 0, 0),

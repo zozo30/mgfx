@@ -84,8 +84,8 @@ int main() {
                       {0.0F, 0.0F, 24.0F, 0.0F,
                        {0.0F, 0.4F, 0.8F, 1.0F}, {0.8F, 0.2F, 1.0F, 1.0F}}, true,
                       {0.0F, 0.0F, 24.0F, 24.0F,
-                       {1.0F, 0.2F, 0.1F, 1.0F}, {1.0F, 0.9F, 0.2F, 1.0F}},
-                      7.0F, 4.0F, -2.0F});
+                      {1.0F, 0.2F, 0.1F, 1.0F}, {1.0F, 0.9F, 0.2F, 1.0F}},
+                      7.0F, 4.0F, -2.0F, 6.0F});
     encoder.drawText({gfx::FontFamily::systemRounded, gfx::FontWeight::semibold,
                       gfx::FontStyle::italic,
                       0.08F,
@@ -241,6 +241,7 @@ int main() {
         !nearlyEqual(path.strokeGradientPaint.endColor.green, 0.9F) ||
         !nearlyEqual(path.dashLength, 7.0F) || !nearlyEqual(path.gapLength, 4.0F) ||
         !nearlyEqual(path.dashOffset, -2.0F) ||
+        !nearlyEqual(path.miterLimit, 6.0F) ||
         !decoder.next(command)) {
         return fail("Path decoding failed");
     }

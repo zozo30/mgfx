@@ -80,9 +80,9 @@ geometry cache; clients still upload only the original canonical path.
 
 Stroke caps are encoded as butt (`0`), round (`1`), or square (`2`), and joins
 as bevel (`0`), round (`1`), or miter (`2`). Square-cap extension and miter
-intersection are server tessellation details. Miters longer than four stroke
-half-widths fall back to bevel joins, preventing sharp paths from producing
-unbounded geometry.
+intersection are server tessellation details. The default limit is four stroke
+half-widths; `DrawStyledPath` can override it per draw. Longer miters fall back
+to bevel joins, preventing sharp paths from producing unbounded geometry.
 
 MGFX colors are specified as straight RGBA. Backends must premultiply before
 interpolation and use source-over compositing. Texture uploads remain
