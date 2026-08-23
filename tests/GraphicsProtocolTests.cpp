@@ -33,6 +33,8 @@ int main() {
     encoder.popTransform();
     encoder.pushOpacity(0.625F);
     encoder.popOpacity();
+    encoder.drawShadow({{-0.6F, 0.6F, 0.6F, -0.4F}, 14.0F, 18.0F, 2.0F,
+                        {0.0F, 0.1F, 0.2F, 0.55F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -81,6 +83,12 @@ int main() {
         !decoder.next(command) || command.opcode != gfx::Opcode::popOpacity ||
         command.payloadSize != 0 || !decoder.next(command)) {
         return fail("Opacity decoding failed");
+    }
+    gfx::ShadowCommand shadow{};
+    if (!gfx::decodeShadow(command, shadow) || !nearlyEqual(shadow.blur, 18.0F) ||
+        !nearlyEqual(shadow.destination.bottom, -0.4F) ||
+        !nearlyEqual(shadow.color.alpha, 0.55F) || !decoder.next(command)) {
+        return fail("Shadow decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

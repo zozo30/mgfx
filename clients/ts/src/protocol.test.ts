@@ -111,6 +111,22 @@ test("MGFX inherited opacity uses balanced skippable commands", () => {
   assert.throws(() => frame.pushOpacity(1.1));
 });
 
+test("MGFX soft shadow is one fixed backend-neutral command", () => {
+  const frame = new FrameEncoder();
+  frame.shadow({ destination: { left: -0.5, top: 0.5, right: 0.5, bottom: -0.5 },
+    cornerRadius: 14, blur: 18, spread: 2,
+    color: { red: 0, green: 0.1, blue: 0.2, alpha: 0.55 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 13);
+  assert.equal(bytes.readUInt32LE(20), 44);
+  assert.equal(bytes.readFloatLE(40), 14);
+  assert.equal(bytes.readFloatLE(44), 18);
+  assert.throws(() => frame.shadow({ destination: { left: 0, top: 0, right: 1, bottom: 1 },
+    cornerRadius: 0, blur: 300, spread: 0,
+    color: { red: 0, green: 0, blue: 0, alpha: 1 } }));
+});
+
 test("text input decodes validated UTF-8", () => {
   assert.equal(decodeText(encodeText("árvíz")), "árvíz");
   assert.throws(() => decodeText(Buffer.from([0xc3, 0x28])));

@@ -313,7 +313,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::pathResources |
             mgfx::ipc::ServerCapability::nativeTextMetrics |
             mgfx::ipc::ServerCapability::transformStack |
-            mgfx::ipc::ServerCapability::opacityStack;
+            mgfx::ipc::ServerCapability::opacityStack |
+            mgfx::ipc::ServerCapability::softShadows;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

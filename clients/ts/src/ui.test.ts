@@ -94,6 +94,24 @@ test("component opacity lowers around the complete subtree", () => {
   assert.equal(frame.readUInt16LE(frame.length - 16), 12);
 });
 
+test("component shadow draws before its own clipping and content", () => {
+  class ShadowComponent extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 80, height: 40 }, cornerRadius: 10, clip: true,
+        background: { red: 0.2, green: 0.4, blue: 0.8, alpha: 1 },
+        shadow: { color: { red: 0, green: 0, blue: 0, alpha: 0.6 },
+          blur: 16, spread: 2, offsetY: 6 } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new ShadowComponent());
+  host.layout({ width: 100, height: 60 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 60 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 13);
+  assert.equal(frame.readUInt16LE(68), 4);
+});
+
 test("keyboard focus traverses and activates controls", () => {
   let first = 0, second = 0;
   class KeyboardComponent extends Component {

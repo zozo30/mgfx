@@ -162,6 +162,11 @@ An inherited `opacity` style lowers to a separate balanced stack. Nested values
 multiply on the server and tint every drawable category while leaving cached
 geometry and uploaded resources unchanged.
 
+Soft rounded shadows are also server primitives. A component sends its rectangle,
+corner radius, blur, spread, offset, and color once per frame; Metal evaluates a
+signed-distance field in the fragment shader instead of receiving many translucent
+client triangles. Shadows compose with transform and opacity stacks.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,

@@ -47,3 +47,39 @@ fragment float4 imageFragmentMain(ImageVertexOut in [[stage_in]],
     const float4 sampled = image.sample(imageSampler, in.uv);
     return float4(sampled.rgb * in.tint.rgb * in.tint.a, sampled.a * in.tint.a);
 }
+
+struct ShadowVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 halfSize;
+    float radius;
+    float blur;
+    packed_float4 color;
+};
+
+struct ShadowVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 halfSize;
+    float radius;
+    float blur;
+    float4 color;
+};
+
+vertex ShadowVertexOut shadowVertexMain(const device ShadowVertex* vertices [[buffer(0)]],
+                                        uint vertexId [[vertex_id]]) {
+    const ShadowVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.halfSize,
+            value.radius, value.blur, value.color};
+}
+
+fragment float4 shadowFragmentMain(ShadowVertexOut in [[stage_in]]) {
+    const float radius = min(in.radius, min(in.halfSize.x, in.halfSize.y));
+    const float2 q = abs(in.local) - in.halfSize + radius;
+    const float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+    const float coverage = in.blur > 0.001
+        ? 1.0 - smoothstep(-in.blur, in.blur, distance)
+        : (distance <= 0.0 ? 1.0 : 0.0);
+    const float alpha = in.color.a * coverage;
+    return float4(in.color.rgb * alpha, alpha);
+}

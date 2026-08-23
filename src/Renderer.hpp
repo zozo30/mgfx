@@ -34,6 +34,7 @@ private:
     NS::SharedPtr<MTL::CommandQueue> commandQueue_;
     NS::SharedPtr<MTL::RenderPipelineState> pipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> imagePipelineState_;
+    NS::SharedPtr<MTL::RenderPipelineState> shadowPipelineState_;
     std::unordered_map<std::uint32_t, NS::SharedPtr<MTL::Texture>> textures_;
     struct CachedPath {
         bool fill;

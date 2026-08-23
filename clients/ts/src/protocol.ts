@@ -54,6 +54,7 @@ export enum ServerCapability {
   NativeTextMetrics = 1 << 12,
   TransformStack = 1 << 13,
   OpacityStack = 1 << 14,
+  SoftShadows = 1 << 15,
 }
 export interface ServerHello {
   readonly version: number;
@@ -122,6 +123,10 @@ export interface ClipRect {
 export interface AffineTransform {
   readonly m11: number; readonly m12: number; readonly m21: number; readonly m22: number;
   readonly translateX: number; readonly translateY: number;
+}
+export interface ShadowPaint {
+  readonly destination: ClipRect; readonly cornerRadius: number;
+  readonly blur: number; readonly spread: number; readonly color: Color;
 }
 
 export type PathSegment =
@@ -621,6 +626,18 @@ export class FrameEncoder {
   }
 
   popOpacity(): void { this.command(12, Buffer.alloc(0)); }
+
+  shadow(value: ShadowPaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.cornerRadius, value.blur, value.spread,
+      value.color.red, value.color.green, value.color.blue, value.color.alpha];
+    if (values.some((item) => !Number.isFinite(item)) || value.cornerRadius < 0 ||
+        value.blur < 0 || value.blur > 256 || value.spread < -256 || value.spread > 256)
+      throw new RangeError("Shadow values must be finite and within supported bounds");
+    const payload = Buffer.alloc(44);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(13, payload);
+  }
 
   finish(): Buffer {
     const byteCount = MGFX_HEADER_BYTES + this.commands.reduce((sum, item) => sum + item.length, 0);

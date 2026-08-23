@@ -115,6 +115,14 @@ multiplies the effective alpha into vertex colors, image tint, path gradients,
 and native text after decoding. This is lightweight inherited opacity rather
 than offscreen group isolation, and is advertised by `opacityStack`.
 
+## Soft shadows
+
+`DrawShadow` contains a normalized destination plus pixel-space corner radius,
+blur, spread, and color. Metal expands one quad and evaluates a rounded-box
+signed-distance field per fragment. The command is drawn before the component's
+own clip and content, while inherited parent clips, transforms, and opacity remain
+active. Servers advertise this path with `softShadows`.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

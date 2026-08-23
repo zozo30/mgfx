@@ -67,6 +67,7 @@ enum ServerCapability : std::uint32_t {
     nativeTextMetrics = 1U << 12U,
     transformStack = 1U << 13U,
     opacityStack = 1U << 14U,
+    softShadows = 1U << 15U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };

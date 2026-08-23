@@ -78,7 +78,10 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto fragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("fragmentMain")));
     auto imageVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageVertexMain")));
     auto imageFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageFragmentMain")));
-    if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction) {
+    auto shadowVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("shadowVertexMain")));
+    auto shadowFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("shadowFragmentMain")));
+    if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
+        !shadowVertexFunction || !shadowFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -113,6 +116,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     imagePipelineState_ = NS::TransferPtr(device_->newRenderPipelineState(imageDescriptor.get(), &error));
     if (!imagePipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the image render pipeline", error));
+    }
+
+    auto shadowDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    shadowDescriptor->setVertexFunction(shadowVertexFunction.get());
+    shadowDescriptor->setFragmentFunction(shadowFragmentFunction.get());
+    shadowDescriptor->setRasterSampleCount(sampleCount);
+    auto* shadowColor = shadowDescriptor->colorAttachments()->object(0);
+    shadowColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    shadowColor->setBlendingEnabled(true);
+    shadowColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    shadowColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    shadowColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    shadowColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    shadowPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(shadowDescriptor.get(), &error));
+    if (!shadowPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the shadow render pipeline", error));
     }
 }
 
@@ -283,6 +303,62 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->setFragmentTexture(found->second.get(), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawShadow) {
+            gfx::ShadowCommand shadow{};
+            if (!gfx::decodeShadow(command, shadow) || !std::isfinite(shadow.cornerRadius) ||
+                !std::isfinite(shadow.blur) || !std::isfinite(shadow.spread) ||
+                shadow.cornerRadius < 0.0F || shadow.blur < 0.0F || shadow.blur > 256.0F ||
+                shadow.spread < -256.0F || shadow.spread > 256.0F) {
+                throw std::runtime_error("Malformed shadow command");
+            }
+            if (clipEmpty() || shadow.color.alpha <= 0.0F) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const float width = (shadow.destination.right - shadow.destination.left) *
+                                drawableWidth * 0.5F;
+            const float height = (shadow.destination.top - shadow.destination.bottom) *
+                                 drawableHeight * 0.5F;
+            const std::array<float, 2> halfSize = {
+                std::max(0.0F, width * 0.5F + shadow.spread),
+                std::max(0.0F, height * 0.5F + shadow.spread)};
+            if (halfSize[0] <= 0.0F || halfSize[1] <= 0.0F) continue;
+            const std::array<float, 2> extent = {
+                halfSize[0] + shadow.blur * 2.0F,
+                halfSize[1] + shadow.blur * 2.0F};
+            const float centerX = (shadow.destination.left + shadow.destination.right) * 0.5F;
+            const float centerY = (shadow.destination.top + shadow.destination.bottom) * 0.5F;
+            const float extentX = extent[0] / drawableWidth * 2.0F;
+            const float extentY = extent[1] / drawableHeight * 2.0F;
+            struct ShadowVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> halfSize;
+                float radius;
+                float blur;
+                std::array<float, 4> color;
+            };
+            const float radius = std::max(0.0F, shadow.cornerRadius + shadow.spread);
+            const std::array<float, 4> color = {shadow.color.red, shadow.color.green,
+                shadow.color.blue, shadow.color.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return ShadowVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, halfSize, radius, shadow.blur, color};
+            };
+            const ShadowVertex vertices[] = {
+                vertex(centerX - extentX, centerY + extentY, -extent[0], -extent[1]),
+                vertex(centerX - extentX, centerY - extentY, -extent[0], extent[1]),
+                vertex(centerX + extentX, centerY - extentY, extent[0], extent[1]),
+                vertex(centerX - extentX, centerY + extentY, -extent[0], -extent[1]),
+                vertex(centerX + extentX, centerY - extentY, extent[0], extent[1]),
+                vertex(centerX + extentX, centerY + extentY, extent[0], -extent[1]),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(shadowPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));

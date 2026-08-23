@@ -207,7 +207,10 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
           <Button key={label} label={label} background={normal} activeBackground={active}
             active={selected === index} onPress={() => setSelected(index)}
             style={{ preferredSize: { width: 128, height: 116 }, flexGrow: 1,
-              padding: all(18), cornerRadius: 14 }}
+              padding: all(18), cornerRadius: 14,
+              shadow: { color: rgba(0, 0, 0, selected === index ? 0.66 : 0.42),
+                blur: selected === index ? 20 : 12, spread: selected === index ? 2 : 0,
+                offsetY: 7 } }}
             textStyle={{ fontSize: 26, color: rgba(0.04, 0.05, 0.08) }} />
         ))}
       </Row>

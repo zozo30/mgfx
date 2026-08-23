@@ -143,6 +143,17 @@ void CommandEncoder::popOpacity() {
     beginCommand(Opcode::popOpacity, 0);
 }
 
+void CommandEncoder::drawShadow(const ShadowCommand& shadow) {
+    beginCommand(Opcode::drawShadow, 11 * sizeof(float));
+    for (float value : {shadow.destination.left, shadow.destination.top,
+                        shadow.destination.right, shadow.destination.bottom,
+                        shadow.cornerRadius, shadow.blur, shadow.spread,
+                        shadow.color.red, shadow.color.green,
+                        shadow.color.blue, shadow.color.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -315,6 +326,18 @@ bool decodePushTransform(const CommandView& command, AffineTransform& transform)
 bool decodePushOpacity(const CommandView& command, float& opacity) {
     if (command.opcode != Opcode::pushOpacity || command.payloadSize != 4) return false;
     opacity = readFloat(command.payload);
+    return true;
+}
+
+bool decodeShadow(const CommandView& command, ShadowCommand& shadow) {
+    if (command.opcode != Opcode::drawShadow || command.payloadSize != 44) return false;
+    shadow.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                          readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    shadow.cornerRadius = readFloat(command.payload + 16);
+    shadow.blur = readFloat(command.payload + 20);
+    shadow.spread = readFloat(command.payload + 24);
+    shadow.color = {readFloat(command.payload + 28), readFloat(command.payload + 32),
+                    readFloat(command.payload + 36), readFloat(command.payload + 40)};
     return true;
 }
 

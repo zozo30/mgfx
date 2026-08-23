@@ -29,6 +29,10 @@ export interface Transform {
   readonly rotation?: number;
   readonly originX?: number; readonly originY?: number;
 }
+export interface Shadow {
+  readonly color: Color; readonly blur?: number; readonly spread?: number;
+  readonly offsetX?: number; readonly offsetY?: number;
+}
 export interface Style {
   preferredSize?: Partial<Size>; padding?: Partial<Insets>; gap?: number;
   background?: Color; backgroundGradient?: LinearGradient;
@@ -45,6 +49,7 @@ export interface Style {
   modal?: boolean;
   transform?: Transform;
   opacity?: number;
+  shadow?: Shadow;
 }
 export interface TextStyle {
   fontSize?: number;
@@ -457,6 +462,15 @@ class Node {
   paint(encoder: FrameEncoder, viewport: Size): void {
     if (this.style.opacity !== undefined) encoder.pushOpacity(this.style.opacity);
     if (this.style.transform) encoder.pushTransform(this.affineTransform(viewport));
+    const shadow = this.style.shadow;
+    if (shadow && shadow.color.alpha > 0 && this.bounds.width > 0 && this.bounds.height > 0) {
+      const destination = { ...this.bounds, x: this.bounds.x + (shadow.offsetX ?? 0),
+        y: this.bounds.y + (shadow.offsetY ?? 0) };
+      const radius = this.type === "circle"
+        ? Math.min(this.bounds.width, this.bounds.height) / 2 : this.style.cornerRadius ?? 0;
+      encoder.shadow({ destination: normalizedRect(destination, viewport), cornerRadius: radius,
+        blur: shadow.blur ?? 12, spread: shadow.spread ?? 0, color: shadow.color });
+    }
     if (this.style.clip) encoder.pushClip({ left: this.bounds.x / viewport.width,
       top: this.bounds.y / viewport.height, right: (this.bounds.x + this.bounds.width) / viewport.width,
       bottom: (this.bounds.y + this.bounds.height) / viewport.height });
