@@ -7,10 +7,12 @@ import { ReactSurface } from "./renderer.js";
 import { decodeImageFile, type DecodedImage } from "./image-codec.js";
 import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
-  decodeServerCapabilities, decodeServerHello, decodeSize, decodeText, decodeTextMetrics, decodeWindowChromeMetrics,
+  decodeResourceStatus, decodeServerCapabilities, decodeServerHello, decodeSize, decodeText,
+  decodeTextMetrics, decodeWindowChromeMetrics,
   encodeCursor, encodeFontCreate, encodeMeshCreate, encodePathCreate, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
-  MessageType, sendMessage, TextMetricsClient } from "@mgfx/demo-client/protocol";
+  MessageType, ResourceKind, ResourceState, sendMessage,
+  TextMetricsClient } from "@mgfx/demo-client/protocol";
 
 const userId = process.geteuid?.() ?? process.getuid?.();
 if (userId === undefined) throw new Error("MGFX React requires a POSIX Node.js platform");
@@ -98,6 +100,13 @@ socket.on("data", (chunk) => {
       case MessageType.ServerCapabilities:
         console.log(`MGFX extended capabilities 0x${decodeServerCapabilities(message.payload).toString(16)}`);
         break;
+      case MessageType.ResourceStatus: {
+        const status = decodeResourceStatus(message.payload);
+        const label = ResourceKind[status.kind]?.toLowerCase() ?? "resource";
+        const state = ResourceState[status.state]?.toLowerCase() ?? "unknown";
+        console.log(`MGFX ${label} resource ${status.id} ${state}`);
+        break;
+      }
       case MessageType.FramePresented: framePacer.presented(message.sequence); break;
       case MessageType.AnimationFrame:
         animationClock.receive(message.sequence, decodeAnimationTime(message.payload)); break;

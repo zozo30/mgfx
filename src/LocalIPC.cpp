@@ -443,6 +443,25 @@ bool decodeServerCapabilities(const std::vector<std::uint8_t>& payload,
     return true;
 }
 
+std::vector<std::uint8_t> encodeResourceStatus(ResourceStatus status) {
+    std::vector<std::uint8_t> payload(8);
+    payload[0] = static_cast<std::uint8_t>(status.kind);
+    payload[1] = static_cast<std::uint8_t>(status.state);
+    writeU32(payload.data() + 4, status.id);
+    return payload;
+}
+
+bool decodeResourceStatus(const std::vector<std::uint8_t>& payload, ResourceStatus& status) {
+    if (payload.size() != 8 || payload[0] < static_cast<std::uint8_t>(ResourceKind::texture) ||
+        payload[0] > static_cast<std::uint8_t>(ResourceKind::font) ||
+        payload[1] < static_cast<std::uint8_t>(ResourceState::ready) ||
+        payload[1] > static_cast<std::uint8_t>(ResourceState::rejected) ||
+        payload[2] != 0 || payload[3] != 0 || readU32(payload.data() + 4) == 0) return false;
+    status = {static_cast<ResourceKind>(payload[0]), static_cast<ResourceState>(payload[1]),
+              readU32(payload.data() + 4)};
+    return true;
+}
+
 std::vector<std::uint8_t> encodeAnimationTime(std::uint64_t nanoseconds) {
     std::vector<std::uint8_t> payload(8);
     writeU64(payload.data(), nanoseconds);

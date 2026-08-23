@@ -48,6 +48,14 @@ int main() {
         std::cerr << "Extended server capabilities round trip failed\n";
         return 1;
     }
+    mgfx::ipc::ResourceStatus resourceStatus{};
+    if (!mgfx::ipc::decodeResourceStatus(mgfx::ipc::encodeResourceStatus(
+            {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::ready, 73}),
+            resourceStatus) || resourceStatus.kind != mgfx::ipc::ResourceKind::mesh ||
+        resourceStatus.state != mgfx::ipc::ResourceState::ready || resourceStatus.id != 73) {
+        std::cerr << "Resource status payload round trip failed\n";
+        return 1;
+    }
 
     mgfx::ipc::WindowState windowState{};
     if (!mgfx::ipc::decodeWindowState(

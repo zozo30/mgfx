@@ -306,6 +306,12 @@ nonzero ID. CoreText validates and shapes the font server-side; the client never
 converts glyphs to geometry. Resource versions prevent stale cached outlines
 after replacement, and fonts are released on destroy or disconnect.
 
+Textures, paths, meshes, and fonts now produce a common `ResourceStatus` event.
+Ready is emitted only after the resource reaches Metal, the renderer cache, or
+CoreText; rejection reports native allocation or validation failure. Pending
+uploads carry their connection generation so hot-reload completions cannot cross
+into the replacement program.
+
 React `<RichText>` accepts declarative spans with independent color, family,
 weight, italic, tracking, decoration, and custom font ID. The client lowers the
 whole visible line to one `DrawRichText` command; Metal-side CoreText shaping

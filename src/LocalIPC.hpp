@@ -48,6 +48,7 @@ enum class MessageType : std::uint16_t {
     fontCreate = 32,
     fontDestroy = 33,
     serverCapabilities = 34,
+    resourceStatus = 35,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -90,6 +91,25 @@ enum ServerCapability : std::uint64_t {
     fontResources = 1U << 30U,
     richTextRuns = 1ULL << 31U,
     capabilityWords64 = 1ULL << 32U,
+    resourceStatusEvents = 1ULL << 33U,
+};
+
+enum class ResourceKind : std::uint8_t {
+    texture = 1,
+    path = 2,
+    mesh = 3,
+    font = 4,
+};
+
+enum class ResourceState : std::uint8_t {
+    ready = 1,
+    rejected = 2,
+};
+
+struct ResourceStatus {
+    ResourceKind kind;
+    ResourceState state;
+    std::uint32_t id;
 };
 
 enum class TextFamily : std::uint8_t {
@@ -297,6 +317,8 @@ bool decodeServerHello(const std::vector<std::uint8_t>& payload, ServerHello& he
 std::vector<std::uint8_t> encodeServerCapabilities(std::uint64_t capabilities);
 bool decodeServerCapabilities(const std::vector<std::uint8_t>& payload,
                               std::uint64_t& capabilities);
+std::vector<std::uint8_t> encodeResourceStatus(ResourceStatus status);
+bool decodeResourceStatus(const std::vector<std::uint8_t>& payload, ResourceStatus& status);
 std::vector<std::uint8_t> encodeAnimationTime(std::uint64_t nanoseconds);
 bool decodeAnimationTime(const std::vector<std::uint8_t>& payload,
                          std::uint64_t& nanoseconds);

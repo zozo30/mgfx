@@ -19,6 +19,12 @@ struct FrameSnapshot final {
     std::uint64_t connectionGeneration = 0;
 };
 
+template <typename Resource>
+struct PendingResourceUpload final {
+    std::uint64_t connectionGeneration;
+    Resource resource;
+};
+
 class GraphicsServer final {
 public:
     explicit GraphicsServer(std::string socketPath);
@@ -51,15 +57,17 @@ public:
     std::optional<mgfx::ipc::WindowChrome> takeWindowChrome();
     std::optional<std::string> takeClipboardWrite();
     std::optional<std::pair<std::uint64_t, std::uint32_t>> takeClipboardRead();
-    std::vector<mgfx::ipc::TextureUpload> takeTextureUploads();
+    std::vector<PendingResourceUpload<mgfx::ipc::TextureUpload>> takeTextureUploads();
     std::vector<std::uint32_t> takeTextureDestroys();
-    std::vector<mgfx::ipc::PathUpload> takePathUploads();
+    std::vector<PendingResourceUpload<mgfx::ipc::PathUpload>> takePathUploads();
     std::vector<std::uint32_t> takePathDestroys();
-    std::vector<mgfx::ipc::MeshUpload> takeMeshUploads();
+    std::vector<PendingResourceUpload<mgfx::ipc::MeshUpload>> takeMeshUploads();
     std::vector<std::uint32_t> takeMeshDestroys();
     void sendClipboardText(std::uint64_t connectionGeneration,
                            std::uint32_t sequence,
                            const std::string& text);
+    void sendResourceStatus(std::uint64_t connectionGeneration,
+                            mgfx::ipc::ResourceStatus status);
     bool takeClientDisconnected();
 
 private:
@@ -104,10 +112,10 @@ private:
     std::optional<std::pair<std::uint64_t, std::uint32_t>> pendingClipboardRead_;
 
     mutable std::mutex resourceMutex_;
-    std::vector<mgfx::ipc::TextureUpload> pendingTextureUploads_;
+    std::vector<PendingResourceUpload<mgfx::ipc::TextureUpload>> pendingTextureUploads_;
     std::vector<std::uint32_t> pendingTextureDestroys_;
-    std::vector<mgfx::ipc::PathUpload> pendingPathUploads_;
+    std::vector<PendingResourceUpload<mgfx::ipc::PathUpload>> pendingPathUploads_;
     std::vector<std::uint32_t> pendingPathDestroys_;
-    std::vector<mgfx::ipc::MeshUpload> pendingMeshUploads_;
+    std::vector<PendingResourceUpload<mgfx::ipc::MeshUpload>> pendingMeshUploads_;
     std::vector<std::uint32_t> pendingMeshDestroys_;
 };

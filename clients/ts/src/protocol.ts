@@ -40,6 +40,7 @@ export enum MessageType {
   FontCreate = 32,
   FontDestroy = 33,
   ServerCapabilities = 34,
+  ResourceStatus = 35,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -79,7 +80,15 @@ export enum ServerCapability {
 }
 export const ExtendedServerCapability = {
   CapabilityWords64: 1n << 32n,
+  ResourceStatusEvents: 1n << 33n,
 } as const;
+export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
+export enum ResourceState { Ready = 1, Rejected = 2 }
+export interface ResourceStatus {
+  readonly kind: ResourceKind;
+  readonly state: ResourceState;
+  readonly id: number;
+}
 export interface ServerHello {
   readonly version: number;
   readonly backend: GraphicsBackend;
@@ -567,6 +576,16 @@ export function decodeServerHello(payload: Buffer): ServerHello {
 export function decodeServerCapabilities(payload: Buffer): bigint {
   if (payload.length !== 8) throw new Error("ServerCapabilities payload must be 8 bytes");
   return payload.readBigUInt64LE(0);
+}
+
+export function decodeResourceStatus(payload: Buffer): ResourceStatus {
+  if (payload.length !== 8 || payload.readUInt16LE(2) !== 0)
+    throw new Error("ResourceStatus payload must be 8 bytes with zero reserved fields");
+  const kind = payload.readUInt8(0), state = payload.readUInt8(1), id = payload.readUInt32LE(4);
+  if (kind < ResourceKind.Texture || kind > ResourceKind.Font ||
+      state < ResourceState.Ready || state > ResourceState.Rejected || id === 0)
+    throw new Error("ResourceStatus payload has invalid fields");
+  return { kind: kind as ResourceKind, state: state as ResourceState, id };
 }
 
 export function decodeAnimationTime(payload: Buffer): bigint {

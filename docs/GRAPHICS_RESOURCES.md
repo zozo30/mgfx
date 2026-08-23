@@ -19,6 +19,11 @@ Resource uploads are separate from MGFX frames. A frame may reference only
 resources acknowledged as ready, keeping display lists small and allowing the
 server to retain GPU allocations between frames.
 
+`ResourceStatus` reports readiness only after a texture reaches Metal, a path or
+mesh reaches the renderer cache, or a font passes CoreText validation. The server
+tags pending work with its connection generation, preventing late completion from
+an old build from acknowledging a reused resource ID in the new build.
+
 ## Raster images
 
 The portable first format is premultiplied RGBA8 plus width, height, row stride,
@@ -218,8 +223,8 @@ color glyph atlases remain available for small text and emoji.
 ## Proposed implementation order
 
 1. **Implemented:** texture upload/destroy messages and `DrawImage` quads.
-2. **Implemented:** bounded client PNG/JPEG decoding, `<Image>`, and
-   fill/contain/cover geometry. Resource-ready acknowledgements remain to add.
+2. **Implemented:** bounded client PNG/JPEG decoding, `<Image>`,
+   fill/contain/cover geometry, and native resource-ready/rejected events.
 3. **Implemented:** persistent canonical path resources plus server-side
    adaptive curve flattening, concave/compound fills, and width/cap/join stroke
    tessellation with geometry caching. Stroke contours are triangulated as one

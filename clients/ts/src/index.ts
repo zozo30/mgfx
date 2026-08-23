@@ -7,6 +7,7 @@ import {
   decodePoint,
   decodeKey,
   decodeScroll,
+  decodeResourceStatus,
   decodeText,
   decodeSize,
   decodeServerCapabilities, decodeServerHello,
@@ -18,6 +19,8 @@ import {
   encodeWindowState,
   MessageParser,
   MessageType,
+  ResourceKind,
+  ResourceState,
   sendMessage,
 } from "./protocol.js";
 
@@ -57,6 +60,10 @@ socket.on("data", (chunk) => {
         console.log(`MGFX server ready: protocol ${hello.version}, ${backend}, capabilities 0x${hello.capabilities.toString(16)}`);
       } else if (message.type === MessageType.ServerCapabilities) {
         console.log(`MGFX extended capabilities 0x${decodeServerCapabilities(message.payload).toString(16)}`);
+      } else if (message.type === MessageType.ResourceStatus) {
+        const status = decodeResourceStatus(message.payload);
+        console.log(`MGFX ${ResourceKind[status.kind]?.toLowerCase()} resource ${status.id} ` +
+          `${ResourceState[status.state]?.toLowerCase()}`);
       } else if (message.type === MessageType.FramePresented) {
         framePacer.presented(message.sequence);
       } else if (message.type === MessageType.AnimationFrame) {

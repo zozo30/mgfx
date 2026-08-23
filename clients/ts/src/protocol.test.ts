@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerCapabilities, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, ExtendedServerCapability, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeResourceStatus, decodeServerCapabilities, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, ExtendedServerCapability, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ResourceKind, ResourceState, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -32,10 +32,25 @@ test("server hello identifies backend and portable capabilities", () => {
 
 test("extended capabilities preserve bits beyond the legacy hello word", () => {
   const payload = Buffer.alloc(8);
-  const capabilities = 0xffff_ffffn | ExtendedServerCapability.CapabilityWords64;
+  const capabilities = 0xffff_ffffn | ExtendedServerCapability.CapabilityWords64 |
+    ExtendedServerCapability.ResourceStatusEvents;
   payload.writeBigUInt64LE(capabilities);
   assert.equal(decodeServerCapabilities(payload), capabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
+});
+
+test("resource status identifies native readiness and rejection", () => {
+  const payload = Buffer.alloc(8);
+  payload.writeUInt8(ResourceKind.Path, 0);
+  payload.writeUInt8(ResourceState.Ready, 1);
+  payload.writeUInt32LE(72, 4);
+  assert.deepEqual(decodeResourceStatus(payload), {
+    kind: ResourceKind.Path, state: ResourceState.Ready, id: 72,
+  });
+  payload.writeUInt8(ResourceState.Rejected, 1);
+  assert.equal(decodeResourceStatus(payload).state, ResourceState.Rejected);
+  payload.writeUInt16LE(1, 2);
+  assert.throws(() => decodeResourceStatus(payload));
 });
 
 test("frame pacer keeps only the newest frame while one is in flight", () => {

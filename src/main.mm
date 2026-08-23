@@ -202,20 +202,38 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
         return;
     }
 
-    for (mgfx::ipc::TextureUpload& texture : _graphicsServer->takeTextureUploads()) {
-        _renderer->createTexture(texture.id, texture.width, texture.height, texture.rgba);
+    for (PendingResourceUpload<mgfx::ipc::TextureUpload>& pending :
+         _graphicsServer->takeTextureUploads()) {
+        mgfx::ipc::TextureUpload& texture = pending.resource;
+        try {
+            _renderer->createTexture(texture.id, texture.width, texture.height, texture.rgba);
+            _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+                {mgfx::ipc::ResourceKind::texture, mgfx::ipc::ResourceState::ready, texture.id});
+        } catch (const std::exception& error) {
+            NSLog(@"MGFX texture %u rejected: %s", texture.id, error.what());
+            _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+                {mgfx::ipc::ResourceKind::texture, mgfx::ipc::ResourceState::rejected, texture.id});
+        }
     }
     for (const std::uint32_t id : _graphicsServer->takeTextureDestroys()) {
         _renderer->destroyTexture(id);
     }
-    for (mgfx::ipc::PathUpload& path : _graphicsServer->takePathUploads()) {
+    for (PendingResourceUpload<mgfx::ipc::PathUpload>& pending :
+         _graphicsServer->takePathUploads()) {
+        mgfx::ipc::PathUpload& path = pending.resource;
         _renderer->createPath(path.id, std::move(path.segments));
+        _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+            {mgfx::ipc::ResourceKind::path, mgfx::ipc::ResourceState::ready, path.id});
     }
     for (const std::uint32_t id : _graphicsServer->takePathDestroys()) {
         _renderer->destroyPath(id);
     }
-    for (mgfx::ipc::MeshUpload& mesh : _graphicsServer->takeMeshUploads()) {
+    for (PendingResourceUpload<mgfx::ipc::MeshUpload>& pending :
+         _graphicsServer->takeMeshUploads()) {
+        mgfx::ipc::MeshUpload& mesh = pending.resource;
         _renderer->createMesh(mesh.id, mesh.vertices, mesh.indices);
+        _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+            {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::ready, mesh.id});
     }
     for (const std::uint32_t id : _graphicsServer->takeMeshDestroys()) {
         _renderer->destroyMesh(id);

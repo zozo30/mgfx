@@ -78,6 +78,7 @@ created or shown a drawable surface.
 | 32 | `FontCreate` | client → server | Nonzero `u32` ID followed by at most 16 MiB of native font bytes |
 | 33 | `FontDestroy` | client → server | Nonzero `u32` resource ID |
 | 34 | `ServerCapabilities` | server → client | Full `u64` capability mask; sent after legacy `ServerHello` |
+| 35 | `ResourceStatus` | server → client | `u8` kind, `u8` state, reserved zero `u16`, nonzero `u32` resource ID |
 
 Backend is `1` Metal, `2` Vulkan, or `3` DirectX. Capability bits are client
 window lifecycle (`1 << 0`), pointer input (`1 << 1`), keyboard input (`1 << 2`),
@@ -100,6 +101,13 @@ Persistent client font resources are advertised by `1 << 30`.
 Compact rich-text runs are advertised by `1 << 31`.
 The 64-bit capability companion itself is advertised by `1 << 32` in its full
 mask. Bits 0–31 exactly mirror the legacy `ServerHello` word.
+Native resource readiness events are advertised by `1 << 33`.
+
+Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
+ready (`1`) after the resource reaches its native owning subsystem, or rejected
+(`2`) when native validation or allocation fails. Status belongs to the current
+connection generation, so a completion from a retired client is never forwarded
+to its replacement.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.
