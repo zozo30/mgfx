@@ -82,6 +82,11 @@ interface RawGradientDefinition {
   readonly stops: readonly { readonly offset: number; readonly color: Color }[];
 }
 
+interface RawRadialGradientDefinition {
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly stops: readonly { readonly offset: number; readonly color: Color }[];
+}
+
 interface RadialGradientDefinition {
   readonly units: "objectBoundingBox" | "userSpaceOnUse";
   readonly cx: string; readonly cy: string; readonly radius: string;
@@ -289,28 +294,54 @@ function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<
 }
 
 function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<string, RadialGradientDefinition> {
-  const definitions = new Map<string, RadialGradientDefinition>();
-  for (const match of source.matchAll(/<radialGradient\b([^>]*)>([\s\S]*?)<\/radialGradient\s*>/gi)) {
+  const raw = new Map<string, RawRadialGradientDefinition>();
+  for (const match of source.matchAll(/<radialGradient\b([^>]*?)(?:\/\s*>|>([\s\S]*?)<\/radialGradient\s*>)/gi)) {
     const attributes = withInlineStyle(svgAttributes(match[1]!));
     const id = attributes.id?.trim();
     if (!id) continue;
-    const cx = attributes.cx ?? "50%", cy = attributes.cy ?? "50%";
-    const stops = [...match[2]!.matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
+    const stops = [...(match[2] ?? "").matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
       const values = withInlineStyle(svgAttributes(stop[1]!));
       const color = parseColor(values["stop-color"] ?? "black", currentColor)!;
       return { offset: unitInterval(values.offset ?? "0"),
         color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
     }).sort((left, right) => left.offset - right.offset);
-    if (stops.length < 2 || stops.length > 8) continue;
-    definitions.set(id, {
-      units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
-      cx, cy, fx: attributes.fx ?? cx, fy: attributes.fy ?? cy,
-      radius: attributes.r ?? "50%", focalRadius: attributes.fr ?? "0",
-      transform: parseTransform(attributes.gradientTransform),
-      stops, spread: attributes.spreadMethod === "repeat" ? "repeat" :
-        attributes.spreadMethod === "reflect" ? "reflect" : "pad",
-    });
+    raw.set(id, { attributes, stops });
   }
+  const definitions = new Map<string, RadialGradientDefinition>();
+  const resolve = (id: string, visiting: ReadonlySet<string>): RadialGradientDefinition | undefined => {
+    const cached = definitions.get(id);
+    if (cached) return cached;
+    const item = raw.get(id);
+    if (!item) return undefined;
+    if (visiting.has(id)) throw new Error(`SVG radial gradient reference cycle at #${id}`);
+    const href = item.attributes.href ?? item.attributes["xlink:href"];
+    if (href !== undefined && !/^#[^\s]+$/.test(href))
+      throw new Error(`SVG radial gradient #${id} has an external reference`);
+    const nextVisiting = new Set(visiting); nextVisiting.add(id);
+    const base = href ? resolve(href.slice(1), nextVisiting) : undefined;
+    if (href && !base) throw new Error(`SVG radial gradient #${id} references missing ${href}`);
+    const stops = item.stops.length > 0 ? item.stops : base?.stops ?? [];
+    if (stops.length < 2 || stops.length > 8) return undefined;
+    const cx = item.attributes.cx ?? base?.cx ?? "50%";
+    const cy = item.attributes.cy ?? base?.cy ?? "50%";
+    const definition: RadialGradientDefinition = {
+      units: item.attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" :
+        item.attributes.gradientUnits === "objectBoundingBox" ? "objectBoundingBox" :
+        base?.units ?? "objectBoundingBox",
+      cx, cy, radius: item.attributes.r ?? base?.radius ?? "50%",
+      fx: item.attributes.fx ?? base?.fx ?? cx,
+      fy: item.attributes.fy ?? base?.fy ?? cy,
+      focalRadius: item.attributes.fr ?? base?.focalRadius ?? "0",
+      transform: item.attributes.gradientTransform !== undefined
+        ? parseTransform(item.attributes.gradientTransform) : base?.transform ?? identity,
+      stops,
+      spread: item.attributes.spreadMethod === "repeat" ? "repeat" :
+        item.attributes.spreadMethod === "reflect" ? "reflect" : base?.spread ?? "pad",
+    };
+    definitions.set(id, definition);
+    return definition;
+  };
+  for (const id of raw.keys()) resolve(id, new Set());
   return definitions;
 }
 

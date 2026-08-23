@@ -104,8 +104,8 @@ instead of intrinsic host elements:
   maximum-length handling
 - `Mesh` for explicit application-owned indexed geometry and `Path` for SVG
   path data lowered to persistent canonical server resources
-- `Svg` for bounded multi-layer vector documents, including 2–8 stop linear gradients,
-  local gradient-definition inheritance, and centered 2–8 stop radial fills
+- `Svg` for bounded multi-layer vector documents, including 2–8 stop linear and
+  radial gradients with local gradient-definition inheritance
 
 `src/navigation.tsx` provides an in-memory history `Router`, `useRouter()` with
 push/replace/back operations, and a depth-aware `Dialog`. Dialogs use absolute
@@ -131,7 +131,8 @@ stay native. React sends the center, transformed elliptical basis, ordered stop
 table, and spread mode; Metal wraps radial distance and interpolates the matching
 interval per fragment. Offset `fx`/`fy` and nonzero `fr` use Metal's native
 two-circle solver; the client normalizes focal radius against outer radius and
-sends no gradient geometry.
+sends no gradient geometry. Radial `href`/`xlink:href` chains inherit geometry,
+transforms, spread, and stops before lowering to that same command.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

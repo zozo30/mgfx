@@ -56,7 +56,8 @@ becomes a stable path resource with its own compact paint command. Linear gradie
 resolve from `<defs>` in either SVG user space or object-bounding-box
 space, including stop opacity, gradient transforms, and fragment-only `href` or
 `xlink:href` inheritance, then use native `DrawPath`
-gradient paint. Centered two- through eight-stop radial fills with `pad`, `repeat`,
+gradient paint. Radial definitions resolve the same local inheritance chain for
+geometry, transforms, spread, and stops. Centered two- through eight-stop radial fills with `pad`, `repeat`,
 or `reflect` spread resolve into a center and two radius vectors, preserving elliptical
 and transformed fields without client tessellation. Offset focal points and nonzero
 focal radii use the native two-circle solver. `stroke-dasharray`

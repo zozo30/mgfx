@@ -109,6 +109,24 @@ test("SVG multi-stop radial gradients retain ordered native stops", () => {
   assert.ok((radial?.stops?.[1]?.color.green ?? 0) > 0.85);
 });
 
+test("SVG radial gradients inherit local geometry, spread, and stops", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 40 40"><defs>
+    <radialGradient id="base" r="40%" fx="30%" fy="40%" fr="5%" spreadMethod="repeat">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#40e0b0"/>
+      <stop offset="1" stop-color="#108050"/></radialGradient>
+    <radialGradient id="derived" xlink:href="#base" cx="60%"/>
+    </defs><circle cx="20" cy="20" r="20" fill="url(#derived)"/></svg>`);
+  const radial = document.layers[0]?.fillRadialGradient;
+  assert.deepEqual(radial?.center, { x: 24, y: 20 });
+  assert.deepEqual(radial?.focal, { x: 12, y: 16 });
+  assert.ok(Math.abs((radial?.focalRadius ?? 0) - 0.125) < 0.0001);
+  assert.equal(radial?.spread, "repeat");
+  assert.equal(radial?.stops?.length, 3);
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 10 10"><defs>
+    <radialGradient id="a" href="#b"/><radialGradient id="b" href="#a"/>
+    </defs><rect width="10" height="10" fill="url(#a)"/></svg>`), /reference cycle/);
+});
+
 test("SVG vector lowering reports unresolved gradient paint", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z" fill="url(#missing)"/></svg>`),
