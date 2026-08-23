@@ -267,7 +267,7 @@ export class ReactSurface {
         const letterSpacing = (child.props.textStyle?.letterSpacing ?? 0) / fontSize;
         const value = child.props.value ?? child.children
           .filter((item): item is TextNode => item.kind === "text").map((item) => item.value).join("");
-        if (family === "system" || family === "monospace") {
+        if (family && family !== "pixel") {
           for (const run of nativeTextMetricRuns(value, child.props.textStyle ?? {})) {
             if (nativeTextAdvance(family, run, weight, style, letterSpacing) !== undefined) continue;
             const key = `${family}\0${weight}\0${style}\0${letterSpacing}\0${run}`;

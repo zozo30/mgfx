@@ -233,7 +233,12 @@ struct PathCommand {
     PathGradient gradient{};
 };
 
-enum class FontFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
+enum class FontFamily : std::uint8_t {
+    systemSans = 0,
+    systemMonospace = 1,
+    systemSerif = 2,
+    systemRounded = 3,
+};
 enum class FontWeight : std::uint8_t { regular = 0, bold = 1, medium = 2, semibold = 3 };
 enum class FontStyle : std::uint8_t { regular = 0, italic = 1 };
 enum TextDecoration : std::uint8_t {

@@ -83,9 +83,15 @@ enum ServerCapability : std::uint32_t {
     typographyStyles = 1U << 26U,
     textLetterSpacing = 1U << 27U,
     textDecorations = 1U << 28U,
+    portableFontFamilies = 1U << 29U,
 };
 
-enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
+enum class TextFamily : std::uint8_t {
+    systemSans = 0,
+    systemMonospace = 1,
+    systemSerif = 2,
+    systemRounded = 3,
+};
 enum class TextWeight : std::uint8_t { regular = 0, bold = 1, medium = 2, semibold = 3 };
 enum class TextStyle : std::uint8_t { regular = 0, italic = 1 };
 

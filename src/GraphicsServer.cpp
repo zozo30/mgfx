@@ -343,7 +343,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::conicGradients |
             mgfx::ipc::ServerCapability::typographyStyles |
             mgfx::ipc::ServerCapability::textLetterSpacing |
-            mgfx::ipc::ServerCapability::textDecorations;
+            mgfx::ipc::ServerCapability::textDecorations |
+            mgfx::ipc::ServerCapability::portableFontFamilies;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -474,9 +475,12 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
                    message.sequence != 0) {
             mgfx::ipc::TextMeasure measure{};
             if (mgfx::ipc::decodeTextMeasure(message.payload, measure)) {
-                const gfx::FontFamily family = measure.family ==
-                    mgfx::ipc::TextFamily::systemMonospace
-                    ? gfx::FontFamily::systemMonospace : gfx::FontFamily::systemSans;
+                const gfx::FontFamily family = measure.family == mgfx::ipc::TextFamily::systemMonospace
+                    ? gfx::FontFamily::systemMonospace
+                    : measure.family == mgfx::ipc::TextFamily::systemSerif
+                    ? gfx::FontFamily::systemSerif
+                    : measure.family == mgfx::ipc::TextFamily::systemRounded
+                    ? gfx::FontFamily::systemRounded : gfx::FontFamily::systemSans;
                 const gfx::FontWeight weight = measure.weight == mgfx::ipc::TextWeight::bold
                     ? gfx::FontWeight::bold : measure.weight == mgfx::ipc::TextWeight::medium
                     ? gfx::FontWeight::medium : measure.weight == mgfx::ipc::TextWeight::semibold

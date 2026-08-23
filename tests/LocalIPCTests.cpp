@@ -77,9 +77,9 @@ int main() {
 
     mgfx::ipc::TextMeasure textMeasure{};
     if (!mgfx::ipc::decodeTextMeasure(mgfx::ipc::encodeTextMeasure(
-            {mgfx::ipc::TextFamily::systemSans, mgfx::ipc::TextWeight::bold,
+            {mgfx::ipc::TextFamily::systemSerif, mgfx::ipc::TextWeight::bold,
              mgfx::ipc::TextStyle::italic, 0.08F, "Árvíztűrő — Ω"}), textMeasure) ||
-        textMeasure.family != mgfx::ipc::TextFamily::systemSans ||
+        textMeasure.family != mgfx::ipc::TextFamily::systemSerif ||
         textMeasure.weight != mgfx::ipc::TextWeight::bold ||
         textMeasure.style != mgfx::ipc::TextStyle::italic ||
         std::fabs(textMeasure.letterSpacing - 0.08F) > 0.00001F ||

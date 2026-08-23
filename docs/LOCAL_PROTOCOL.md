@@ -92,6 +92,7 @@ Correlated native text measurement is advertised by `1 << 12`.
 Native medium/semibold/italic typography is advertised by `1 << 26`, and
 native letter spacing by `1 << 27`.
 Native font-metric underline and line-through are advertised by `1 << 28`.
+Portable serif and rounded system families are advertised by `1 << 29`.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.

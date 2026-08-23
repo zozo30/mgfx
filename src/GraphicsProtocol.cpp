@@ -702,7 +702,7 @@ bool decodeText(const CommandView& command, TextCommand& text) {
     const std::size_t headerSize = extension == 2 ? 40 : extension == 1 ? 36 : baseHeaderSize;
     if (command.opcode != Opcode::drawText || command.payloadSize <= headerSize ||
         command.payloadSize > headerSize + 65536 ||
-        command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemMonospace) ||
+        command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemRounded) ||
         command.payload[1] > static_cast<std::uint8_t>(FontWeight::semibold) ||
         command.payload[2] > static_cast<std::uint8_t>(FontStyle::italic) ||
         extension > 2 || (extension == 2 &&

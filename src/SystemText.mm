@@ -1,5 +1,6 @@
 #include "SystemText.hpp"
 
+#import <AppKit/AppKit.h>
 #import <CoreText/CoreText.h>
 #import <Foundation/Foundation.h>
 
@@ -72,9 +73,22 @@ void appendPathElement(void* context, const CGPathElement* element) {
 }
 
 CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style) {
-    const CTFontUIFontType type = family == FontFamily::systemMonospace
-        ? kCTFontUIFontUserFixedPitch : kCTFontUIFontSystem;
-    CTFontRef font = CTFontCreateUIFontForLanguage(type, designSize, nullptr);
+    CTFontRef font = nullptr;
+    if (family == FontFamily::systemSerif || family == FontFamily::systemRounded) {
+        NSFontDescriptor* base = [NSFont systemFontOfSize:designSize].fontDescriptor;
+        const NSFontDescriptorSystemDesign design = family == FontFamily::systemSerif
+            ? NSFontDescriptorSystemDesignSerif : NSFontDescriptorSystemDesignRounded;
+        NSFontDescriptor* designed = [base fontDescriptorWithDesign:design];
+        if (designed != nil) {
+            font = CTFontCreateWithFontDescriptor(
+                (__bridge CTFontDescriptorRef)designed, designSize, nullptr);
+        }
+    }
+    if (font == nullptr) {
+        const CTFontUIFontType type = family == FontFamily::systemMonospace
+            ? kCTFontUIFontUserFixedPitch : kCTFontUIFontSystem;
+        font = CTFontCreateUIFontForLanguage(type, designSize, nullptr);
+    }
     if (font != nullptr && weight != FontWeight::regular) {
         const CGFloat traitWeight = weight == FontWeight::bold ? boldWeight
             : weight == FontWeight::semibold ? semiboldWeight : mediumWeight;

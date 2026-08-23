@@ -19,6 +19,15 @@ int main() {
         std::cerr << "Monospaced system font metrics are implausible\n";
         return 1;
     }
+    const gfx::ShapedText serif = gfx::shapeSystemText(
+        "Serif typography", gfx::FontFamily::systemSerif);
+    const gfx::ShapedText rounded = gfx::shapeSystemText(
+        "Rounded typography", gfx::FontFamily::systemRounded);
+    if (serif.triangles.empty() || rounded.triangles.empty() ||
+        serif.advance <= 0.0F || rounded.advance <= 0.0F) {
+        std::cerr << "Portable native font families produced no shaped geometry\n";
+        return 1;
+    }
     const gfx::ShapedText bold = gfx::shapeSystemText(
         "Readable", gfx::FontFamily::systemSans, gfx::FontWeight::bold);
     if (bold.triangles.empty() || bold.advance <= 0.0F) {

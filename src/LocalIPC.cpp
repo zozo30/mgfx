@@ -624,7 +624,7 @@ std::vector<std::uint8_t> encodeTextMeasure(const TextMeasure& measure) {
 
 bool decodeTextMeasure(const std::vector<std::uint8_t>& payload, TextMeasure& measure) {
     if (payload.size() <= 4 ||
-        payload[0] > static_cast<std::uint8_t>(TextFamily::systemMonospace) ||
+        payload[0] > static_cast<std::uint8_t>(TextFamily::systemRounded) ||
         payload[1] > static_cast<std::uint8_t>(TextWeight::semibold) ||
         payload[2] > static_cast<std::uint8_t>(TextStyle::italic) || payload[3] > 1) return false;
     const bool hasLetterSpacing = payload[3] == 1;

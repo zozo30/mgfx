@@ -270,7 +270,7 @@ function GraphicsRoute({ chromeMetrics, vectorIcons }: AppProps) {
             mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
             <Text value="Graphics Route — native glyph outlines" style={{ fontSize: 32,
               fontWeight: "bold",
-              fontFamily: "system", color: rgba(0.9, 1, 0.97) }} />
+              fontFamily: "rounded", color: rgba(0.9, 1, 0.97) }} />
             <Button label="BACK" onPress={router.back} background={rgba(0.08, 0.12, 0.20)}
               style={{ preferredSize: { width: 120, height: 42 } }} />
           </Row>
@@ -281,7 +281,8 @@ function GraphicsRoute({ chromeMetrics, vectorIcons }: AppProps) {
             <Text value={"CoreText shaping: Árvíztűrő — Ω → MGFX. Exact native " +
               "metrics wrap this sentence in the language-neutral layout engine before compact " +
               "DrawText commands reach Metal."}
-              style={{ fontSize: 26, lineHeight: 32, fontFamily: "system", wrap: true,
+              style={{ fontSize: 26, lineHeight: 32, fontFamily: "serif", wrap: true,
+                fontStyle: "italic",
                 textAlign: "center",
                 color: rgba(0.62, 0.88, 1) }} />
           </Row>

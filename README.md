@@ -253,8 +253,8 @@ of the next layout pass, so an event handler never mutates the retained tree whi
 hit testing is in progress.
 
 React `Text` now defaults to native `system` rendering; `fontFamily: "pixel"`
-keeps the built-in 5x7 font available only as a diagnostic/bootstrap mode, and
-`monospace` selects the native fixed-pitch family. Native modes emit one compact
+keeps the built-in 5x7 font available only as a diagnostic/bootstrap mode.
+`monospace`, `serif`, and `rounded` select portable native designs. Native modes emit one compact
 UTF-8 `DrawText` command per visible line. Explicit newlines and configurable
 line height participate in intrinsic measurement. `wrap: true` performs greedy
 word wrapping against layout constraints with exact cached word/space advances,
@@ -288,6 +288,12 @@ keys. Zero spacing retains the original compact text payload for compatibility.
 contains only decoration flags; the graphics server derives placement and
 thickness from native font metrics and adds the lines to cached text geometry.
 This is advertised independently through the `textDecorations` capability bit.
+
+Portable `fontFamily` choices now include `system`, `monospace`, `serif`, and
+`rounded`. These are semantic families rather than font-file names: CoreText
+maps them to the current macOS system designs, while future backends can choose
+their native equivalents. Servers advertise the expanded family set with
+`portableFontFamilies`.
 
 ## Requirements
 

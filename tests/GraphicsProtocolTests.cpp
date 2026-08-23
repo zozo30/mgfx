@@ -75,7 +75,7 @@ int main() {
                       {0.0F, 0.0F, 0.0F, 0.0F}, {1.0F, 0.5F, 0.1F, 1.0F}, true,
                       {0.0F, 0.0F, 24.0F, 0.0F,
                        {0.0F, 0.4F, 0.8F, 1.0F}, {0.8F, 0.2F, 1.0F, 1.0F}}});
-    encoder.drawText({gfx::FontFamily::systemMonospace, gfx::FontWeight::semibold,
+    encoder.drawText({gfx::FontFamily::systemRounded, gfx::FontWeight::semibold,
                       gfx::FontStyle::italic,
                       0.08F,
                       gfx::underlineText | gfx::strikeThroughText,
@@ -207,7 +207,7 @@ int main() {
         return fail("Path decoding failed");
     }
     gfx::TextCommand text{};
-    if (!gfx::decodeText(command, text) || text.family != gfx::FontFamily::systemMonospace ||
+    if (!gfx::decodeText(command, text) || text.family != gfx::FontFamily::systemRounded ||
         text.weight != gfx::FontWeight::semibold || text.style != gfx::FontStyle::italic ||
         !nearlyEqual(text.letterSpacing, 0.08F) ||
         text.decoration != (gfx::underlineText | gfx::strikeThroughText) ||

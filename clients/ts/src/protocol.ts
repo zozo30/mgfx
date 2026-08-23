@@ -70,6 +70,7 @@ export enum ServerCapability {
   TypographyStyles = 1 << 26,
   TextLetterSpacing = 1 << 27,
   TextDecorations = 1 << 28,
+  PortableFontFamilies = 1 << 29,
 }
 export interface ServerHello {
   readonly version: number;
@@ -210,12 +211,14 @@ export interface PathPaint {
   readonly lineJoin?: "bevel" | "round";
 }
 
-export type FontFamily = "system" | "monospace";
+export type FontFamily = "system" | "monospace" | "serif" | "rounded";
 export type FontWeight = "regular" | "medium" | "semibold" | "bold";
 export type FontStyle = "regular" | "italic";
 export enum TextDecoration { None = 0, Underline = 1, LineThrough = 2 }
 const fontWeightCode = (weight: FontWeight): number =>
   weight === "bold" ? 1 : weight === "medium" ? 2 : weight === "semibold" ? 3 : 0;
+const fontFamilyCode = (family: FontFamily): number =>
+  family === "monospace" ? 1 : family === "serif" ? 2 : family === "rounded" ? 3 : 0;
 
 export function encodeTextMeasure(family: FontFamily, text: string,
   weight: FontWeight = "regular", style: FontStyle = "regular",
@@ -228,7 +231,7 @@ export function encodeTextMeasure(family: FontFamily, text: string,
   const hasLetterSpacing = letterSpacing !== 0;
   const headerSize = hasLetterSpacing ? 8 : 4;
   const payload = Buffer.alloc(headerSize + utf8.length);
-  payload.writeUInt8(family === "monospace" ? 1 : 0, 0);
+  payload.writeUInt8(fontFamilyCode(family), 0);
   payload.writeUInt8(fontWeightCode(weight), 1);
   payload.writeUInt8(style === "italic" ? 1 : 0, 2);
   payload.writeUInt8(hasLetterSpacing ? 1 : 0, 3);
@@ -704,7 +707,7 @@ export class FrameEncoder {
     const extension = decoration !== TextDecoration.None ? 2 : letterSpacing !== 0 ? 1 : 0;
     const headerSize = extension === 2 ? 40 : extension === 1 ? 36 : 32;
     const payload = Buffer.alloc(headerSize + utf8.length);
-    payload.writeUInt8(family === "monospace" ? 1 : 0, 0);
+    payload.writeUInt8(fontFamilyCode(family), 0);
     payload.writeUInt8(fontWeightCode(weight), 1);
     payload.writeUInt8(style === "italic" ? 1 : 0, 2);
     payload.writeUInt8(extension, 3);

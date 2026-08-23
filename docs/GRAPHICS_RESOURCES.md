@@ -71,6 +71,10 @@ Metal therefore receives compact cached vector text instead of one
 rectangle pair per lit pixel. Other native hosts can execute the same command
 through DirectWrite or a HarfBuzz/FreeType service.
 
+Family codes select semantic system sans, fixed-pitch, serif, or rounded
+designs. They deliberately do not expose platform font names, so identical
+client commands remain meaningful on every backend.
+
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is
 part of shaping, measurement, and geometry cache identity.

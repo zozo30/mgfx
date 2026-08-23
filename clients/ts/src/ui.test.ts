@@ -199,7 +199,7 @@ test("UTF-8 text and editing keys route only to the focused node", () => {
 test("system text lowers to one server-shaped UTF-8 command", () => {
   class TextComponent extends Component {
     build(): Element {
-      return text("Árvíztűrő — Ω", { fontSize: 20, fontFamily: "system",
+      return text("Árvíztűrő — Ω", { fontSize: 20, fontFamily: "rounded",
         fontWeight: "semibold", fontStyle: "italic",
         letterSpacing: 1,
         textDecoration: "underline line-through",
@@ -214,6 +214,7 @@ test("system text lowers to one server-shaped UTF-8 command", () => {
   encoder.endFrame();
   const frame = encoder.finish();
   assert.equal(frame.readUInt16LE(16), 8);
+  assert.equal(frame.readUInt8(24), 3);
   assert.equal(frame.readUInt8(25), 3);
   assert.equal(frame.readUInt8(26), 1);
   assert.equal(frame.readUInt8(27), 2);

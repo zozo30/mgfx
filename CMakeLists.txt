@@ -189,6 +189,7 @@ if(BUILD_TESTING)
     target_include_directories(SystemTextTests SYSTEM PRIVATE "${earcut_hpp_SOURCE_DIR}/include")
     target_compile_options(SystemTextTests PRIVATE -Wall -Wextra -Wpedantic -fobjc-arc)
     target_link_libraries(SystemTextTests PRIVATE
+        ${APPKIT_FRAMEWORK}
         ${FOUNDATION_FRAMEWORK}
         ${CORETEXT_FRAMEWORK}
         ${COREGRAPHICS_FRAMEWORK}

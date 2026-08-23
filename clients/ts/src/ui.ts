@@ -81,7 +81,7 @@ export interface Style {
 export interface TextStyle {
   fontSize?: number;
   color?: Color;
-  fontFamily?: "pixel" | "system" | "monospace";
+  fontFamily?: "pixel" | "system" | "monospace" | "serif" | "rounded";
   fontWeight?: "regular" | "medium" | "semibold" | "bold";
   fontStyle?: "regular" | "italic";
   letterSpacing?: number;
@@ -92,24 +92,26 @@ export interface TextStyle {
 }
 
 const nativeTextAdvances = new Map<string, number>();
-const nativeTextKey = (family: "system" | "monospace", value: string,
+const nativeTextKey = (family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">, value: string,
   weight: "regular" | "medium" | "semibold" | "bold" = "regular",
   style: "regular" | "italic" = "regular", letterSpacing = 0) =>
   `${family}\0${weight}\0${style}\0${letterSpacing}\0${value}`;
-export function cacheNativeTextAdvance(family: "system" | "monospace", value: string,
+export function cacheNativeTextAdvance(
+  family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">, value: string,
   advance: number, weight: "regular" | "medium" | "semibold" | "bold" = "regular",
   style: "regular" | "italic" = "regular", letterSpacing = 0): void {
   if (Number.isFinite(advance) && advance >= 0)
     nativeTextAdvances.set(nativeTextKey(family, value, weight, style, letterSpacing), advance);
 }
-export function nativeTextAdvance(family: "system" | "monospace", value: string,
+export function nativeTextAdvance(
+  family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">, value: string,
   weight: "regular" | "medium" | "semibold" | "bold" = "regular",
   style: "regular" | "italic" = "regular", letterSpacing = 0): number | undefined {
   return nativeTextAdvances.get(nativeTextKey(family, value, weight, style, letterSpacing));
 }
 
 export function nativeTextMetricRuns(value: string, style: TextStyle): readonly string[] {
-  if (style.fontFamily !== "system" && style.fontFamily !== "monospace") return [];
+  if (!style.fontFamily || style.fontFamily === "pixel") return [];
   if (!style.wrap) return value.split("\n").filter(Boolean);
   const runs = new Set<string>();
   let wordCount = 0;

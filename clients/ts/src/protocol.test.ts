@@ -409,9 +409,10 @@ test("system Unicode text is a compact skippable display-list command", () => {
 test("native text metrics correlate asynchronous measurement replies", async () => {
   const sent: Array<{ payload: Buffer; sequence: number }> = [];
   const metrics = new TextMetricsClient((payload, sequence) => sent.push({ payload, sequence }));
-  const pending = metrics.measure("system", "Árvíztűrő — Ω", "medium", "italic", 0.075);
+  const pending = metrics.measure("serif", "Árvíztűrő — Ω", "medium", "italic", 0.075);
   assert.deepEqual(sent[0]?.payload,
-    encodeTextMeasure("system", "Árvíztűrő — Ω", "medium", "italic", 0.075));
+    encodeTextMeasure("serif", "Árvíztűrő — Ω", "medium", "italic", 0.075));
+  assert.equal(sent[0]?.payload.readUInt8(0), 2);
   assert.equal(sent[0]?.payload.readUInt8(3), 1);
   assert.ok(Math.abs(sent[0]!.payload.readFloatLE(4) - 0.075) < 0.00001);
   const payload = Buffer.alloc(4); payload.writeFloatLE(6.25);
