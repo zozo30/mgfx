@@ -34,6 +34,43 @@ ID, UV rectangle, destination, and tint. The Metal backend retains the native
 texture and uses a separate sampled-image pipeline, providing the base for real
 PNG/JPEG decoders, SVG raster fallback, and font glyph atlases.
 
+The React client includes bounded PNG, JPEG, and SVG decoders. Raster files are converted to
+premultiplied RGBA8, uploaded once, and displayed with `fill`, `contain`, or
+`cover` geometry computed by the backend-neutral UI runtime.
+SVG currently uses a client-side high-quality raster fallback, including vector
+paths, gradients, masks, transforms, and system-font text; Metal still receives
+only the same portable texture resource and `DrawImage` command.
+
+React can also submit indexed normalized `Mesh` geometry directly. The retained
+layout runtime maps mesh coordinates into measured component bounds and lowers
+indices plus per-vertex colors to ordinary MGFX triangle lists. `Mesh` remains
+the explicit low-level escape hatch for application-owned geometry.
+
+The React `Path` component now directly accepts SVG path data. Relative and
+absolute commands are normalized, arcs and quadratic segments become cubics,
+TypeScript sends those backend-neutral `move`, `line`, `cubic`, and `close`
+commands once as a persistent MGIP path resource. Frame display lists reference
+the resource with `DrawPath`, destination, paint, fill rule, tolerance, and
+stroke parameters; they contain no generated path vertices.
+
+The graphics server owns adaptive curve flattening and tessellation. Its cache
+is keyed independently from destination and paint, so animated colors and
+layout changes reuse geometry. Compound paths support SVG `evenodd` and
+`nonzero` fill rules, while strokes support configurable width, butt or round
+caps, and bevel or round joins. `DrawPath` also supports source-space linear
+gradient fills: the server derives vertex colors from cached source geometry,
+so changing gradient colors does not invalidate tessellation. The demo loads several icons from the
+ISC-licensed `lucide-static` package through this path pipeline.
+
+All colored geometry uses source-over alpha compositing. Straight-alpha MGFX
+vertex colors are premultiplied in the vertex shader before interpolation, then
+blended with `one` / `one-minus-source-alpha`; translucent paths, gradients,
+meshes, text, circles, and patterns therefore compose consistently with
+premultiplied uploaded images.
+The client loader converts SVG paths, lines, polylines, polygons, rectangles, circles,
+and ellipses into a common path stream, so the gallery is not restricted to
+path-only icons.
+
 The local process protocol uses `MGIP` framing and a per-user Unix-domain socket
 at `/tmp/mgfx-<uid>.sock`. It carries MGFX frames from client to server and sends
 resize, pointer-down, and close events back to the client. Payloads are capped at
@@ -90,6 +127,11 @@ The TypeScript client also has its own retained component and layout runtime in
 `clients/ts/src/ui.ts`. This demonstrates that component state, measurement,
 layout, and interaction can live entirely in another language while the native
 process remains only a window, event, and graphics server.
+
+The layout tree supports stable numeric `zIndex` ordering and absolute `inset`
+positioning without changing flow measurement. Painting follows ascending
+depth, hit testing follows the exact reverse, and a `modal` layer isolates
+pointer, scroll, and keyboard focus from every lower route.
 
 MGIP carries pointer move, down, and up as separate events. The TypeScript host
 retains hover and pressed state and activates a component only when release lands

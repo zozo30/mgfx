@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeWindowChromeMetrics, encodeCursor, encodeMessage, encodeResourceId, encodeText, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeWindowChromeMetrics, encodeCursor, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -133,6 +133,32 @@ test("RGBA textures are persistent resource uploads and frames reference their I
   const bytes = frame.finish();
   assert.equal(bytes.readUInt16LE(16), 6);
   assert.equal(bytes.readUInt32LE(24), 7);
+});
+
+test("canonical paths upload once and frames reference server-side vector geometry", () => {
+  const upload = encodePathCreate(12, [
+    { verb: "move", x: 2, y: 12 },
+    { verb: "cubic", x1: 4, y1: 2, x2: 20, y2: 2, x: 22, y: 12 },
+  ]);
+  assert.equal(upload.readUInt32LE(0), 12);
+  assert.equal(upload.readUInt32LE(4), 2);
+  assert.equal(upload.readUInt8(16), 1);
+  assert.equal(upload.readUInt8(44), 3);
+  const frame = new FrameEncoder();
+  frame.path(12, { left: -1, top: 1, right: 1, bottom: -1 },
+    { x: 0, y: 0, width: 24, height: 24 }, {
+      stroke: { red: 1, green: 0.5, blue: 0.1, alpha: 1 }, strokeWidth: 2,
+      fillGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 0 },
+        startColor: { red: 0, green: 0.4, blue: 0.8, alpha: 1 },
+        endColor: { red: 0.8, green: 0.2, blue: 1, alpha: 1 } },
+      lineCap: "round", lineJoin: "round",
+    });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 7);
+  assert.equal(bytes.readUInt32LE(24), 12);
+  assert.equal(bytes.readUInt8(28), 7);
+  assert.equal(bytes.readFloatLE(24 + 124), 1);
 });
 
 test("clipboard replies resolve only their correlated request", async () => {

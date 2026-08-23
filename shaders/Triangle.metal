@@ -14,7 +14,9 @@ struct Vertex {
 
 vertex VertexOut vertexMain(const device Vertex* vertices [[buffer(0)]],
                             uint vertexId [[vertex_id]]) {
-    return {float4(vertices[vertexId].position, 0.0, 1.0), vertices[vertexId].color};
+    const float4 color = vertices[vertexId].color;
+    return {float4(vertices[vertexId].position, 0.0, 1.0),
+            float4(color.rgb * color.a, color.a)};
 }
 
 fragment float4 fragmentMain(VertexOut in [[stage_in]]) {
@@ -42,5 +44,6 @@ vertex ImageVertexOut imageVertexMain(const device ImageVertex* vertices [[buffe
 fragment float4 imageFragmentMain(ImageVertexOut in [[stage_in]],
                                   texture2d<float> image [[texture(0)]]) {
     constexpr sampler imageSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    return image.sample(imageSampler, in.uv) * in.tint;
+    const float4 sampled = image.sample(imageSampler, in.uv);
+    return float4(sampled.rgb * in.tint.rgb * in.tint.a, sampled.a * in.tint.a);
 }

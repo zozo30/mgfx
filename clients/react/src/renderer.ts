@@ -1,15 +1,16 @@
 import { createContext, createElement, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
 import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants.js";
-import { FrameEncoder, type Key, type KeyEvent, type ScrollEvent } from "@mgfx/demo-client/protocol";
+import { FrameEncoder, type Key, type KeyEvent, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
   box, circle, clickable, column, Component, ComponentHost, focusable, row, scrollView, stack, text,
   type Element, type Point, type Size, type Style, type TextStyle,
+  mesh, path as vectorPath, type MeshData, type PathData,
 } from "@mgfx/demo-client/ui";
 import { NativeWindowProvider, type NativeWindowCommands } from "./native-window.js";
 
 export type HostType = "mgfx-box" | "mgfx-row" | "mgfx-column" | "mgfx-stack" |
-  "mgfx-circle" | "mgfx-text" | "mgfx-scroll";
+  "mgfx-circle" | "mgfx-text" | "mgfx-scroll" | "mgfx-mesh" | "mgfx-path";
 
 export interface HostProps {
   readonly children?: ReactNode; readonly style?: Style; readonly value?: string;
@@ -17,6 +18,8 @@ export interface HostProps {
   readonly onHoverChange?: (value: boolean) => void; readonly onPressChange?: (value: boolean) => void;
   readonly onFocusChange?: (value: boolean) => void; readonly onScroll?: (x: number, y: number) => void;
   readonly onKeyDown?: (key: Key) => void; readonly onTextInput?: (value: string) => void;
+  readonly mesh?: MeshData;
+  readonly path?: PathData;
 }
 
 interface HostNode { kind: "host"; id: number; type: HostType; props: HostProps; children: HostChild[]; hidden: boolean }
@@ -128,6 +131,8 @@ function toElement(child: HostChild): Element[] {
   case "mgfx-column": element = column(children, style, key); break;
   case "mgfx-stack": element = stack(children, style, key); break;
   case "mgfx-circle": element = circle(style, key); break;
+  case "mgfx-mesh": element = child.props.mesh ? mesh(child.props.mesh, style, key) : box(style, key); break;
+  case "mgfx-path": element = child.props.path ? vectorPath(child.props.path, style, key) : box(style, key); break;
   case "mgfx-text": {
     const raw = child.children.filter((value): value is TextNode => value.kind === "text")
       .map((value) => value.value).join("");
@@ -159,9 +164,13 @@ export class ReactSurface {
   private readonly host = new ComponentHost();
   private readonly snapshot: SnapshotComponent;
   private viewport: Size = { width: 0, height: 0 };
+  private readonly uploadedPaths = new Set<number>();
 
   constructor(private readonly onFrame: (frame: Buffer) => void,
-              private readonly windowCommands?: NativeWindowCommands) {
+              private readonly windowCommands?: NativeWindowCommands,
+              private readonly resourceCommands?: {
+                readonly createPath: (id: number, segments: readonly PathSegment[]) => void;
+              }) {
     this.container = { children: [], surface: this };
     this.snapshot = new SnapshotComponent(this.container);
     const report = (error: Error) => { throw error; };
@@ -192,6 +201,7 @@ export class ReactSurface {
   commit(): void { this.submit(); }
   private submit(): void {
     if (this.viewport.width <= 0 || this.viewport.height <= 0 || this.container.children.length === 0) return;
+    this.uploadPaths(this.container.children);
     this.host.rebuild(this.snapshot);
     this.host.layout(this.viewport);
     const encoder = new FrameEncoder();
@@ -199,5 +209,16 @@ export class ReactSurface {
     this.host.paint(encoder, this.viewport);
     encoder.endFrame();
     this.onFrame(encoder.finish());
+  }
+  private uploadPaths(children: readonly HostChild[]): void {
+    for (const child of children) {
+      if (child.kind !== "host") continue;
+      const path = child.props.path;
+      if (path && !this.uploadedPaths.has(path.resourceId)) {
+        this.resourceCommands?.createPath(path.resourceId, path.segments);
+        this.uploadedPaths.add(path.resourceId);
+      }
+      this.uploadPaths(child.children);
+    }
   }
 }

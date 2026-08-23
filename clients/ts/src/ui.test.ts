@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FrameEncoder, Key } from "./protocol.js";
-import { box, circle, Component, ComponentHost, constrain, focusable, row, scrollView, type Element } from "./ui.js";
+import { box, circle, Component, ComponentHost, constrain, focusable, mesh, row, scrollView, stack, type Element } from "./ui.js";
 
 test("constraints clamp desired sizes", () => {
   assert.deepEqual(constrain({ width: 200, height: 5 }, {
@@ -180,4 +180,60 @@ test("diagonal patterns fill a clipped area with portable stripe geometry", () =
   encoder.endFrame();
   const frame = encoder.finish();
   assert.equal(frame.readUInt32LE(12), 6); // Base, clip, stripes, pop, border, end.
+});
+
+test("indexed normalized meshes lower to backend-neutral colored triangles", () => {
+  class MeshComponent extends Component {
+    build(): Element {
+      return mesh({ positions: [{ x: 0.5, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }],
+        indices: [0, 1, 2], color: { red: 1, green: 0.4, blue: 0.1, alpha: 1 } },
+      { preferredSize: { width: 100, height: 50 } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new MeshComponent());
+  host.layout({ width: 100, height: 50 });
+  const encoder = new FrameEncoder();
+  host.paint(encoder, { width: 100, height: 50 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt32LE(28), 3);
+});
+
+test("absolute layers use stable z-index order for hit testing", () => {
+  const hits: string[] = [];
+  class Layers extends Component {
+    build(): Element {
+      const inset = { top: 0, right: 0, bottom: 0, left: 0 };
+      return stack([
+        { ...box({ position: "absolute", inset, zIndex: 4 }, "lower"),
+          onClick: () => hits.push("lower") },
+        { ...box({ position: "absolute", inset, zIndex: 20 }, "upper"),
+          onClick: () => hits.push("upper") },
+      ], {}, "layers");
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new Layers()); host.layout({ width: 160, height: 90 });
+  host.pointerDown({ x: 40, y: 30 }); host.pointerUp({ x: 40, y: 30 });
+  assert.deepEqual(hits, ["upper"]);
+});
+
+test("a modal layer isolates keyboard focus from lower routes", () => {
+  const hits: string[] = [];
+  class ModalLayers extends Component {
+    build(): Element {
+      return stack([
+        { ...box({}, "route"), onClick: () => hits.push("route") },
+        { ...box({ position: "absolute", inset: { top: 0, right: 0, bottom: 0, left: 0 },
+          zIndex: 100, modal: true }, "dialog"), onClick: () => hits.push("dialog") },
+      ]);
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new ModalLayers()); host.layout({ width: 160, height: 90 });
+  host.keyDown(Key.Tab, false, false);
+  host.keyDown(Key.Enter, false, false); host.keyUp(Key.Enter);
+  assert.deepEqual(hits, ["dialog"]);
 });

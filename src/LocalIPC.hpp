@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -38,6 +39,8 @@ enum class MessageType : std::uint16_t {
     windowChromeMetrics = 23,
     textureCreate = 24,
     textureDestroy = 25,
+    pathCreate = 26,
+    pathDestroy = 27,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -58,6 +61,7 @@ enum ServerCapability : std::uint32_t {
     clipboard = 1U << 8U,
     clientWindowChrome = 1U << 9U,
     textureResources = 1U << 10U,
+    pathResources = 1U << 11U,
 };
 
 enum class WindowChromeMode : std::uint8_t {
@@ -80,6 +84,23 @@ struct TextureUpload {
     std::uint32_t width;
     std::uint32_t height;
     std::vector<std::uint8_t> rgba;
+};
+
+enum class PathVerb : std::uint8_t {
+    moveTo = 1,
+    lineTo = 2,
+    cubicTo = 3,
+    close = 4,
+};
+
+struct PathSegment {
+    PathVerb verb;
+    std::array<float, 6> values{};
+};
+
+struct PathUpload {
+    std::uint32_t id;
+    std::vector<PathSegment> segments;
 };
 
 enum class CursorShape : std::uint8_t {
@@ -222,6 +243,8 @@ bool decodeWindowChromeMetrics(const std::vector<std::uint8_t>& payload,
                                WindowChromeMetrics& metrics);
 std::vector<std::uint8_t> encodeTextureUpload(const TextureUpload& texture);
 bool decodeTextureUpload(const std::vector<std::uint8_t>& payload, TextureUpload& texture);
+std::vector<std::uint8_t> encodePathUpload(const PathUpload& path);
+bool decodePathUpload(const std::vector<std::uint8_t>& payload, PathUpload& path);
 std::vector<std::uint8_t> encodeResourceId(std::uint32_t id);
 bool decodeResourceId(const std::vector<std::uint8_t>& payload, std::uint32_t& id);
 

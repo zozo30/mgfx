@@ -31,6 +31,8 @@ export enum MessageType {
   WindowChromeMetrics = 23,
   TextureCreate = 24,
   TextureDestroy = 25,
+  PathCreate = 26,
+  PathDestroy = 27,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -46,6 +48,7 @@ export enum ServerCapability {
   Clipboard = 1 << 8,
   ClientWindowChrome = 1 << 9,
   TextureResources = 1 << 10,
+  PathResources = 1 << 11,
 }
 export interface ServerHello {
   readonly version: number;
@@ -111,6 +114,28 @@ export interface ClipRect {
   readonly left: number; readonly top: number; readonly right: number; readonly bottom: number;
 }
 
+export type PathSegment =
+  { readonly verb: "move" | "line"; readonly x: number; readonly y: number } |
+  { readonly verb: "cubic"; readonly x1: number; readonly y1: number;
+    readonly x2: number; readonly y2: number; readonly x: number; readonly y: number } |
+  { readonly verb: "close" };
+
+export interface PathPaint {
+  readonly fill?: Color;
+  readonly fillGradient?: {
+    readonly start: { readonly x: number; readonly y: number };
+    readonly end: { readonly x: number; readonly y: number };
+    readonly startColor: Color;
+    readonly endColor: Color;
+  };
+  readonly stroke?: Color;
+  readonly strokeWidth?: number;
+  readonly tolerance?: number;
+  readonly fillRule?: "nonzero" | "evenodd";
+  readonly lineCap?: "butt" | "round";
+  readonly lineJoin?: "bevel" | "round";
+}
+
 export function encodeTextureCreate(id: number, width: number, height: number,
   rgba: Uint8Array): Buffer {
   if (!Number.isSafeInteger(id) || id <= 0 || id > 0xffff_ffff ||
@@ -122,6 +147,28 @@ export function encodeTextureCreate(id: number, width: number, height: number,
   const payload = Buffer.alloc(16 + rgba.byteLength);
   payload.writeUInt32LE(id, 0); payload.writeUInt32LE(width, 4);
   payload.writeUInt32LE(height, 8); Buffer.from(rgba).copy(payload, 16);
+  return payload;
+}
+
+export function encodePathCreate(id: number, segments: readonly PathSegment[]): Buffer {
+  if (!Number.isSafeInteger(id) || id <= 0 || id > 0xffff_ffff ||
+      segments.length === 0 || segments.length > 65_536) {
+    throw new RangeError("Path must have a nonzero ID and 1 through 65536 segments");
+  }
+  const payload = Buffer.alloc(16 + segments.length * 28);
+  payload.writeUInt32LE(id, 0); payload.writeUInt32LE(segments.length, 4);
+  segments.forEach((segment, index) => {
+    const offset = 16 + index * 28;
+    const values = segment.verb === "cubic"
+      ? [segment.x1, segment.y1, segment.x2, segment.y2, segment.x, segment.y]
+      : segment.verb === "close" ? [] : [segment.x, segment.y];
+    const verbs = { move: 1, line: 2, cubic: 3, close: 4 } as const;
+    payload.writeUInt8(verbs[segment.verb], offset);
+    values.forEach((value, valueIndex) => {
+      if (!Number.isFinite(value)) throw new RangeError("Path coordinates must be finite");
+      payload.writeFloatLE(value, offset + 4 + valueIndex * 4);
+    });
+  });
   return payload;
 }
 
@@ -424,6 +471,41 @@ export class FrameEncoder {
       tint.red, tint.green, tint.blue, tint.alpha]
       .forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
     this.command(6, payload);
+  }
+
+  path(pathId: number, destination: ClipRect,
+    viewBox: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
+    paint: PathPaint): void {
+    if (!Number.isSafeInteger(pathId) || pathId <= 0 || pathId > 0xffff_ffff ||
+        (!paint.fill && !paint.fillGradient && !paint.stroke))
+      throw new RangeError("Path draw requires an ID and paint");
+    const payload = Buffer.alloc(128);
+    payload.writeUInt32LE(pathId, 0);
+    payload.writeUInt8((paint.fill || paint.fillGradient ? 1 : 0) |
+      (paint.stroke ? 2 : 0) | (paint.fillGradient ? 4 : 0), 4);
+    payload.writeUInt8(paint.fillRule === "evenodd" ? 1 : 0, 5);
+    payload.writeUInt8(paint.lineCap === "round" ? 1 : 0, 6);
+    payload.writeUInt8(paint.lineJoin === "round" ? 1 : 0, 7);
+    payload.writeFloatLE(paint.strokeWidth ?? 0, 8);
+    payload.writeFloatLE(paint.tolerance ?? 0.75, 12);
+    [destination.left, destination.top, destination.right, destination.bottom,
+      viewBox.x, viewBox.y, viewBox.width, viewBox.height,
+      ...(paint.fill ? [paint.fill.red, paint.fill.green, paint.fill.blue, paint.fill.alpha]
+        : [0, 0, 0, 0]),
+      ...(paint.stroke ? [paint.stroke.red, paint.stroke.green, paint.stroke.blue, paint.stroke.alpha]
+        : [0, 0, 0, 0]),
+      ...(paint.fillGradient ? [paint.fillGradient.start.x, paint.fillGradient.start.y,
+        paint.fillGradient.end.x, paint.fillGradient.end.y,
+        paint.fillGradient.startColor.red, paint.fillGradient.startColor.green,
+        paint.fillGradient.startColor.blue, paint.fillGradient.startColor.alpha,
+        paint.fillGradient.endColor.red, paint.fillGradient.endColor.green,
+        paint.fillGradient.endColor.blue, paint.fillGradient.endColor.alpha]
+        : Array.from({ length: 12 }, () => 0))]
+      .forEach((value, index) => {
+        if (!Number.isFinite(value)) throw new RangeError("Path draw values must be finite");
+        payload.writeFloatLE(value, 16 + index * 4);
+      });
+    this.command(7, payload);
   }
 
   endFrame(): void {

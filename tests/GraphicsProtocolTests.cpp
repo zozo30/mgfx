@@ -31,6 +31,12 @@ int main() {
     encoder.popClip();
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
+    encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
+                      gfx::LineCap::round, gfx::LineJoin::round, 2.0F, 0.25F,
+                      {-0.8F, 0.8F, -0.4F, 0.4F}, {0.0F, 0.0F, 24.0F, 24.0F},
+                      {0.0F, 0.0F, 0.0F, 0.0F}, {1.0F, 0.5F, 0.1F, 1.0F}, true,
+                      {0.0F, 0.0F, 24.0F, 0.0F,
+                       {0.0F, 0.4F, 0.8F, 1.0F}, {0.8F, 0.2F, 1.0F, 1.0F}}});
     encoder.endFrame();
     const std::vector<std::uint8_t> bytes = encoder.finish();
 
@@ -59,6 +65,14 @@ int main() {
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||
         !nearlyEqual(image.destination.left, -0.5F) || !nearlyEqual(image.tint.green, 0.8F) ||
+        !decoder.next(command)) {
+        return fail("Image decoding failed");
+    }
+    gfx::PathCommand path{};
+    if (!gfx::decodePath(command, path) || path.pathId != 12 || !path.fill || !path.stroke ||
+        path.lineCap != gfx::LineCap::round || !nearlyEqual(path.strokeWidth, 2.0F) ||
+        !nearlyEqual(path.viewBox.width, 24.0F) || !nearlyEqual(path.strokeColor.green, 0.5F) ||
+        !path.fillGradient || !nearlyEqual(path.gradient.endColor.blue, 1.0F) ||
         !decoder.next(command) || command.opcode != gfx::Opcode::endFrame ||
         decoder.next(command) || !decoder.valid()) {
         return fail("End-of-frame decoding failed");

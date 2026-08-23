@@ -1,17 +1,31 @@
 import { createConnection, type Socket } from "node:net";
+import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { App } from "./app.js";
 import { ReactSurface } from "./renderer.js";
+import { decodeImageFile, type DecodedImage } from "./image-codec.js";
+import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
-  decodeServerHello, decodeSize, decodeText, decodeWindowChromeMetrics, encodeCursor, encodeText,
+  decodeServerHello, decodeSize, decodeText, decodeWindowChromeMetrics, encodeCursor, encodePathCreate, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
   MessageType, sendMessage } from "@mgfx/demo-client/protocol";
 
 const userId = process.geteuid?.() ?? process.getuid?.();
 if (userId === undefined) throw new Error("MGFX React requires a POSIX Node.js platform");
 const socketPath = process.argv[2] ?? `/tmp/mgfx-${userId}.sock`;
+const imagePath = process.argv[3] ?? fileURLToPath(new URL("../assets/demo.svg", import.meta.url));
+let headerImage: DecodedImage = { width: 64, height: 64, rgba: demoTexture() };
+const vectorIcons = await loadLucideIcons(["activity", "badge-check", "gamepad-2", "grid"]);
+try {
+  headerImage = await decodeImageFile(imagePath);
+  console.log(`Decoded ${imagePath}: ${headerImage.width}×${headerImage.height} RGBA8`);
+} catch (error) {
+  console.warn(`Could not decode ${imagePath}; using generated texture:`, error);
+}
 const socket = await connectWithRetry(socketPath);
-sendMessage(socket, MessageType.TextureCreate, encodeTextureCreate(1, 64, 64, demoTexture()));
+let shuttingDown = false;
+sendMessage(socket, MessageType.TextureCreate, encodeTextureCreate(1,
+  headerImage.width, headerImage.height, headerImage.rgba));
 const animationClock = new AnimationClock((requestSequence) =>
   sendMessage(socket, MessageType.RequestAnimationFrame, Buffer.alloc(0), requestSequence));
 const clipboard = new ClipboardClient(
@@ -33,10 +47,16 @@ const surface = new ReactSurface(
     setChrome: (mode, height) => sendMessage(socket, MessageType.WindowChrome,
       encodeWindowChrome(mode, height)),
   },
+  {
+    createPath: (id, segments) => sendMessage(socket, MessageType.PathCreate,
+      encodePathCreate(id, segments)),
+  },
 );
 let chromeMetrics = { leadingInset: 132, titleBarHeight: 56 };
 const renderApplication = () => surface.render(
-  <App animationClock={animationClock} chromeMetrics={chromeMetrics} />);
+  <App animationClock={animationClock} chromeMetrics={chromeMetrics}
+    headerImageSize={{ width: headerImage.width, height: headerImage.height }}
+    vectorIcons={vectorIcons} />);
 renderApplication();
 const parser = new MessageParser();
 
@@ -75,8 +95,14 @@ socket.on("data", (chunk) => {
   }
 });
 socket.on("close", () => { clipboard.close(); process.exit(0); });
-socket.on("error", (error) => console.error("MGFX React socket error:", error.message));
-process.on("SIGINT", () => { sendMessage(socket, MessageType.Close); socket.end(); });
+socket.on("error", (error) => {
+  if (!shuttingDown) console.error("MGFX React socket error:", error.message);
+});
+process.on("SIGINT", () => {
+  shuttingDown = true;
+  if (socket.writable) sendMessage(socket, MessageType.Close);
+  socket.end();
+});
 console.log(`MGFX React client connected to ${socketPath}`);
 
 function demoTexture(): Buffer {

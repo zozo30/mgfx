@@ -20,8 +20,17 @@ else()
         GIT_TAG 27c4382b7151d55a51692cdcb27aaa98752240de
         GIT_SHALLOW FALSE
     )
-    FetchContent_MakeAvailable(metal_cpp)
+FetchContent_MakeAvailable(metal_cpp)
 endif()
+
+FetchContent_Declare(
+    earcut_hpp
+    GIT_REPOSITORY https://github.com/mapbox/earcut.hpp.git
+    GIT_TAG v2.2.4
+    GIT_SHALLOW TRUE
+    SOURCE_SUBDIR include
+)
+FetchContent_MakeAvailable(earcut_hpp)
 
 find_library(APPKIT_FRAMEWORK AppKit REQUIRED)
 find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
@@ -74,6 +83,8 @@ add_executable(MGFXServer MACOSX_BUNDLE
     src/LocalIPC.hpp
     src/Renderer.cpp
     src/Renderer.hpp
+    src/VectorPath.cpp
+    src/VectorPath.hpp
     src/MetalCpp.cpp
     "${MGFX_SHADER_RESOURCE}"
 )
@@ -96,6 +107,7 @@ target_include_directories(MGFXServer PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 target_include_directories(MGFXServer SYSTEM PRIVATE "${metal_cpp_SOURCE_DIR}")
+target_include_directories(MGFXServer SYSTEM PRIVATE "${earcut_hpp_SOURCE_DIR}/include")
 target_compile_options(MGFXServer PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-Wall;-Wextra;-Wpedantic>"
     "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>"
@@ -146,4 +158,16 @@ if(BUILD_TESTING)
     target_include_directories(LocalIPCTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
     target_compile_options(LocalIPCTests PRIVATE -Wall -Wextra -Wpedantic)
     add_test(NAME local_ipc_round_trip COMMAND LocalIPCTests)
+
+    add_executable(VectorPathTests
+        tests/VectorPathTests.cpp
+        src/VectorPath.cpp
+    )
+    target_compile_features(VectorPathTests PRIVATE cxx_std_17)
+    target_include_directories(VectorPathTests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+    target_include_directories(VectorPathTests SYSTEM PRIVATE "${earcut_hpp_SOURCE_DIR}/include")
+    target_compile_options(VectorPathTests PRIVATE -Wall -Wextra -Wpedantic)
+    add_test(NAME vector_path_tessellation COMMAND VectorPathTests)
 endif()

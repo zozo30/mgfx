@@ -53,6 +53,8 @@ public:
     std::optional<std::pair<std::uint64_t, std::uint32_t>> takeClipboardRead();
     std::vector<mgfx::ipc::TextureUpload> takeTextureUploads();
     std::vector<std::uint32_t> takeTextureDestroys();
+    std::vector<mgfx::ipc::PathUpload> takePathUploads();
+    std::vector<std::uint32_t> takePathDestroys();
     void sendClipboardText(std::uint64_t connectionGeneration,
                            std::uint32_t sequence,
                            const std::string& text);
@@ -102,4 +104,6 @@ private:
     mutable std::mutex resourceMutex_;
     std::vector<mgfx::ipc::TextureUpload> pendingTextureUploads_;
     std::vector<std::uint32_t> pendingTextureDestroys_;
+    std::vector<mgfx::ipc::PathUpload> pendingPathUploads_;
+    std::vector<std::uint32_t> pendingPathDestroys_;
 };

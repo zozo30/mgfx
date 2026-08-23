@@ -65,7 +65,7 @@ created or shown a drawable surface.
 | 19 | `ClipboardWrite` | client → server | UTF-8 text, at most 1 MiB |
 | 20 | `ClipboardRead` | client → server | Empty; nonzero sequence identifies the request |
 | 21 | `ClipboardText` | server → client | UTF-8 text; echoes the read-request sequence |
-| 22 | `WindowChrome` | client → server | `u8 mode`, three reserved zero bytes, `u32 draggableHeight` |
+| 22 | `WindowChrome` | client → server | `u8 mode`, three reserved zero bytes, `u32 draggableHeight` in drawable units |
 | 23 | `WindowChromeMetrics` | server → client | `f32 leadingInset`, `f32 titleBarHeight` in drawable units |
 | 24 | `TextureCreate` | client → server | `u32 id`, `u32 width`, `u32 height`, reserved `u32`, tightly packed RGBA8 pixels |
 | 25 | `TextureDestroy` | client → server | Nonzero `u32` resource ID |
@@ -115,8 +115,9 @@ applies transitions idempotently on its UI thread.
 
 Window chrome mode is `0` native or `1` overlay. Overlay mode makes the native
 title bar transparent, extends the graphics surface beneath it, preserves the
-platform window controls, and treats the top `draggableHeight` logical units as
-a native window-drag region. This lets clients draw browser-style title bars
+platform window controls, and treats the top `draggableHeight` drawable units as
+a native window-drag region. The host converts that height to platform points
+using the current drawable scale. This lets clients draw browser-style title bars
 without reimplementing native move, close, minimize, or zoom behavior.
 After applying chrome, the host measures its actual standard window buttons and
 sends `WindowChromeMetrics`. The client uses `leadingInset` instead of guessing

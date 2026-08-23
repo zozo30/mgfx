@@ -134,6 +134,37 @@ void CommandEncoder::drawImage(const ImageCommand& image) {
     }
 }
 
+void CommandEncoder::drawPath(const PathCommand& path) {
+    beginCommand(Opcode::drawPath, 128);
+    appendU32(bytes_, path.pathId);
+    bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
+                                               (path.stroke ? 2U : 0U) |
+                                               (path.fillGradient ? 4U : 0U)));
+    bytes_.push_back(static_cast<std::uint8_t>(path.fillRule));
+    bytes_.push_back(static_cast<std::uint8_t>(path.lineCap));
+    bytes_.push_back(static_cast<std::uint8_t>(path.lineJoin));
+    appendFloat(bytes_, path.strokeWidth);
+    appendFloat(bytes_, path.tolerance);
+    for (float value : {path.destination.left, path.destination.top,
+                        path.destination.right, path.destination.bottom,
+                        path.viewBox.x, path.viewBox.y,
+                        path.viewBox.width, path.viewBox.height,
+                        path.fillColor.red, path.fillColor.green,
+                        path.fillColor.blue, path.fillColor.alpha,
+                        path.strokeColor.red, path.strokeColor.green,
+                        path.strokeColor.blue, path.strokeColor.alpha}) {
+        appendFloat(bytes_, value);
+    }
+    for (float value : {path.gradient.startX, path.gradient.startY,
+                        path.gradient.endX, path.gradient.endY,
+                        path.gradient.startColor.red, path.gradient.startColor.green,
+                        path.gradient.startColor.blue, path.gradient.startColor.alpha,
+                        path.gradient.endColor.red, path.gradient.endColor.green,
+                        path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 std::vector<std::uint8_t> CommandEncoder::finish() {
     if (bytes_.size() > std::numeric_limits<std::uint32_t>::max()) {
         throw std::length_error("Graphics command stream exceeds 4 GiB");
@@ -245,6 +276,39 @@ bool decodeImage(const CommandView& command, ImageCommand& image) {
     image.tint = {readFloat(command.payload + 40), readFloat(command.payload + 44),
                   readFloat(command.payload + 48), readFloat(command.payload + 52)};
     return image.textureId != 0;
+}
+
+bool decodePath(const CommandView& command, PathCommand& path) {
+    if (command.opcode != Opcode::drawPath || command.payloadSize != 128 ||
+        command.payload[4] > 7 ||
+        command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
+        command.payload[6] > static_cast<std::uint8_t>(LineCap::round) ||
+        command.payload[7] > static_cast<std::uint8_t>(LineJoin::round)) return false;
+    path.pathId = readU32(command.payload);
+    path.fill = (command.payload[4] & 1U) != 0;
+    path.stroke = (command.payload[4] & 2U) != 0;
+    path.fillGradient = (command.payload[4] & 4U) != 0;
+    path.fillRule = static_cast<FillRule>(command.payload[5]);
+    path.lineCap = static_cast<LineCap>(command.payload[6]);
+    path.lineJoin = static_cast<LineJoin>(command.payload[7]);
+    path.strokeWidth = readFloat(command.payload + 8);
+    path.tolerance = readFloat(command.payload + 12);
+    path.destination = {readFloat(command.payload + 16), readFloat(command.payload + 20),
+                        readFloat(command.payload + 24), readFloat(command.payload + 28)};
+    path.viewBox = {readFloat(command.payload + 32), readFloat(command.payload + 36),
+                    readFloat(command.payload + 40), readFloat(command.payload + 44)};
+    path.fillColor = {readFloat(command.payload + 48), readFloat(command.payload + 52),
+                      readFloat(command.payload + 56), readFloat(command.payload + 60)};
+    path.strokeColor = {readFloat(command.payload + 64), readFloat(command.payload + 68),
+                        readFloat(command.payload + 72), readFloat(command.payload + 76)};
+    path.gradient = {readFloat(command.payload + 80), readFloat(command.payload + 84),
+                     readFloat(command.payload + 88), readFloat(command.payload + 92),
+                     {readFloat(command.payload + 96), readFloat(command.payload + 100),
+                      readFloat(command.payload + 104), readFloat(command.payload + 108)},
+                     {readFloat(command.payload + 112), readFloat(command.payload + 116),
+                      readFloat(command.payload + 120), readFloat(command.payload + 124)}};
+    return path.pathId != 0 && (path.fill || path.stroke) &&
+           (!path.fillGradient || path.fill);
 }
 
 } // namespace gfx

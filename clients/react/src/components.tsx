@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Key, type Color } from "@mgfx/demo-client/protocol";
-import type { Style, TextStyle } from "@mgfx/demo-client/ui";
+import type { MeshData, PathData, Style, TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
+import { canonicalPath } from "./vector-path.js";
 
 export interface LayoutProps {
   readonly children?: ReactNode;
@@ -18,9 +19,41 @@ export const Stack = ({ children, style }: LayoutProps) =>
   <mgfx-stack style={style ?? {}}>{children}</mgfx-stack>;
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
-export const Image = ({ textureId, style }: {
+export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit }: {
   readonly textureId: number; readonly style?: Style;
-}) => <mgfx-box style={{ ...style, backgroundImage: { textureId } }} />;
+  readonly sourceWidth?: number; readonly sourceHeight?: number;
+  readonly fit?: "fill" | "contain" | "cover";
+}) => <mgfx-box style={{ ...style, backgroundImage: {
+  textureId,
+  ...(sourceWidth !== undefined && sourceHeight !== undefined
+    ? { sourceSize: { width: sourceWidth, height: sourceHeight } } : {}),
+  ...(fit ? { fit } : {}),
+} }} />;
+export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
+  <mgfx-mesh mesh={data} style={style ?? {}} />;
+
+export function Path({ data, color, gradient, strokeColor, strokeWidth = 0, viewBox, tolerance,
+  fillRule, lineCap = "round", lineJoin = "round", style }: {
+  readonly data: string; readonly color?: Color;
+  readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
+    readonly end: { readonly x: number; readonly y: number };
+    readonly startColor: Color; readonly endColor: Color };
+  readonly strokeColor?: Color;
+  readonly strokeWidth?: number; readonly viewBox?: { x: number; y: number;
+    width: number; height: number }; readonly tolerance?: number;
+  readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round";
+  readonly lineJoin?: "bevel" | "round"; readonly style?: Style;
+}) {
+  const resource = useMemo(() => canonicalPath(data), [data]);
+  const path: PathData = { resourceId: resource.resourceId, segments: resource.segments,
+    viewBox: viewBox ?? resource.bounds, fit: "contain",
+    ...(color ? { fill: color } : {}), ...(gradient ? { fillGradient: gradient } : {}),
+    ...(strokeColor && strokeWidth > 0
+      ? { stroke: strokeColor, strokeWidth } : {}),
+    ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),
+    lineCap, lineJoin };
+  return <mgfx-path path={path} style={style ?? {}} />;
+}
 
 export function Text({ value, style }: {
   readonly value: string;

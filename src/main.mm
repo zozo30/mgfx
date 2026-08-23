@@ -10,6 +10,7 @@
 #include <exception>
 #include <chrono>
 #include <memory>
+#include <utility>
 
 namespace {
 
@@ -136,7 +137,7 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     mgfx::ipc::WindowState _desiredWindowState;
     bool _hasDesiredWindowState;
     bool _clientWindowVisible;
-    CGFloat _draggableTitleHeight;
+    CGFloat _draggableTitleHeightPixels;
     std::uint64_t _lastSubmittedFrameRevision;
     std::unique_ptr<Renderer> _renderer;
     std::unique_ptr<GraphicsServer> _graphicsServer;
@@ -182,6 +183,7 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
 
     if (_graphicsServer->takeClientDisconnected()) {
         _renderer->clearTextures();
+        _renderer->clearPaths();
         if (_window != nil) {
             _clientWindowVisible = false;
             _metalView.paused = YES;
@@ -200,6 +202,12 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     }
     for (const std::uint32_t id : _graphicsServer->takeTextureDestroys()) {
         _renderer->destroyTexture(id);
+    }
+    for (mgfx::ipc::PathUpload& path : _graphicsServer->takePathUploads()) {
+        _renderer->createPath(path.id, std::move(path.segments));
+    }
+    for (const std::uint32_t id : _graphicsServer->takePathDestroys()) {
+        _renderer->destroyPath(id);
     }
 
     if (const std::optional<std::string> title = _graphicsServer->takeWindowTitle()) {
@@ -240,7 +248,10 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     if (const std::optional<mgfx::ipc::WindowChrome> chrome =
             _graphicsServer->takeWindowChrome()) {
         const bool overlay = chrome->mode == mgfx::ipc::WindowChromeMode::overlay;
-        _draggableTitleHeight = overlay ? chrome->draggableHeight : 0;
+        // Protocol UI coordinates are drawable pixels. Keep the requested value
+        // in that coordinate space and convert at hit-test time so moving the
+        // window between displays with different backing scales stays correct.
+        _draggableTitleHeightPixels = overlay ? chrome->draggableHeight : 0;
         _window.titlebarAppearsTransparent = overlay;
         _window.titleVisibility = overlay ? NSWindowTitleHidden : NSWindowTitleVisible;
         NSWindowStyleMask mask = _window.styleMask;
@@ -407,8 +418,13 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
 }
 
 - (BOOL)metalView:(MTKView*)view shouldBeginWindowDragAt:(NSPoint)point {
-    return _draggableTitleHeight > 0.0 &&
-           point.y >= view.bounds.size.height - _draggableTitleHeight;
+    if (_draggableTitleHeightPixels <= 0.0 || view.bounds.size.height <= 0.0) {
+        return NO;
+    }
+    const CGFloat scaleY = view.drawableSize.height / view.bounds.size.height;
+    if (scaleY <= 0.0) return NO;
+    const CGFloat draggableHeightPoints = _draggableTitleHeightPixels / scaleY;
+    return point.y >= view.bounds.size.height - draggableHeightPoints;
 }
 
 - (void)metalView:(MTKView*)view pointerMovedTo:(NSPoint)point {

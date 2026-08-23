@@ -32,16 +32,25 @@ patterns can be tessellated by the frontend into several ordinary image quads.
 
 ## SVG and vector paths
 
-SVG remains a frontend document format. The TypeScript or VM runtime parses it,
-resolves styles and transforms, flattens curves to a chosen tolerance, and
-tessellates fills and strokes into reusable mesh resources. This gives Metal,
-Vulkan, and DirectX identical geometry and avoids embedding an SVG engine in
-every backend.
+SVG remains a frontend document format. The TypeScript or VM runtime parses it
+and resolves document-level styles and transforms into canonical path commands.
+Those commands become connection-scoped path resources. The graphics server
+flattens curves and tessellates fills/strokes into cached geometry shared by
+Metal, Vulkan, or DirectX backends, avoiding duplicated tessellators in every
+language client without embedding a complete SVG engine in the server.
 
 Reusable `Mesh` resources contain positions, optional UVs, vertex colors, and
 indices. Gradient stops become either vertex colors for simple gradients or a
 small sampled texture for complex gradients. Raster fallback is allowed for SVG
 features that the vector path does not yet support.
+
+The current `DrawPath` paint supports a two-stop source-space linear gradient.
+Gradient endpoints and colors are deliberately excluded from the tessellation
+cache key, allowing paint animation without rebuilding path geometry.
+
+MGFX colors are specified as straight RGBA. Backends must premultiply before
+interpolation and use source-over compositing. Texture uploads remain
+premultiplied RGBA8, giving vector and image draws the same blending result.
 
 ## Text and fonts
 
@@ -59,9 +68,14 @@ color glyph atlases remain available for small text and emoji.
 
 ## Proposed implementation order
 
-1. Add texture upload/destroy acknowledgements and `DrawImage` quads.
-2. Add client PNG/JPEG decoding and an `<Image>` component with intrinsic size.
-3. Add indexed mesh resources, path tessellation, and an `<Svg>` frontend.
+1. **Implemented:** texture upload/destroy messages and `DrawImage` quads.
+2. **Implemented:** bounded client PNG/JPEG decoding, `<Image>`, and
+   fill/contain/cover geometry. Resource-ready acknowledgements remain to add.
+3. **Implemented:** persistent canonical path resources plus server-side
+   adaptive curve flattening, concave/compound fills, and width/cap/join stroke
+   tessellation with geometry caching. Direct `<Mesh>` remains available.
+   Next add persistent mesh resources and selective lowering of complete
+   `<Svg>` documents.
 4. Add font upload, shaping, glyph atlas caching, and measured rich text.
 5. Add cache budgets, device-loss recreation, and resource tracing tools.
 

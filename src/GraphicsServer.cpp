@@ -207,6 +207,20 @@ std::vector<std::uint32_t> GraphicsServer::takeTextureDestroys() {
     return result;
 }
 
+std::vector<mgfx::ipc::PathUpload> GraphicsServer::takePathUploads() {
+    const std::lock_guard<std::mutex> lock(resourceMutex_);
+    std::vector<mgfx::ipc::PathUpload> result;
+    result.swap(pendingPathUploads_);
+    return result;
+}
+
+std::vector<std::uint32_t> GraphicsServer::takePathDestroys() {
+    const std::lock_guard<std::mutex> lock(resourceMutex_);
+    std::vector<std::uint32_t> result;
+    result.swap(pendingPathDestroys_);
+    return result;
+}
+
 void GraphicsServer::sendClipboardText(std::uint64_t connectionGeneration,
                                        std::uint32_t sequence,
                                        const std::string& text) {
@@ -275,6 +289,13 @@ void GraphicsServer::run() {
             pendingClipboardWrite_.reset();
             pendingClipboardRead_.reset();
         }
+        {
+            const std::lock_guard<std::mutex> lock(resourceMutex_);
+            pendingTextureUploads_.clear();
+            pendingTextureDestroys_.clear();
+            pendingPathUploads_.clear();
+            pendingPathDestroys_.clear();
+        }
         clientDisconnected_ = false;
         constexpr std::uint32_t capabilities =
             mgfx::ipc::ServerCapability::clientWindowLifecycle |
@@ -287,7 +308,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::clientCursor |
             mgfx::ipc::ServerCapability::clipboard |
             mgfx::ipc::ServerCapability::clientWindowChrome |
-            mgfx::ipc::ServerCapability::textureResources;
+            mgfx::ipc::ServerCapability::textureResources |
+            mgfx::ipc::ServerCapability::pathResources;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -389,6 +411,18 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
             if (mgfx::ipc::decodeResourceId(message.payload, id)) {
                 const std::lock_guard<std::mutex> lock(resourceMutex_);
                 pendingTextureDestroys_.push_back(id);
+            }
+        } else if (message.type == mgfx::ipc::MessageType::pathCreate) {
+            mgfx::ipc::PathUpload path{};
+            if (mgfx::ipc::decodePathUpload(message.payload, path)) {
+                const std::lock_guard<std::mutex> lock(resourceMutex_);
+                pendingPathUploads_.push_back(std::move(path));
+            }
+        } else if (message.type == mgfx::ipc::MessageType::pathDestroy) {
+            std::uint32_t id = 0;
+            if (mgfx::ipc::decodeResourceId(message.payload, id)) {
+                const std::lock_guard<std::mutex> lock(resourceMutex_);
+                pendingPathDestroys_.push_back(id);
             }
         }
     }

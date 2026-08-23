@@ -3,9 +3,10 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { Key, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Button, TextField } from "./components.js";
+import { Button, Path, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { DotGrid } from "./app.js";
+import { Router, useRouter } from "./navigation.js";
 
 test("React JSX commits an MGFX binary frame", () => {
   let frame: Buffer | undefined;
@@ -19,6 +20,47 @@ test("React JSX commits an MGFX binary frame", () => {
   assert.ok(frame);
   assert.equal(frame.toString("ascii", 0, 4), "MGFX");
   assert.equal(frame.readUInt32LE(8), frame.length);
+});
+
+test("React Path uploads canonical curves once and emits DrawPath instead of triangles", () => {
+  let uploads = 0;
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; }, undefined, {
+    createPath: (_id, segments) => {
+      uploads += 1;
+      assert.deepEqual(segments.map((segment) => segment.verb), ["move", "cubic"]);
+    },
+  });
+  surface.render(<Path data="M2 12C4 2 20 2 22 12"
+    viewBox={{ x: 0, y: 0, width: 24, height: 24 }} strokeWidth={2}
+    strokeColor={{ red: 1, green: 0.5, blue: 0.1, alpha: 1 }} />);
+  surface.resize({ width: 100, height: 100 });
+  surface.resize({ width: 120, height: 100 });
+  assert.equal(uploads, 1);
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 7);
+});
+
+test("native router pushes and pops React route history", () => {
+  let observed = "";
+  function Home() {
+    const router = useRouter(); observed = `${router.route}:${router.canGoBack}`;
+    return <mgfx-stack style={{ preferredSize: { width: 100, height: 50 } }}
+      onClick={() => router.push("details")} />;
+  }
+  function Details() {
+    const router = useRouter(); observed = `${router.route}:${router.canGoBack}`;
+    return <mgfx-stack style={{ preferredSize: { width: 100, height: 50 } }}
+      onClick={router.back} />;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Router initialRoute="home" routes={{ home: <Home />, details: <Details /> }} />);
+  surface.resize({ width: 100, height: 50 });
+  assert.equal(observed, "home:false");
+  surface.pointerDown({ x: 20, y: 20 }); surface.pointerUp({ x: 20, y: 20 });
+  assert.equal(observed, "details:true");
+  surface.pointerDown({ x: 20, y: 20 }); surface.pointerUp({ x: 20, y: 20 });
+  assert.equal(observed, "home:false");
 });
 
 test("MGFX pointer events drive React hook state and a new commit", () => {

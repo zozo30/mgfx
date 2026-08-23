@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Circle, Column, Image, Row, Stack, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Circle, Column, Image, Path, Row, Stack, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard } from "./native-window.js";
+import type { VectorIcon } from "./icon-pack.js";
+import { Dialog, Router, useRouter } from "./navigation.js";
 
 export function DotGrid({ time }: { readonly time: number }) {
   const ink = rgba(0.55, 0.86, 0.68);
@@ -80,15 +82,89 @@ export function DiagonalPattern({ time }: { readonly time: number }) {
   );
 }
 
-export function App({ animationClock, chromeMetrics }: {
+function ImagePreview({ sourceSize }: {
+  readonly sourceSize: { readonly width: number; readonly height: number };
+}) {
+  return (
+    <Row style={{ preferredSize: { height: 126 }, padding: all(12), gap: 18,
+      background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
+      <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
+        <Text value="PERSISTENT IMAGE / SVG" style={{ fontSize: 14,
+          color: rgba(0.82, 0.86, 0.94) }} />
+      </Stack>
+      <Image textureId={1} sourceWidth={sourceSize.width} sourceHeight={sourceSize.height}
+        fit="contain" style={{ preferredSize: { height: 102 }, flexGrow: 1,
+          background: rgba(0.015, 0.02, 0.03) }} />
+    </Row>
+  );
+}
+
+function ServerVectorPath({ time }: { readonly time: number }) {
+  const pulse = (Math.sin(time / 420) + 1) / 2;
+  return (
+    <Row style={{ preferredSize: { height: 94 }, padding: all(12), gap: 18,
+      background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
+      <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
+        <Text value="SERVER PATH CACHE" style={{ fontSize: 14,
+          color: rgba(0.82, 0.86, 0.94) }} />
+      </Stack>
+      <Path
+        data="M18 4H302L316 18V82L302 96H18L4 82V18Z M28 20H292L300 28V72L292 80H28L20 72V28Z"
+        viewBox={{ x: 0, y: 0, width: 320, height: 100 }} fillRule="evenodd"
+        gradient={{ start: { x: 4, y: 50 }, end: { x: 316, y: 50 },
+          startColor: rgba(0.04, 0.32 + pulse * 0.2, 0.44 + pulse * 0.18,
+            0.48 + pulse * 0.28),
+          endColor: rgba(0.54 + pulse * 0.18, 0.18, 0.92, 0.82) }}
+        strokeColor={rgba(1, 0.42 + pulse * 0.3, 0.06, 0.88)} strokeWidth={2.5}
+        style={{ preferredSize: { height: 68 }, flexGrow: 1 }} />
+    </Row>
+  );
+}
+
+function IconGallery({ icons, time }: { readonly icons: readonly VectorIcon[];
+  readonly time: number }) {
+  const pulse = (Math.sin(time / 420) + 1) / 2;
+  return (
+    <Row style={{ preferredSize: { height: 112 }, padding: all(12), gap: 18,
+      background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
+      <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
+        <Text value="LUCIDE VECTOR STROKES" style={{ fontSize: 14,
+          color: rgba(0.82, 0.86, 0.94) }} />
+      </Stack>
+      <Row style={{ gap: 22, flexGrow: 1, mainAxisAlignment: "center",
+        crossAxisAlignment: "center" }}>
+        {icons.map((icon, index) => <Path key={icon.name} data={icon.path}
+          viewBox={{ x: 0, y: 0, width: 24, height: 24 }} tolerance={0.12}
+          strokeWidth={2} lineCap="round" lineJoin="round"
+          strokeColor={rgba(0.24 + index * 0.14, 0.72 + pulse * 0.18, 1 - index * 0.12)}
+          style={{ preferredSize: { width: 76, height: 76 } }} />)}
+      </Row>
+    </Row>
+  );
+}
+
+interface AppProps {
   readonly animationClock: AnimationClock;
   readonly chromeMetrics: WindowChromeMetrics;
-}) {
+  readonly headerImageSize: { readonly width: number; readonly height: number };
+  readonly vectorIcons: readonly VectorIcon[];
+}
+
+export function App(props: AppProps) {
+  return <Router initialRoute="dashboard" routes={{
+    dashboard: <Dashboard {...props} />,
+    graphics: <GraphicsRoute {...props} />,
+  }} />;
+}
+
+function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
   const [selected, setSelected] = useState(0);
   const [value, setValue] = useState("");
   const [mode, setMode] = useState<WindowMode>("normal");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const animationTime = useAnimationTime(animationClock);
   const clipboard = useNativeClipboard();
+  const router = useRouter();
   const cards = [
     ["REACT", rgba(0.95, 0.24, 0.2), rgba(1, 0.52, 0.2)],
     ["HOOKS", rgba(0.16, 0.78, 0.42), rgba(0.45, 1, 0.58)],
@@ -98,7 +174,9 @@ export function App({ animationClock, chromeMetrics }: {
     <Window title="MGFX React Native Window" width={1100} height={700}
       minimumWidth={720} minimumHeight={520} mode={mode}
       chrome="overlay" draggableHeight={Math.max(82, chromeMetrics.titleBarHeight + 26)}>
-    <Column style={{ padding: { top: 14, right: 20, bottom: 20, left: 20 }, gap: 16,
+    <Stack>
+    <Column style={{ position: "absolute", inset: all(0),
+      padding: { top: 14, right: 20, bottom: 20, left: 20 }, gap: 16,
       crossAxisAlignment: "stretch" }}>
       <Row style={{ preferredSize: { height: 72 },
         padding: { top: 14, right: 14, bottom: 14,
@@ -112,7 +190,9 @@ export function App({ animationClock, chromeMetrics }: {
         crossAxisAlignment: "center" }}>
         <Text value="MGFX REACT" style={{ fontSize: 24 }} />
         <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
-          <Image textureId={1} style={{ preferredSize: { width: 52, height: 52 },
+          <Image textureId={1} sourceWidth={headerImageSize.width}
+            sourceHeight={headerImageSize.height} fit="cover"
+            style={{ preferredSize: { width: 52, height: 52 },
             borderWidth: 2, borderColor: rgba(0.75, 0.92, 1) }} />
           <DotGrid time={animationTime} />
         </Row>
@@ -130,6 +210,9 @@ export function App({ animationClock, chromeMetrics }: {
         textStyle={{ fontSize: 16 }} />
       <WavePattern time={animationTime} />
       <DiagonalPattern time={animationTime} />
+      <ImagePreview sourceSize={headerImageSize} />
+      <ServerVectorPath time={animationTime} />
+      <IconGallery icons={vectorIcons} time={animationTime} />
       <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
         <Stack style={{ preferredSize: { height: 48 }, padding: all(14), cornerRadius: 10,
           background: rgba(0.30, 0.32, 0.42), flexGrow: 1 }}>
@@ -142,12 +225,67 @@ export function App({ animationClock, chromeMetrics }: {
           void clipboard.readClipboard().then((text) => setValue([...text].slice(0, 28).join("")));
         }} background={rgba(0.24, 0.44, 0.68)}
           style={{ preferredSize: { width: 110, height: 48 } }} />
+        <Button label="DETAILS" onPress={() => router.push("graphics")}
+          background={rgba(0.14, 0.54, 0.42)}
+          style={{ preferredSize: { width: 110, height: 48 } }} />
+        <Button label="DIALOG" onPress={() => setDialogOpen(true)}
+          background={rgba(0.56, 0.30, 0.66)}
+          style={{ preferredSize: { width: 110, height: 48 } }} />
         <Button label={mode === "fullscreen" ? "EXIT FULLSCREEN" : "FULLSCREEN"}
           onPress={() => setMode((value) => value === "fullscreen" ? "normal" : "fullscreen")}
           background={rgba(0.36, 0.22, 0.78)}
           style={{ preferredSize: { width: 190, height: 48 } }} />
       </Row>
     </Column>
+    <Dialog open={dialogOpen} title="MODAL LAYER 1000" onDismiss={() => setDialogOpen(false)}>
+      <Text value="ROUTE INPUT IS ISOLATED BEHIND THIS LAYER"
+        style={{ fontSize: 14, color: rgba(0.68, 0.74, 0.86) }} />
+      <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
+        <Button label="CLOSE" onPress={() => setDialogOpen(false)}
+          style={{ preferredSize: { width: 150 } }} />
+        <Button label="OPEN DETAILS" onPress={() => {
+          setDialogOpen(false); router.push("graphics");
+        }} background={rgba(0.16, 0.62, 0.48)} style={{ flexGrow: 1 }} />
+      </Row>
+    </Dialog>
+    </Stack>
+    </Window>
+  );
+}
+
+function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps) {
+  const router = useRouter();
+  const animationTime = useAnimationTime(animationClock);
+  const draggableHeight = Math.max(82, chromeMetrics.titleBarHeight + 26);
+  return (
+    <Window title="MGFX Graphics Route" width={1100} height={700}
+      minimumWidth={720} minimumHeight={520} chrome="overlay"
+      draggableHeight={draggableHeight}>
+      <Stack>
+        <Column style={{ position: "absolute", inset: all(0),
+          padding: { top: draggableHeight + 14, right: 28, bottom: 28, left: 28 }, gap: 22,
+          crossAxisAlignment: "stretch" }}>
+          <Row style={{ preferredSize: { height: 70 }, padding: all(16), cornerRadius: 14,
+            backgroundGradient: { start: rgba(0.08, 0.46, 0.36),
+              end: rgba(0.28, 0.12, 0.68), direction: "horizontal" },
+            mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
+            <Text value="GRAPHICS ROUTE" style={{ fontSize: 24 }} />
+            <Button label="BACK" onPress={router.back} background={rgba(0.08, 0.12, 0.20)}
+              style={{ preferredSize: { width: 120, height: 42 } }} />
+          </Row>
+          <ServerVectorPath time={animationTime} />
+          <IconGallery icons={vectorIcons} time={animationTime} />
+          <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,
+            background: rgba(0.055, 0.07, 0.11), borderWidth: 1,
+            borderColor: rgba(0.22, 0.30, 0.46) }}>
+            <Text value="HISTORY ROUTER" style={{ fontSize: 18, color: rgba(0.62, 0.88, 1) }} />
+            <Text value="THIS SCREEN REPLACED THE ACTIVE REACT SUBTREE"
+              style={{ fontSize: 14, color: rgba(0.68, 0.72, 0.82) }} />
+            <Text value={`ROUTE ${router.route}  BACK ${router.canGoBack ? "READY" : "EMPTY"}`}
+              style={{ fontSize: 14, color: rgba(0.42, 0.92, 0.68) }} />
+          </Column>
+        </Column>
+      </Stack>
     </Window>
   );
 }

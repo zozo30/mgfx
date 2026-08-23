@@ -84,6 +84,20 @@ int main() {
         return 1;
     }
 
+    const mgfx::ipc::PathUpload sourcePath{12, {
+        {mgfx::ipc::PathVerb::moveTo, {0.0F, 0.0F}},
+        {mgfx::ipc::PathVerb::lineTo, {24.0F, 24.0F}},
+        {mgfx::ipc::PathVerb::close, {}},
+    }};
+    mgfx::ipc::PathUpload decodedPath{};
+    if (!mgfx::ipc::decodePathUpload(mgfx::ipc::encodePathUpload(sourcePath), decodedPath) ||
+        decodedPath.id != 12 || decodedPath.segments.size() != 3 ||
+        decodedPath.segments[1].verb != mgfx::ipc::PathVerb::lineTo ||
+        decodedPath.segments[1].values[0] != 24.0F) {
+        std::cerr << "Path upload payload round trip failed\n";
+        return 1;
+    }
+
     std::string decodedText;
     if (!mgfx::ipc::decodeText(mgfx::ipc::encodeText("hello"), decodedText) ||
         decodedText != "hello") {

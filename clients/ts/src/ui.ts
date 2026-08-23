@@ -1,4 +1,4 @@
-import { FrameEncoder, Key, type Color, type Vertex } from "./protocol.js";
+import { FrameEncoder, Key, type ClipRect, type Color, type PathSegment, type Vertex } from "./protocol.js";
 
 export interface Point { readonly x: number; readonly y: number }
 export interface Size { readonly width: number; readonly height: number }
@@ -17,7 +17,12 @@ export interface DiagonalStripePattern {
   readonly direction?: "forward" | "backward";
   readonly offset?: number;
 }
-export interface ImagePaint { readonly textureId: number; readonly tint?: Color }
+export interface ImagePaint {
+  readonly textureId: number;
+  readonly tint?: Color;
+  readonly sourceSize?: Size;
+  readonly fit?: "fill" | "contain" | "cover";
+}
 export interface Style {
   preferredSize?: Partial<Size>; padding?: Partial<Insets>; gap?: number;
   background?: Color; backgroundGradient?: LinearGradient;
@@ -28,9 +33,38 @@ export interface Style {
   clip?: boolean;
   borderWidth?: number; borderColor?: Color;
   cornerRadius?: number;
+  position?: "flow" | "absolute";
+  inset?: Partial<Insets>;
+  zIndex?: number;
+  modal?: boolean;
 }
 export interface TextStyle { fontSize?: number; color?: Color }
-export type ElementType = "box" | "row" | "column" | "stack" | "text" | "scroll" | "circle";
+export interface MeshData {
+  readonly positions: readonly Point[];
+  readonly indices: readonly number[];
+  readonly color: Color;
+  readonly colors?: readonly Color[];
+  readonly viewBox?: Rect;
+  readonly fit?: "stretch" | "contain";
+}
+export interface PathData {
+  readonly resourceId: number;
+  readonly segments: readonly PathSegment[];
+  readonly viewBox: Rect;
+  readonly fit?: "stretch" | "contain";
+  readonly fill?: Color;
+  readonly fillGradient?: {
+    readonly start: Point; readonly end: Point;
+    readonly startColor: Color; readonly endColor: Color;
+  };
+  readonly stroke?: Color;
+  readonly strokeWidth?: number;
+  readonly tolerance?: number;
+  readonly fillRule?: "nonzero" | "evenodd";
+  readonly lineCap?: "butt" | "round";
+  readonly lineJoin?: "bevel" | "round";
+}
+export type ElementType = "box" | "row" | "column" | "stack" | "text" | "scroll" | "circle" | "mesh" | "path";
 export interface Element {
   type: ElementType; key: string; style: Style; children: readonly Element[];
   onClick?: () => void; onHoverChange?: (hovered: boolean) => void;
@@ -38,12 +72,18 @@ export interface Element {
   onFocusChange?: (focused: boolean) => void;
   onScroll?: (deltaX: number, deltaY: number) => void; scrollOffsetY?: number;
   onKeyDown?: (key: Key) => void; onTextInput?: (text: string) => void;
+  mesh?: MeshData;
+  path?: PathData;
 }
 
 const make = (type: ElementType, children: readonly Element[], style: Style, key: string): Element =>
   ({ type, children, style, key });
 export const box = (style: Style = {}, key = ""): Element => make("box", [], style, key);
 export const circle = (style: Style = {}, key = ""): Element => make("circle", [], style, key);
+export const mesh = (data: MeshData, style: Style = {}, key = ""): Element =>
+  ({ ...make("mesh", [], style, key), mesh: data });
+export const path = (data: PathData, style: Style = {}, key = ""): Element =>
+  ({ ...make("path", [], style, key), path: data });
 export const row = (children: readonly Element[], style: Style = {}, key = ""): Element => make("row", children, style, key);
 export const column = (children: readonly Element[], style: Style = {}, key = ""): Element => make("column", children, style, key);
 export const stack = (children: readonly Element[], style: Style = {}, key = ""): Element => make("stack", children, style, key);
@@ -165,6 +205,11 @@ export class ComponentHost {
     const element = this.component.build();
     if (this.root?.matches(element)) this.root.update(element);
     else this.root = new Node(element);
+    if (this.focused) {
+      const targets: Node[] = [];
+      this.root.collectTargets(targets);
+      if (!targets.includes(this.focused)) this.setFocus(targets[0]);
+    }
     this.dirty = false;
   }
   private setFocus(target: Node | undefined): void {
@@ -195,6 +240,8 @@ class Node {
   scrollOffsetY = 0;
   onKeyDown: ((key: Key) => void) | undefined;
   onTextInput: ((text: string) => void) | undefined;
+  mesh: MeshData | undefined = undefined;
+  path: PathData | undefined = undefined;
   measured: Size = { width: 0, height: 0 };
   bounds: Rect = { x: 0, y: 0, width: 0, height: 0 };
   constructor(element: Element) { this.type = element.type; this.key = element.key; this.update(element); }
@@ -207,6 +254,8 @@ class Node {
     this.onKeyDown = element.onKeyDown; this.onTextInput = element.onTextInput;
     this.value = element.value ?? "";
     this.textStyle = element.textStyle ?? {};
+    this.mesh = element.mesh;
+    this.path = element.path;
     const old = this.children, used = old.map(() => false);
     this.children = element.children.map((child, index) => {
       let found = child.key === "" && old[index]?.matches(child) ? index : -1;
@@ -226,13 +275,16 @@ class Node {
       const fontSize = this.textStyle.fontSize ?? 16, cell = fontSize / 7;
       width = this.value.length * cell * 6 - cell; height = fontSize;
     }
+    let flowCount = 0;
     for (const child of this.children) {
       const size = child.measure(inner);
+      if (child.style.position === "absolute") continue;
+      flowCount += 1;
       if (this.type === "row") { width += size.width; height = Math.max(height, size.height); }
       else if (this.type === "column") { width = Math.max(width, size.width); height += size.height; }
       else { width = Math.max(width, size.width); height = Math.max(height, size.height); }
     }
-    const gaps = Math.max(0, this.children.length - 1) * (this.style.gap ?? 0);
+    const gaps = Math.max(0, flowCount - 1) * (this.style.gap ?? 0);
     if (this.type === "row") width += gaps;
     if (this.type === "column") height += gaps;
     const preferred = this.style.preferredSize ?? {};
@@ -257,18 +309,19 @@ class Node {
       return;
     }
     const horizontal = this.type === "row", vertical = this.type === "column", linear = horizontal || vertical;
+    const flowChildren = this.children.filter((child) => child.style.position !== "absolute");
     const gap = this.style.gap ?? 0;
-    let occupied = linear ? Math.max(0, this.children.length - 1) * gap : 0, flex = 0;
-    for (const child of this.children) { occupied += horizontal ? child.measured.width : child.measured.height; flex += Math.max(0, child.style.flexGrow ?? 0); }
+    let occupied = linear ? Math.max(0, flowChildren.length - 1) * gap : 0, flex = 0;
+    for (const child of flowChildren) { occupied += horizontal ? child.measured.width : child.measured.height; flex += Math.max(0, child.style.flexGrow ?? 0); }
     const remaining = linear ? Math.max(0, (horizontal ? content.width : content.height) - occupied) : 0;
     let leading = 0, effectiveGap = gap;
     if (linear && flex === 0) {
       if (this.style.mainAxisAlignment === "center") leading = remaining / 2;
       if (this.style.mainAxisAlignment === "end") leading = remaining;
-      if (this.style.mainAxisAlignment === "spaceBetween" && this.children.length > 1) effectiveGap += remaining / (this.children.length - 1);
+      if (this.style.mainAxisAlignment === "spaceBetween" && flowChildren.length > 1) effectiveGap += remaining / (flowChildren.length - 1);
     }
     let x = content.x + (horizontal ? leading : 0), y = content.y + (vertical ? leading : 0);
-    for (const child of this.children) {
+    for (const child of flowChildren) {
       let width = Math.min(child.measured.width, content.width), height = Math.min(child.measured.height, content.height);
       const grow = Math.max(0, child.style.flexGrow ?? 0);
       if (linear && flex > 0 && grow > 0) {
@@ -290,6 +343,15 @@ class Node {
       }
       child.layout({ x: childX, y: childY, width, height });
     }
+    for (const child of this.children) {
+      if (child.style.position !== "absolute") continue;
+      const inset = insets(child.style.inset);
+      const hasHorizontal = child.style.inset?.left !== undefined || child.style.inset?.right !== undefined;
+      const hasVertical = child.style.inset?.top !== undefined || child.style.inset?.bottom !== undefined;
+      child.layout({ x: content.x + inset.left, y: content.y + inset.top,
+        width: hasHorizontal ? extent(content.width, inset.left, inset.right) : child.measured.width,
+        height: hasVertical ? extent(content.height, inset.top, inset.bottom) : child.measured.height });
+    }
   }
   paint(encoder: FrameEncoder, viewport: Size): void {
     if (this.style.clip) encoder.pushClip({ left: this.bounds.x / viewport.width,
@@ -297,7 +359,11 @@ class Node {
       bottom: (this.bounds.y + this.bounds.height) / viewport.height });
     const background = this.style.background;
     const gradient = this.style.backgroundGradient;
-    if (this.type === "circle") {
+    if (this.type === "mesh") {
+      paintMesh(encoder, this.bounds, this.mesh, viewport);
+    } else if (this.type === "path") {
+      paintPath(encoder, this.bounds, this.path, viewport);
+    } else if (this.type === "circle") {
       paintCircle(encoder, this.bounds, background, gradient, this.style.borderWidth ?? 0,
         this.style.borderColor, viewport);
     } else if ((this.style.cornerRadius ?? 0) > 0) {
@@ -308,36 +374,43 @@ class Node {
         if (gradient) encoder.triangles(gradientRectangleVertices(this.bounds, gradient, viewport));
         else if (background && background.alpha > 0)
           encoder.triangles(rectangleVertices(this.bounds, background, viewport));
-        if (this.style.backgroundImage) encoder.image(this.style.backgroundImage.textureId, {
-          left: this.bounds.x / viewport.width * 2 - 1,
-          top: 1 - this.bounds.y / viewport.height * 2,
-          right: (this.bounds.x + this.bounds.width) / viewport.width * 2 - 1,
-          bottom: 1 - (this.bounds.y + this.bounds.height) / viewport.height * 2,
-        }, undefined, this.style.backgroundImage.tint);
+        if (this.style.backgroundImage) {
+          const image = imageGeometry(this.bounds, this.style.backgroundImage);
+          encoder.image(this.style.backgroundImage.textureId, normalizedRect(image.destination, viewport),
+            image.uv, this.style.backgroundImage.tint);
+        }
       }
       paintDiagonalStripes(encoder, this.bounds, this.style.backgroundPattern, viewport);
       paintBorder(encoder, this.bounds, this.style.borderWidth ?? 0, this.style.borderColor, viewport);
     }
     if (this.type === "text") paintText(encoder, this.bounds, this.value, this.textStyle, viewport);
-    for (const child of this.children) child.paint(encoder, viewport);
+    for (const child of this.paintOrder()) child.paint(encoder, viewport);
     if (this.style.clip) encoder.popClip();
   }
   hitTarget(point: Point): Node | undefined {
     if (!contains(this.bounds, point)) return undefined;
-    for (let i = this.children.length - 1; i >= 0; i--) {
-      const target = this.children[i]!.hitTarget(point);
+    const modal = this.modalChild();
+    if (modal) return modal.hitTarget(point);
+    const ordered = this.paintOrder();
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const target = ordered[i]!.hitTarget(point);
       if (target) return target;
     }
     return this.isFocusable() ? this : undefined;
   }
   collectTargets(targets: Node[]): void {
     if (this.isFocusable()) targets.push(this);
-    for (const child of this.children) child.collectTargets(targets);
+    const modal = this.modalChild();
+    if (modal) modal.collectTargets(targets);
+    else for (const child of this.paintOrder()) child.collectTargets(targets);
   }
   scrollTarget(point: Point): Node | undefined {
     if (!contains(this.bounds, point)) return undefined;
-    for (let i = this.children.length - 1; i >= 0; i--) {
-      const target = this.children[i]!.scrollTarget(point);
+    const modal = this.modalChild();
+    if (modal) return modal.scrollTarget(point);
+    const ordered = this.paintOrder();
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const target = ordered[i]!.scrollTarget(point);
       if (target) return target;
     }
     return this.onScroll ? this : undefined;
@@ -345,6 +418,106 @@ class Node {
   private isFocusable(): boolean {
     return this.onClick !== undefined || this.onKeyDown !== undefined || this.onTextInput !== undefined;
   }
+  private paintOrder(): Node[] {
+    return this.children.map((child, index) => ({ child, index }))
+      .sort((left, right) => (left.child.style.zIndex ?? 0) - (right.child.style.zIndex ?? 0) ||
+        left.index - right.index).map(({ child }) => child);
+  }
+  private modalChild(): Node | undefined {
+    return [...this.children].filter((child) => child.style.modal)
+      .sort((left, right) => (right.style.zIndex ?? 0) - (left.style.zIndex ?? 0))[0];
+  }
+}
+
+function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefined,
+  viewport: Size): void {
+  if (!path || (!path.fill && !path.fillGradient && !path.stroke) ||
+      path.viewBox.width <= 0 || path.viewBox.height <= 0) return;
+  let destination = bounds;
+  if (path.fit === "contain") {
+    const sourceAspect = path.viewBox.width / path.viewBox.height;
+    const boundsAspect = bounds.width / bounds.height;
+    if (sourceAspect > boundsAspect) {
+      const height = bounds.width / sourceAspect;
+      destination = { ...bounds, y: bounds.y + (bounds.height - height) / 2, height };
+    } else {
+      const width = bounds.height * sourceAspect;
+      destination = { ...bounds, x: bounds.x + (bounds.width - width) / 2, width };
+    }
+  }
+  encoder.path(path.resourceId, normalizedRect(destination, viewport), path.viewBox, {
+    ...(path.fill ? { fill: path.fill } : {}),
+    ...(path.fillGradient ? { fillGradient: path.fillGradient } : {}),
+    ...(path.stroke ? { stroke: path.stroke } : {}),
+    ...(path.strokeWidth !== undefined ? { strokeWidth: path.strokeWidth } : {}),
+    ...(path.tolerance !== undefined ? { tolerance: path.tolerance } : {}),
+    ...(path.fillRule ? { fillRule: path.fillRule } : {}),
+    ...(path.lineCap ? { lineCap: path.lineCap } : {}),
+    ...(path.lineJoin ? { lineJoin: path.lineJoin } : {}),
+  });
+}
+
+function paintMesh(encoder: FrameEncoder, bounds: Rect, mesh: MeshData | undefined,
+  viewport: Size): void {
+  if (!mesh || mesh.indices.length === 0 || mesh.indices.length % 3 !== 0) return;
+  const vertices: Vertex[] = [];
+  const source = mesh.viewBox ?? { x: 0, y: 0, width: 1, height: 1 };
+  if (source.width <= 0 || source.height <= 0) return;
+  let destination = bounds;
+  if (mesh.fit === "contain") {
+    const sourceAspect = source.width / source.height;
+    const boundsAspect = bounds.width / bounds.height;
+    if (sourceAspect > boundsAspect) {
+      const height = bounds.width / sourceAspect;
+      destination = { ...bounds, y: bounds.y + (bounds.height - height) / 2, height };
+    } else {
+      const width = bounds.height * sourceAspect;
+      destination = { ...bounds, x: bounds.x + (bounds.width - width) / 2, width };
+    }
+  }
+  for (const index of mesh.indices) {
+    const position = mesh.positions[index];
+    if (!position) return;
+    const color = mesh.colors?.[index] ?? mesh.color;
+    vertices.push(pointVertex({
+      x: destination.x + (position.x - source.x) / source.width * destination.width,
+      y: destination.y + (position.y - source.y) / source.height * destination.height,
+    }, color, viewport));
+  }
+  encoder.triangles(vertices);
+}
+
+function normalizedRect(r: Rect, viewport: Size): ClipRect {
+  return { left: r.x / viewport.width * 2 - 1,
+    top: 1 - r.y / viewport.height * 2,
+    right: (r.x + r.width) / viewport.width * 2 - 1,
+    bottom: 1 - (r.y + r.height) / viewport.height * 2 };
+}
+
+function imageGeometry(bounds: Rect, image: ImagePaint): {
+  destination: Rect; uv: ClipRect;
+} {
+  const uv: ClipRect = { left: 0, top: 0, right: 1, bottom: 1 };
+  if (!image.sourceSize || !image.fit || image.fit === "fill" ||
+      image.sourceSize.width <= 0 || image.sourceSize.height <= 0) {
+    return { destination: bounds, uv };
+  }
+  const sourceAspect = image.sourceSize.width / image.sourceSize.height;
+  const destinationAspect = bounds.width / bounds.height;
+  if (image.fit === "contain") {
+    if (sourceAspect > destinationAspect) {
+      const height = bounds.width / sourceAspect;
+      return { destination: { ...bounds, y: bounds.y + (bounds.height - height) / 2, height }, uv };
+    }
+    const width = bounds.height * sourceAspect;
+    return { destination: { ...bounds, x: bounds.x + (bounds.width - width) / 2, width }, uv };
+  }
+  if (sourceAspect > destinationAspect) {
+    const visible = destinationAspect / sourceAspect;
+    return { destination: bounds, uv: { ...uv, left: (1 - visible) / 2, right: (1 + visible) / 2 } };
+  }
+  const visible = sourceAspect / destinationAspect;
+  return { destination: bounds, uv: { ...uv, top: (1 - visible) / 2, bottom: (1 + visible) / 2 } };
 }
 
 function paintDiagonalStripes(encoder: FrameEncoder, r: Rect,

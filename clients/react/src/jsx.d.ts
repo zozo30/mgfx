@@ -1,4 +1,4 @@
-import type { Style, TextStyle } from "@mgfx/demo-client/ui";
+import type { MeshData, PathData, Style, TextStyle } from "@mgfx/demo-client/ui";
 import type { Key } from "@mgfx/demo-client/protocol";
 import type { Key as ReactKey, ReactNode } from "react";
 
@@ -16,6 +16,8 @@ export interface MGFXProps {
   readonly onScroll?: (deltaX: number, deltaY: number) => void;
   readonly onKeyDown?: (key: Key) => void;
   readonly onTextInput?: (text: string) => void;
+  readonly mesh?: MeshData;
+  readonly path?: PathData;
 }
 
 declare module "react" {
@@ -28,6 +30,8 @@ declare module "react" {
       "mgfx-circle": MGFXProps;
       "mgfx-text": MGFXProps;
       "mgfx-scroll": MGFXProps;
+      "mgfx-mesh": MGFXProps;
+      "mgfx-path": MGFXProps;
     }
   }
 }

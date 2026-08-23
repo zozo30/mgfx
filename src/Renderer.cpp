@@ -61,7 +61,13 @@ Renderer::Renderer(MTL::Device* device)
     auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
     descriptor->setVertexFunction(vertexFunction.get());
     descriptor->setFragmentFunction(fragmentFunction.get());
-    descriptor->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    auto* color = descriptor->colorAttachments()->object(0);
+    color->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    color->setBlendingEnabled(true);
+    color->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    color->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    color->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    color->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
 
     pipelineState_ = NS::TransferPtr(device_->newRenderPipelineState(descriptor.get(), &error));
     if (!pipelineState_) {
@@ -74,7 +80,7 @@ Renderer::Renderer(MTL::Device* device)
     imageDescriptor->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
     auto* imageColor = imageDescriptor->colorAttachments()->object(0);
     imageColor->setBlendingEnabled(true);
-    imageColor->setSourceRGBBlendFactor(MTL::BlendFactorSourceAlpha);
+    imageColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
     imageColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
     imageColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
     imageColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
@@ -102,6 +108,14 @@ void Renderer::createTexture(std::uint32_t id, std::uint32_t width, std::uint32_
 
 void Renderer::destroyTexture(std::uint32_t id) { textures_.erase(id); }
 void Renderer::clearTextures() { textures_.clear(); }
+
+void Renderer::createPath(std::uint32_t id, std::vector<mgfx::ipc::PathSegment> segments) {
+    if (id == 0 || segments.empty()) return;
+    paths_[id] = {std::move(segments), {}};
+}
+
+void Renderer::destroyPath(std::uint32_t id) { paths_.erase(id); }
+void Renderer::clearPaths() { paths_.clear(); }
 
 MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStream,
                                      MTL::RenderPassDescriptor* renderPass,
@@ -218,6 +232,88 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawPath) {
+            gfx::PathCommand path{};
+            if (!gfx::decodePath(command, path) || !std::isfinite(path.strokeWidth) ||
+                !std::isfinite(path.tolerance) || path.strokeWidth < 0.0F ||
+                path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
+                path.viewBox.height <= 0.0F) {
+                throw std::runtime_error("Malformed path command");
+            }
+            const auto found = paths_.find(path.pathId);
+            if (found == paths_.end() || clipEmpty()) continue;
+            PathResource& resource = found->second;
+            const auto sameStyle = [&](const CachedPath& cached) {
+                return cached.fill == path.fill && cached.stroke == path.stroke &&
+                       cached.fillRule == path.fillRule && cached.lineCap == path.lineCap &&
+                       cached.lineJoin == path.lineJoin && cached.strokeWidth == path.strokeWidth &&
+                       cached.tolerance == path.tolerance;
+            };
+            auto cached = std::find_if(resource.cache.begin(), resource.cache.end(), sameStyle);
+            if (cached == resource.cache.end()) {
+                if (resource.cache.size() >= 16) resource.cache.erase(resource.cache.begin());
+                resource.cache.push_back({path.fill, path.stroke, path.fillRule, path.lineCap,
+                    path.lineJoin, path.strokeWidth, path.tolerance,
+                    gfx::tessellatePath(resource.segments, path.fill, path.stroke,
+                        path.fillRule, path.lineCap, path.lineJoin,
+                        path.strokeWidth, path.tolerance)});
+                cached = std::prev(resource.cache.end());
+            }
+            const auto drawPathTriangles = [&](const std::vector<gfx::PathPoint>& points,
+                                               gfx::Color color,
+                                               const gfx::PathGradient* gradient) {
+                if (points.empty()) return;
+                if (encoder == nullptr) {
+                    encoder = commandBuffer->renderCommandEncoder(renderPass);
+                    applyClip();
+                }
+                encoder->setRenderPipelineState(pipelineState_.get());
+                constexpr std::size_t maxInlineBytes = 4096;
+                constexpr std::size_t maxVertices =
+                    (maxInlineBytes / sizeof(gfx::Vertex) / 3) * 3;
+                for (std::size_t first = 0; first < points.size();) {
+                    const std::size_t count = std::min(maxVertices, points.size() - first);
+                    std::vector<gfx::Vertex> vertices;
+                    vertices.reserve(count);
+                    for (std::size_t index = 0; index < count; ++index) {
+                        const gfx::PathPoint& point = points[first + index];
+                        std::array<float, 4> vertexColor = {
+                            color.red, color.green, color.blue, color.alpha};
+                        if (gradient != nullptr) {
+                            const float dx = gradient->endX - gradient->startX;
+                            const float dy = gradient->endY - gradient->startY;
+                            const float lengthSquared = dx * dx + dy * dy;
+                            const float amount = lengthSquared > 0.0F
+                                ? std::clamp(((point[0] - gradient->startX) * dx +
+                                              (point[1] - gradient->startY) * dy) /
+                                             lengthSquared, 0.0F, 1.0F)
+                                : 0.0F;
+                            const auto mix = [amount](float start, float end) {
+                                return start + (end - start) * amount;
+                            };
+                            vertexColor = {mix(gradient->startColor.red, gradient->endColor.red),
+                                mix(gradient->startColor.green, gradient->endColor.green),
+                                mix(gradient->startColor.blue, gradient->endColor.blue),
+                                mix(gradient->startColor.alpha, gradient->endColor.alpha)};
+                        }
+                        const float x = path.destination.left +
+                            (point[0] - path.viewBox.x) / path.viewBox.width *
+                            (path.destination.right - path.destination.left);
+                        const float y = path.destination.top +
+                            (point[1] - path.viewBox.y) / path.viewBox.height *
+                            (path.destination.bottom - path.destination.top);
+                        vertices.push_back({{x, y}, vertexColor});
+                    }
+                    encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
+                    encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                            static_cast<NS::UInteger>(0),
+                                            static_cast<NS::UInteger>(vertices.size()));
+                    first += count;
+                }
+            };
+            if (path.fill) drawPathTriangles(cached->triangles.fill, path.fillColor,
+                                             path.fillGradient ? &path.gradient : nullptr);
+            if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor, nullptr);
         } else if (command.opcode == gfx::Opcode::popClip) {
             if (command.payloadSize != 0 || clipStack.empty()) {
                 throw std::runtime_error("Malformed or unbalanced pop-clip command");

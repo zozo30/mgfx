@@ -31,6 +31,19 @@ npm start
 
 Start `MGFXServer.app` before `npm start`.
 
+To exercise a real image file, pass the socket followed by a PNG, JPEG, or SVG path:
+
+```sh
+npm start -- /tmp/mgfx-$(id -u).sock /absolute/path/to/image.png
+```
+
+The client validates and decodes the file to premultiplied RGBA8 once, uploads
+it as a persistent texture, and subsequent frames reference only its resource
+ID. Files are limited to 32 MiB and decoded dimensions to 4096×4096.
+SVG uses a high-quality client-side vector raster fallback with gradients,
+strokes, transforms, masks, paths, and system-font text. External image
+references are rejected; embedded `data:` images remain supported.
+
 The server has no startup window. This React tree creates and owns the visible
 window through MGIP; stopping and restarting React hides and restores it without
 restarting Metal or the Unix socket server.
@@ -89,6 +102,22 @@ instead of intrinsic host elements:
 - `Button` with built-in hover, press, focus, active, and disabled states
 - controlled `TextField` with focus styling, UTF-8 input, Unicode Backspace, and
   maximum-length handling
+- `Mesh` for explicit application-owned indexed geometry and `Path` for SVG
+  path data lowered to persistent canonical server resources
+
+`src/navigation.tsx` provides an in-memory history `Router`, `useRouter()` with
+push/replace/back operations, and a depth-aware `Dialog`. Dialogs use absolute
+insets, explicit `zIndex`, translucent source-over dimming, and modal input
+isolation; no AppKit child window is required.
+
+The demo installs the ISC-licensed `lucide-static` icon pack and extracts SVG
+path data from four sample icons. React sends only normalized path commands and
+paint. The graphics server flattens curves, tessellates fills/strokes, caches
+the geometry, and then feeds ordinary triangles to Metal; the TypeScript client
+does not generate icon triangles or image textures.
+Path paint can be a solid color or a source-space linear gradient. Gradient
+endpoints and colors travel in each lightweight `DrawPath`, while geometry
+remains cached by the server.
 
 ```tsx
 const [name, setName] = useState("");

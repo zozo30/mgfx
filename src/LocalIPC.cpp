@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cerrno>
+#include <cmath>
 #include <cstring>
 #include <stdexcept>
 #include <system_error>
@@ -36,6 +37,13 @@ void writeU64(std::uint8_t* bytes, std::uint64_t value) {
     }
 }
 
+void writeFloat(std::uint8_t* bytes, float value) {
+    std::uint32_t bits = 0;
+    static_assert(sizeof(bits) == sizeof(value));
+    std::memcpy(&bits, &value, sizeof(bits));
+    writeU32(bytes, bits);
+}
+
 std::uint16_t readU16(const std::uint8_t* bytes) {
     return static_cast<std::uint16_t>(bytes[0]) |
            static_cast<std::uint16_t>(bytes[1] << 8);
@@ -53,6 +61,13 @@ std::uint64_t readU64(const std::uint8_t* bytes) {
     for (unsigned shift = 0; shift < 64; shift += 8) {
         value |= static_cast<std::uint64_t>(*bytes++) << shift;
     }
+    return value;
+}
+
+float readFloat(const std::uint8_t* bytes) {
+    const std::uint32_t bits = readU32(bytes);
+    float value = 0.0F;
+    std::memcpy(&value, &bits, sizeof(value));
     return value;
 }
 
@@ -482,6 +497,52 @@ bool decodeTextureUpload(const std::vector<std::uint8_t>& payload, TextureUpload
     if (id == 0 || width == 0 || height == 0 || width > 4096 || height > 4096 ||
         static_cast<std::uint64_t>(width) * height * 4 != payload.size() - 16) return false;
     texture = {id, width, height, {payload.begin() + 16, payload.end()}};
+    return true;
+}
+
+std::vector<std::uint8_t> encodePathUpload(const PathUpload& path) {
+    constexpr std::size_t segmentBytes = 28;
+    std::vector<std::uint8_t> payload(16 + path.segments.size() * segmentBytes);
+    writeU32(payload.data(), path.id);
+    writeU32(payload.data() + 4, static_cast<std::uint32_t>(path.segments.size()));
+    std::uint8_t* target = payload.data() + 16;
+    for (const PathSegment& segment : path.segments) {
+        target[0] = static_cast<std::uint8_t>(segment.verb);
+        for (std::size_t index = 0; index < segment.values.size(); ++index) {
+            writeFloat(target + 4 + index * 4, segment.values[index]);
+        }
+        target += segmentBytes;
+    }
+    return payload;
+}
+
+bool decodePathUpload(const std::vector<std::uint8_t>& payload, PathUpload& path) {
+    constexpr std::size_t segmentBytes = 28;
+    if (payload.size() < 16 || readU32(payload.data() + 8) != 0 ||
+        readU32(payload.data() + 12) != 0) return false;
+    const std::uint32_t id = readU32(payload.data());
+    const std::uint32_t count = readU32(payload.data() + 4);
+    if (id == 0 || count == 0 || count > 65'536 ||
+        payload.size() != 16 + static_cast<std::size_t>(count) * segmentBytes) return false;
+    std::vector<PathSegment> segments;
+    segments.reserve(count);
+    const std::uint8_t* source = payload.data() + 16;
+    bool hasMove = false;
+    for (std::uint32_t item = 0; item < count; ++item, source += segmentBytes) {
+        if (source[0] < static_cast<std::uint8_t>(PathVerb::moveTo) ||
+            source[0] > static_cast<std::uint8_t>(PathVerb::close) ||
+            source[1] != 0 || source[2] != 0 || source[3] != 0) return false;
+        PathSegment segment{static_cast<PathVerb>(source[0]), {}};
+        for (std::size_t index = 0; index < segment.values.size(); ++index) {
+            segment.values[index] = readFloat(source + 4 + index * 4);
+            if (!std::isfinite(segment.values[index])) return false;
+        }
+        if (segment.verb == PathVerb::moveTo) hasMove = true;
+        else if (!hasMove) return false;
+        segments.push_back(segment);
+    }
+    if (!hasMove) return false;
+    path = {id, std::move(segments)};
     return true;
 }
 

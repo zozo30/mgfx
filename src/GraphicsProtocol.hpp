@@ -17,6 +17,7 @@ enum class Opcode : std::uint16_t {
     pushClip = 4,
     popClip = 5,
     drawImage = 6,
+    drawPath = 7,
 };
 
 enum class Primitive : std::uint8_t {
@@ -60,6 +61,43 @@ struct ImageCommand {
     Color tint;
 };
 
+enum class FillRule : std::uint8_t { nonzero = 0, evenodd = 1 };
+enum class LineCap : std::uint8_t { butt = 0, round = 1 };
+enum class LineJoin : std::uint8_t { bevel = 0, round = 1 };
+
+struct PathRect {
+    float x;
+    float y;
+    float width;
+    float height;
+};
+
+struct PathGradient {
+    float startX;
+    float startY;
+    float endX;
+    float endY;
+    Color startColor;
+    Color endColor;
+};
+
+struct PathCommand {
+    std::uint32_t pathId;
+    bool fill;
+    bool stroke;
+    FillRule fillRule;
+    LineCap lineCap;
+    LineJoin lineJoin;
+    float strokeWidth;
+    float tolerance;
+    ClipRect destination;
+    PathRect viewBox;
+    Color fillColor;
+    Color strokeColor;
+    bool fillGradient = false;
+    PathGradient gradient{};
+};
+
 class CommandEncoder final {
 public:
     CommandEncoder();
@@ -70,6 +108,7 @@ public:
     void pushClip(ClipRect clip);
     void popClip();
     void drawImage(const ImageCommand& image);
+    void drawPath(const PathCommand& path);
 
     std::vector<std::uint8_t> finish();
 
@@ -101,5 +140,6 @@ bool decodeClear(const CommandView& command, Color& color);
 bool decodeDraw(const CommandView& command, DrawCommand& draw);
 bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
+bool decodePath(const CommandView& command, PathCommand& path);
 
 } // namespace gfx
