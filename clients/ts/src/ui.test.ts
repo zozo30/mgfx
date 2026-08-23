@@ -402,6 +402,30 @@ test("dot grids lower to one constant-size server command", () => {
   assert.equal(frame.readUInt32LE(20), 96);
 });
 
+test("animated wave dots lower to one constant-size server command", () => {
+  class WaveComponent extends Component {
+    build(): Element {
+      const low = { red: 0.2, green: 0.4, blue: 1, alpha: 1 };
+      const high = { red: 0.2, green: 1, blue: 0.7, alpha: 1 };
+      return box({ preferredSize: { width: 400, height: 70 },
+        backgroundWaveDots: { count: 24, inset: 12, minimumRadius: 3.5,
+          maximumRadius: 15, phase: 2, frequency: 0.56, borderWidth: 1,
+          troughStartColor: low, troughEndColor: high,
+          crestStartColor: high, crestEndColor: low, borderColor: high } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new WaveComponent());
+  host.layout({ width: 400, height: 70 });
+  const encoder = new FrameEncoder();
+  host.paint(encoder, { width: 400, height: 70 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 21);
+  assert.equal(frame.readUInt32LE(20), 128);
+});
+
 test("indexed normalized meshes lower to backend-neutral colored triangles", () => {
   class MeshComponent extends Component {
     build(): Element {

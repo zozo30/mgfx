@@ -31,6 +31,7 @@ enum class Opcode : std::uint16_t {
     drawLinearGradient = 18,
     drawImageSurface = 19,
     drawDotGrid = 20,
+    drawWaveDots = 21,
 };
 
 enum class Primitive : std::uint8_t {
@@ -160,6 +161,22 @@ struct DotGridCommand {
     Color highlightColor;
 };
 
+struct WaveDotsCommand {
+    ClipRect destination;
+    std::uint32_t count;
+    float inset;
+    float minimumRadius;
+    float maximumRadius;
+    float phase;
+    float frequency;
+    float borderWidth;
+    Color troughStartColor;
+    Color troughEndColor;
+    Color crestStartColor;
+    Color crestEndColor;
+    Color borderColor;
+};
+
 enum class FillRule : std::uint8_t { nonzero = 0, evenodd = 1 };
 enum class LineCap : std::uint8_t { butt = 0, round = 1 };
 enum class LineJoin : std::uint8_t { bevel = 0, round = 1 };
@@ -234,6 +251,7 @@ public:
     void drawDiagonalPattern(const DiagonalPatternCommand& pattern);
     void drawLinearGradient(const LinearGradientCommand& gradient);
     void drawDotGrid(const DotGridCommand& grid);
+    void drawWaveDots(const WaveDotsCommand& wave);
 
     std::vector<std::uint8_t> finish();
 
@@ -277,5 +295,6 @@ bool decodeCircle(const CommandView& command, CircleCommand& circle);
 bool decodeDiagonalPattern(const CommandView& command, DiagonalPatternCommand& pattern);
 bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gradient);
 bool decodeDotGrid(const CommandView& command, DotGridCommand& grid);
+bool decodeWaveDots(const CommandView& command, WaveDotsCommand& wave);
 
 } // namespace gfx

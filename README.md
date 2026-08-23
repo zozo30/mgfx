@@ -198,6 +198,10 @@ a 32-bit fill mask, optional active cell, geometry, and colors. Metal evaluates 
 antialiased dot from the destination rectangle; the animated 4×4 title icon therefore
 replaces sixteen React circle nodes and sixteen per-frame draw commands.
 
+The animated wave row is one `DrawWaveDots` command rather than 24 reconciled circle
+components. Count, phase, frequency, radius range, border, and trough/crest gradients
+remain backend-neutral inputs; Metal derives every dot's size and paint per fragment.
+
 `src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
 `Stack` primitives. `ComponentHost` reconciles a component description into a
 retained layout tree, measures it with min/max constraints, assigns final bounds,

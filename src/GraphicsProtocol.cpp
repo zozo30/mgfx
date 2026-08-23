@@ -237,6 +237,26 @@ void CommandEncoder::drawDotGrid(const DotGridCommand& grid) {
                         grid.highlightColor.blue, grid.highlightColor.alpha}) appendFloat(bytes_, value);
 }
 
+void CommandEncoder::drawWaveDots(const WaveDotsCommand& wave) {
+    beginCommand(Opcode::drawWaveDots, 128);
+    for (float value : {wave.destination.left, wave.destination.top,
+                        wave.destination.right, wave.destination.bottom}) appendFloat(bytes_, value);
+    appendU32(bytes_, wave.count);
+    appendU32(bytes_, 0);
+    for (float value : {wave.inset, wave.minimumRadius, wave.maximumRadius, wave.phase,
+                        wave.frequency, wave.borderWidth,
+                        wave.troughStartColor.red, wave.troughStartColor.green,
+                        wave.troughStartColor.blue, wave.troughStartColor.alpha,
+                        wave.troughEndColor.red, wave.troughEndColor.green,
+                        wave.troughEndColor.blue, wave.troughEndColor.alpha,
+                        wave.crestStartColor.red, wave.crestStartColor.green,
+                        wave.crestStartColor.blue, wave.crestStartColor.alpha,
+                        wave.crestEndColor.red, wave.crestEndColor.green,
+                        wave.crestEndColor.blue, wave.crestEndColor.alpha,
+                        wave.borderColor.red, wave.borderColor.green,
+                        wave.borderColor.blue, wave.borderColor.alpha}) appendFloat(bytes_, value);
+}
+
 void CommandEncoder::drawImage(const ImageCommand& image) {
     beginCommand(Opcode::drawImage, 56);
     appendU32(bytes_, image.textureId);
@@ -525,6 +545,31 @@ bool decodeDotGrid(const CommandView& command, DotGridCommand& grid) {
                       readFloat(command.payload + 72), readFloat(command.payload + 76)};
     grid.highlightColor = {readFloat(command.payload + 80), readFloat(command.payload + 84),
                            readFloat(command.payload + 88), readFloat(command.payload + 92)};
+    return true;
+}
+
+bool decodeWaveDots(const CommandView& command, WaveDotsCommand& wave) {
+    if (command.opcode != Opcode::drawWaveDots || command.payloadSize != 128 ||
+        readU32(command.payload + 20) != 0U) return false;
+    wave.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                        readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    wave.count = readU32(command.payload + 16);
+    wave.inset = readFloat(command.payload + 24);
+    wave.minimumRadius = readFloat(command.payload + 28);
+    wave.maximumRadius = readFloat(command.payload + 32);
+    wave.phase = readFloat(command.payload + 36);
+    wave.frequency = readFloat(command.payload + 40);
+    wave.borderWidth = readFloat(command.payload + 44);
+    wave.troughStartColor = {readFloat(command.payload + 48), readFloat(command.payload + 52),
+                             readFloat(command.payload + 56), readFloat(command.payload + 60)};
+    wave.troughEndColor = {readFloat(command.payload + 64), readFloat(command.payload + 68),
+                           readFloat(command.payload + 72), readFloat(command.payload + 76)};
+    wave.crestStartColor = {readFloat(command.payload + 80), readFloat(command.payload + 84),
+                            readFloat(command.payload + 88), readFloat(command.payload + 92)};
+    wave.crestEndColor = {readFloat(command.payload + 96), readFloat(command.payload + 100),
+                          readFloat(command.payload + 104), readFloat(command.payload + 108)};
+    wave.borderColor = {readFloat(command.payload + 112), readFloat(command.payload + 116),
+                        readFloat(command.payload + 120), readFloat(command.payload + 124)};
     return true;
 }
 

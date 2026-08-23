@@ -42,6 +42,7 @@ private:
     NS::SharedPtr<MTL::RenderPipelineState> patternPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> linearGradientPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> dotGridPipelineState_;
+    NS::SharedPtr<MTL::RenderPipelineState> waveDotsPipelineState_;
     std::unordered_map<std::uint32_t, NS::SharedPtr<MTL::Texture>> textures_;
     struct CachedPath {
         bool fill;

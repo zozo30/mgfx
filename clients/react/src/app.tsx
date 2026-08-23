@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Circle, Column, Image, Path, Row, Stack, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Column, Image, Path, Row, Stack, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -25,27 +25,16 @@ export function DotGrid({ time }: { readonly time: number }) {
 
 export function WavePattern({ time }: { readonly time: number }) {
   return (
-    <Row style={{ preferredSize: { height: 70 }, padding: all(12), gap: 10,
-      cornerRadius: 14, clip: true,
+    <Box style={{ preferredSize: { height: 70 }, cornerRadius: 14,
       backgroundGradient: {
         start: rgba(0.055, 0.08, 0.16), end: rgba(0.12, 0.17, 0.34),
         direction: "diagonal",
       },
-      crossAxisAlignment: "center", mainAxisAlignment: "spaceBetween" }}>
-      {Array.from({ length: 24 }, (_, index) => {
-        const phase = time / 240 + index * 0.56;
-        const wave = (Math.sin(phase) + 1) / 2;
-        const size = 7 + wave * 23;
-        return <Circle key={`wave-${index}`} style={{
-          preferredSize: { width: size, height: size },
-          backgroundGradient: {
-            start: rgba(0.22 + wave * 0.34, 0.36, 1),
-            end: rgba(0.16, 1, 0.62 + wave * 0.2), direction: "diagonal",
-          },
-          borderWidth: 1, borderColor: rgba(0.72, 0.94, 1, 0.65),
-        }} />;
-      })}
-    </Row>
+      backgroundWaveDots: { count: 24, inset: 12, minimumRadius: 3.5, maximumRadius: 15,
+        phase: time / 240, frequency: 0.56, borderWidth: 1,
+        troughStartColor: rgba(0.22, 0.36, 1), troughEndColor: rgba(0.16, 1, 0.62),
+        crestStartColor: rgba(0.56, 0.36, 1), crestEndColor: rgba(0.16, 1, 0.82),
+        borderColor: rgba(0.72, 0.94, 1, 0.65) } }} />
   );
 }
 

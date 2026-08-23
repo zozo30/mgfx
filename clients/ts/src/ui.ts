@@ -23,6 +23,13 @@ export interface DotGridPattern {
   readonly borderWidth?: number; readonly fillColor: Color;
   readonly ringColor: Color; readonly highlightColor?: Color;
 }
+export interface WaveDotPattern {
+  readonly count: number; readonly inset?: number;
+  readonly minimumRadius: number; readonly maximumRadius: number;
+  readonly phase: number; readonly frequency: number; readonly borderWidth?: number;
+  readonly troughStartColor: Color; readonly troughEndColor: Color;
+  readonly crestStartColor: Color; readonly crestEndColor: Color; readonly borderColor: Color;
+}
 export interface ImagePaint {
   readonly textureId: number;
   readonly tint?: Color;
@@ -50,6 +57,7 @@ export interface Style {
   backgroundRadialGradient?: RadialGradient;
   backgroundPattern?: DiagonalStripePattern; flexGrow?: number;
   backgroundDotGrid?: DotGridPattern;
+  backgroundWaveDots?: WaveDotPattern;
   backgroundImage?: ImagePaint;
   mainAxisAlignment?: "start" | "center" | "end" | "spaceBetween";
   crossAxisAlignment?: "start" | "center" | "end" | "stretch";
@@ -519,6 +527,7 @@ class Node {
       paintImage(encoder, this.bounds, this.style.backgroundImage,
         this.style.cornerRadius ?? 0, viewport);
       paintDotGrid(encoder, this.bounds, this.style.backgroundDotGrid, viewport);
+      paintWaveDots(encoder, this.bounds, this.style.backgroundWaveDots, viewport);
       if (!combinedBorder) paintServerRoundedRect(encoder, this.bounds,
         this.style.cornerRadius ?? 0, undefined, this.style.borderWidth ?? 0,
         this.style.borderColor, viewport);
@@ -528,7 +537,7 @@ class Node {
         if (radial) paintRadialGradient(encoder, this.bounds, radial, 0, viewport);
         else if (gradient) paintLinearGradient(encoder, this.bounds, gradient, 0, viewport);
         else if (!this.style.backgroundImage && !this.style.backgroundPattern &&
-          !this.style.backgroundDotGrid) {
+          !this.style.backgroundDotGrid && !this.style.backgroundWaveDots) {
           paintServerRoundedRect(encoder, this.bounds, 0, background,
             this.style.borderWidth ?? 0, this.style.borderColor, viewport);
           combinedBorder = true;
@@ -537,6 +546,7 @@ class Node {
       }
       paintDiagonalStripes(encoder, this.bounds, this.style.backgroundPattern, viewport);
       paintDotGrid(encoder, this.bounds, this.style.backgroundDotGrid, viewport);
+      paintWaveDots(encoder, this.bounds, this.style.backgroundWaveDots, viewport);
       if (!combinedBorder) paintServerRoundedRect(encoder, this.bounds, 0, undefined,
         this.style.borderWidth ?? 0, this.style.borderColor, viewport);
     }
@@ -781,6 +791,18 @@ function paintDotGrid(encoder: FrameEncoder, bounds: Rect, pattern: DotGridPatte
     radius: pattern.radius ?? 4, borderWidth: pattern.borderWidth ?? 2,
     fillColor: pattern.fillColor, ringColor: pattern.ringColor,
     highlightColor: pattern.highlightColor ?? pattern.fillColor });
+}
+
+function paintWaveDots(encoder: FrameEncoder, bounds: Rect, pattern: WaveDotPattern | undefined,
+  viewport: Size): void {
+  if (!pattern || bounds.width <= 0 || bounds.height <= 0) return;
+  encoder.waveDots({ destination: normalizedRect(bounds, viewport), count: pattern.count,
+    inset: pattern.inset ?? 0, minimumRadius: pattern.minimumRadius,
+    maximumRadius: pattern.maximumRadius, phase: pattern.phase,
+    frequency: pattern.frequency, borderWidth: pattern.borderWidth ?? 0,
+    troughStartColor: pattern.troughStartColor, troughEndColor: pattern.troughEndColor,
+    crestStartColor: pattern.crestStartColor, crestEndColor: pattern.crestEndColor,
+    borderColor: pattern.borderColor });
 }
 
 export function constrain(size: Size, c: Constraints): Size {

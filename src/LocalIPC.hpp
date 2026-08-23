@@ -75,6 +75,7 @@ enum ServerCapability : std::uint32_t {
     linearGradients = 1U << 20U,
     imageSurfaces = 1U << 21U,
     dotGrids = 1U << 22U,
+    waveDots = 1U << 23U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };

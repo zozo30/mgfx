@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
 import { Button, Path, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
-import { DiagonalPattern, DotGrid } from "./app.js";
+import { DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
 import { AnimationProvider } from "./animation.js";
 
@@ -294,4 +294,20 @@ test("diagonal pattern animation advances from left to right", () => {
   const first = patternOffset();
   surface.render(<DiagonalPattern time={180} />);
   assert.ok(patternOffset() < first);
+});
+
+test("wave animation emits one server pattern instead of circle nodes", () => {
+  let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<WavePattern time={480} />);
+  surface.resize({ width: 1200, height: 70 });
+  let offset = 16, waveCommands = 0;
+  while (offset < frame.length) {
+    const opcode = frame.readUInt16LE(offset);
+    const payloadSize = frame.readUInt32LE(offset + 4);
+    if (opcode === 21) waveCommands += 1;
+    assert.notEqual(opcode, 16); // No individual DrawCircle records.
+    offset += 8 + payloadSize;
+  }
+  assert.equal(waveCommands, 1);
 });

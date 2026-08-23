@@ -321,7 +321,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::diagonalPatterns |
             mgfx::ipc::ServerCapability::linearGradients |
             mgfx::ipc::ServerCapability::imageSurfaces |
-            mgfx::ipc::ServerCapability::dotGrids;
+            mgfx::ipc::ServerCapability::dotGrids |
+            mgfx::ipc::ServerCapability::waveDots;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

@@ -58,6 +58,11 @@ int main() {
                          6.0F, 4.0F, 2.0F,
                          {0.4F, 0.9F, 0.6F, 1.0F}, {0.4F, 0.9F, 0.6F, 0.8F},
                          {0.8F, 1.0F, 0.9F, 1.0F}});
+    encoder.drawWaveDots({{-0.9F, 0.2F, 0.9F, -0.2F}, 24, 12.0F, 3.5F, 15.0F,
+                          1.25F, 0.56F, 1.0F,
+                          {0.22F, 0.36F, 1.0F, 1.0F}, {0.16F, 1.0F, 0.62F, 1.0F},
+                          {0.56F, 0.36F, 1.0F, 1.0F}, {0.16F, 1.0F, 0.82F, 1.0F},
+                          {0.72F, 0.94F, 1.0F, 0.65F}});
     encoder.drawImage({7, {-0.5F, 0.5F, 0.5F, -0.5F}, {0.0F, 0.0F, 1.0F, 1.0F},
                        {1.0F, 0.8F, 0.6F, 1.0F}});
     encoder.drawPath({12, true, true, gfx::FillRule::nonzero,
@@ -160,6 +165,13 @@ int main() {
         !nearlyEqual(grid.radius, 4.0F) ||
         !nearlyEqual(grid.highlightColor.green, 1.0F) || !decoder.next(command)) {
         return fail("Dot-grid decoding failed");
+    }
+    gfx::WaveDotsCommand wave{};
+    if (!gfx::decodeWaveDots(command, wave) || wave.count != 24 ||
+        !nearlyEqual(wave.minimumRadius, 3.5F) || !nearlyEqual(wave.phase, 1.25F) ||
+        !nearlyEqual(wave.frequency, 0.56F) ||
+        !nearlyEqual(wave.crestEndColor.blue, 0.82F) || !decoder.next(command)) {
+        return fail("Wave-dots decoding failed");
     }
     gfx::ImageCommand image{};
     if (!gfx::decodeImage(command, image) || image.textureId != 7 ||

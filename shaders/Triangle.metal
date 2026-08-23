@@ -410,3 +410,80 @@ fragment float4 dotGridFragmentMain(DotGridVertexOut in [[stage_in]]) {
     const float alpha = color.a * coverage;
     return float4(color.rgb * alpha, alpha);
 }
+
+struct WaveDotsVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    uint count;
+    float inset;
+    float minimumRadius;
+    float maximumRadius;
+    float phase;
+    float frequency;
+    float borderWidth;
+    packed_float4 troughStartColor;
+    packed_float4 troughEndColor;
+    packed_float4 crestStartColor;
+    packed_float4 crestEndColor;
+    packed_float4 borderColor;
+};
+
+struct WaveDotsVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    uint count [[flat]];
+    float inset;
+    float minimumRadius;
+    float maximumRadius;
+    float phase;
+    float frequency;
+    float borderWidth;
+    float4 troughStartColor;
+    float4 troughEndColor;
+    float4 crestStartColor;
+    float4 crestEndColor;
+    float4 borderColor;
+};
+
+vertex WaveDotsVertexOut waveDotsVertexMain(
+    const device WaveDotsVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const WaveDotsVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size, value.count,
+            value.inset, value.minimumRadius, value.maximumRadius, value.phase,
+            value.frequency, value.borderWidth, value.troughStartColor,
+            value.troughEndColor, value.crestStartColor, value.crestEndColor,
+            value.borderColor};
+}
+
+fragment float4 waveDotsFragmentMain(WaveDotsVertexOut in [[stage_in]]) {
+    const float availableWidth = in.size.x - in.inset * 2.0;
+    const float relativeX = in.local.x - in.inset;
+    if (relativeX < 0.0 || relativeX >= availableWidth) return float4(0.0);
+    const float cellWidth = availableWidth / float(in.count);
+    const uint index = min(uint(floor(relativeX / cellWidth)), in.count - 1u);
+    const float wave = (sin(in.phase + float(index) * in.frequency) + 1.0) * 0.5;
+    const float requestedRadius = mix(in.minimumRadius, in.maximumRadius, wave);
+    const float radius = min(requestedRadius,
+        min(cellWidth * 0.48, max(0.0, in.size.y * 0.5 - in.inset)));
+    const float2 center = float2(in.inset + (float(index) + 0.5) * cellWidth,
+                                 in.size.y * 0.5);
+    const float2 delta = in.local - center;
+    const float edge = length(delta) - radius;
+    const float aa = max(fwidth(edge), 0.75);
+    const float outerCoverage = 1.0 - smoothstep(0.0, aa, edge);
+    const float innerRadius = max(0.0, radius - in.borderWidth);
+    const float innerEdge = length(delta) - innerRadius;
+    const float innerCoverage = in.borderWidth > 0.0
+        ? 1.0 - smoothstep(0.0, aa, innerEdge) : outerCoverage;
+    const float amount = clamp(0.5 + (delta.x + delta.y) / max(radius * 4.0, 0.001), 0.0, 1.0);
+    const float4 startColor = mix(in.troughStartColor, in.crestStartColor, wave);
+    const float4 endColor = mix(in.troughEndColor, in.crestEndColor, wave);
+    const float4 fillColor = mix(startColor, endColor, amount);
+    const float4 fill = float4(fillColor.rgb * fillColor.a, fillColor.a) * innerCoverage;
+    const float borderCoverage = max(0.0, outerCoverage - innerCoverage);
+    const float4 border = float4(in.borderColor.rgb * in.borderColor.a,
+                                 in.borderColor.a) * borderCoverage;
+    return fill + border;
+}

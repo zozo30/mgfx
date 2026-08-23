@@ -100,6 +100,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("linearGradientFragmentMain")));
     auto dotGridVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("dotGridVertexMain")));
     auto dotGridFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("dotGridFragmentMain")));
+    auto waveDotsVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("waveDotsVertexMain")));
+    auto waveDotsFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("waveDotsFragmentMain")));
     if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !imageSurfaceVertexFunction || !imageSurfaceFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
@@ -108,7 +110,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         !circleVertexFunction || !circleFragmentFunction ||
         !patternVertexFunction || !patternFragmentFunction ||
         !linearGradientVertexFunction || !linearGradientFragmentFunction ||
-        !dotGridVertexFunction || !dotGridFragmentFunction) {
+        !dotGridVertexFunction || !dotGridFragmentFunction ||
+        !waveDotsVertexFunction || !waveDotsFragmentFunction) {
         throw std::runtime_error("Could not find the triangle shader functions");
     }
 
@@ -279,6 +282,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(dotGridDescriptor.get(), &error));
     if (!dotGridPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the dot-grid pipeline", error));
+    }
+
+    auto waveDotsDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    waveDotsDescriptor->setVertexFunction(waveDotsVertexFunction.get());
+    waveDotsDescriptor->setFragmentFunction(waveDotsFragmentFunction.get());
+    waveDotsDescriptor->setRasterSampleCount(sampleCount);
+    auto* waveDotsColor = waveDotsDescriptor->colorAttachments()->object(0);
+    waveDotsColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    waveDotsColor->setBlendingEnabled(true);
+    waveDotsColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    waveDotsColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    waveDotsColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    waveDotsColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    waveDotsPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(waveDotsDescriptor.get(), &error));
+    if (!waveDotsPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the wave-dots pipeline", error));
     }
 }
 
@@ -859,6 +879,69 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(dotGridPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawWaveDots) {
+            gfx::WaveDotsCommand wave{};
+            if (!gfx::decodeWaveDots(command, wave) || wave.count == 0 || wave.count > 256 ||
+                !std::isfinite(wave.inset) || !std::isfinite(wave.minimumRadius) ||
+                !std::isfinite(wave.maximumRadius) || !std::isfinite(wave.phase) ||
+                !std::isfinite(wave.frequency) || !std::isfinite(wave.borderWidth) ||
+                wave.inset < 0.0F || wave.minimumRadius <= 0.0F ||
+                wave.maximumRadius < wave.minimumRadius || wave.maximumRadius > 4096.0F ||
+                wave.borderWidth < 0.0F || wave.borderWidth > 1024.0F) {
+                throw std::runtime_error("Malformed wave-dots command");
+            }
+            if (clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (wave.destination.right - wave.destination.left) * drawableWidth * 0.5F,
+                (wave.destination.top - wave.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= wave.inset * 2.0F || size[1] <= wave.inset * 2.0F) continue;
+            struct WaveDotsVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                std::uint32_t count;
+                float inset;
+                float minimumRadius;
+                float maximumRadius;
+                float phase;
+                float frequency;
+                float borderWidth;
+                std::array<float, 4> troughStartColor;
+                std::array<float, 4> troughEndColor;
+                std::array<float, 4> crestStartColor;
+                std::array<float, 4> crestEndColor;
+                std::array<float, 4> borderColor;
+            };
+            const float opacity = opacityStack.back();
+            const auto color = [opacity](gfx::Color value) {
+                return std::array<float, 4>{value.red, value.green, value.blue,
+                                            value.alpha * opacity};
+            };
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return WaveDotsVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, wave.count, wave.inset, wave.minimumRadius,
+                    wave.maximumRadius, wave.phase, wave.frequency, wave.borderWidth,
+                    color(wave.troughStartColor), color(wave.troughEndColor),
+                    color(wave.crestStartColor), color(wave.crestEndColor),
+                    color(wave.borderColor)};
+            };
+            const WaveDotsVertex vertices[] = {
+                vertex(wave.destination.left, wave.destination.top, 0.0F, 0.0F),
+                vertex(wave.destination.left, wave.destination.bottom, 0.0F, size[1]),
+                vertex(wave.destination.right, wave.destination.bottom, size[0], size[1]),
+                vertex(wave.destination.left, wave.destination.top, 0.0F, 0.0F),
+                vertex(wave.destination.right, wave.destination.bottom, size[0], size[1]),
+                vertex(wave.destination.right, wave.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(waveDotsPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

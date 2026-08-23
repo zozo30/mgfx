@@ -62,6 +62,7 @@ export enum ServerCapability {
   LinearGradients = 1 << 20,
   ImageSurfaces = 1 << 21,
   DotGrids = 1 << 22,
+  WaveDots = 1 << 23,
 }
 export interface ServerHello {
   readonly version: number;
@@ -162,6 +163,13 @@ export interface DotGridPaint {
   readonly filledMask: number; readonly activeIndex: number;
   readonly inset: number; readonly radius: number; readonly borderWidth: number;
   readonly fillColor: Color; readonly ringColor: Color; readonly highlightColor: Color;
+}
+export interface WaveDotsPaint {
+  readonly destination: ClipRect; readonly count: number; readonly inset: number;
+  readonly minimumRadius: number; readonly maximumRadius: number;
+  readonly phase: number; readonly frequency: number; readonly borderWidth: number;
+  readonly troughStartColor: Color; readonly troughEndColor: Color;
+  readonly crestStartColor: Color; readonly crestEndColor: Color; readonly borderColor: Color;
 }
 
 export type PathSegment =
@@ -785,6 +793,29 @@ export class FrameEncoder {
       value.highlightColor.blue, value.highlightColor.alpha]
       .forEach((item, index) => payload.writeFloatLE(item, 32 + index * 4));
     this.command(20, payload);
+  }
+
+  waveDots(value: WaveDotsPaint): void {
+    const colors = [value.troughStartColor, value.troughEndColor,
+      value.crestStartColor, value.crestEndColor, value.borderColor];
+    const floats = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.inset, value.minimumRadius, value.maximumRadius,
+      value.phase, value.frequency, value.borderWidth,
+      ...colors.flatMap((color) => [color.red, color.green, color.blue, color.alpha])];
+    if (!Number.isInteger(value.count) || value.count <= 0 || value.count > 256 ||
+        floats.some((item) => !Number.isFinite(item)) || value.inset < 0 ||
+        value.minimumRadius <= 0 || value.maximumRadius < value.minimumRadius ||
+        value.maximumRadius > 4096 || value.borderWidth < 0 || value.borderWidth > 1024)
+      throw new RangeError("Wave-dot values are outside supported bounds");
+    const payload = Buffer.alloc(128);
+    [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom].forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    payload.writeUInt32LE(value.count, 16);
+    [value.inset, value.minimumRadius, value.maximumRadius, value.phase,
+      value.frequency, value.borderWidth,
+      ...colors.flatMap((color) => [color.red, color.green, color.blue, color.alpha])]
+      .forEach((item, index) => payload.writeFloatLE(item, 24 + index * 4));
+    this.command(21, payload);
   }
 
   finish(): Buffer {

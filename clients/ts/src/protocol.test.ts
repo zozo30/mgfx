@@ -303,6 +303,31 @@ test("dot grids encode all cells as one fixed pattern command", () => {
     highlightColor: { red: 1, green: 1, blue: 1, alpha: 1 } }));
 });
 
+test("animated wave dots remain one fixed server command", () => {
+  const frame = new FrameEncoder();
+  frame.waveDots({ destination: { left: -1, top: 1, right: 1, bottom: -1 }, count: 24,
+    inset: 12, minimumRadius: 3.5, maximumRadius: 15, phase: 1.25,
+    frequency: 0.56, borderWidth: 1,
+    troughStartColor: { red: 0.22, green: 0.36, blue: 1, alpha: 1 },
+    troughEndColor: { red: 0.16, green: 1, blue: 0.62, alpha: 1 },
+    crestStartColor: { red: 0.56, green: 0.36, blue: 1, alpha: 1 },
+    crestEndColor: { red: 0.16, green: 1, blue: 0.82, alpha: 1 },
+    borderColor: { red: 0.72, green: 0.94, blue: 1, alpha: 0.65 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 21);
+  assert.equal(bytes.readUInt32LE(20), 128);
+  assert.equal(bytes.readUInt32LE(40), 24);
+  assert.ok(Math.abs(bytes.readFloatLE(60) - 1.25) < 0.00001);
+  assert.throws(() => frame.waveDots({ destination: { left: 0, top: 1, right: 1, bottom: 0 },
+    count: 0, inset: 0, minimumRadius: 1, maximumRadius: 2, phase: 0, frequency: 1,
+    borderWidth: 0, troughStartColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+    troughEndColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+    crestStartColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+    crestEndColor: { red: 0, green: 0, blue: 0, alpha: 1 },
+    borderColor: { red: 0, green: 0, blue: 0, alpha: 1 } }));
+});
+
 test("canonical paths upload once and frames reference server-side vector geometry", () => {
   const upload = encodePathCreate(12, [
     { verb: "move", x: 2, y: 12 },
