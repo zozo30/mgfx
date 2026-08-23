@@ -145,6 +145,8 @@ paint, and transforms are preserved, while unsafe external or cyclic references
 are rejected. Symbol instances honor numeric `width`/`height`, `viewBox`, aligned
 `meet`, clipped `slice`, and `preserveAspectRatio="none"`. Axis-aligned slice clips
 lower to balanced display-list clip commands around the persistent path draw.
+Local `clip-path="url(#...)"` references support one numeric user-space `<rect>`;
+group transforms and nested clip intersections remain native display-list state.
 Direct React `Path` components also accept `conicGradient` and
 `strokeConicGradient`. Two through eight angular stops, a source-space center,
 and a radian rotation lower to one native path command; rotation animation does

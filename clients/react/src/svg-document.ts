@@ -100,6 +100,12 @@ interface RadialGradientDefinition {
   readonly spread: "pad" | "repeat" | "reflect";
 }
 
+interface ClipDefinition {
+  readonly rect?: Rect;
+  readonly transform?: Matrix;
+  readonly error?: string;
+}
+
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 const white: Color = { red: 1, green: 1, blue: 1, alpha: 1 };
 const primitiveTags = new Set(["path", "line", "polyline", "polygon", "rect", "circle", "ellipse"]);
@@ -224,6 +230,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
   const viewBox = parseViewBox(rootAttributes);
   const gradients = parseLinearGradients(expandedSource, defaultColor);
   const radialGradients = parseRadialGradients(expandedSource, defaultColor);
+  const clipPaths = parseClipPaths(expandedSource);
   const initial: PaintState = { fill: { red: 0, green: 0, blue: 0, alpha: 1 },
     strokeWidth: 1, opacity: 1, fillOpacity: 1, strokeOpacity: 1,
     fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
@@ -237,15 +244,16 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     const name = token.match(/^<\/?\s*([\w:-]+)/)?.[1]?.toLowerCase();
     if (!name) continue;
     if (closing) {
-      if (name === "defs" || name === "symbol") hiddenDepth = Math.max(0, hiddenDepth - 1);
+      if (name === "defs" || name === "symbol" || name === "clippath")
+        hiddenDepth = Math.max(0, hiddenDepth - 1);
       if ((name === "svg" || name === "g") && stack.length > 1) stack.pop();
       continue;
     }
     const attributeSource = token.replace(/^<\s*[\w:-]+|\/?\s*>$/g, "");
     const attributes = withInlineStyle(svgAttributes(attributeSource));
     const parent = stack[stack.length - 1]!;
-    const state = inherit(parent, attributes);
-    if (name === "defs" || name === "symbol") {
+    const state = inherit(parent, attributes, clipPaths);
+    if (name === "defs" || name === "symbol" || name === "clippath") {
       if (!/\/\s*>$/.test(token)) hiddenDepth += 1;
       continue;
     }
@@ -309,7 +317,63 @@ function parseViewBox(attributes: Readonly<Record<string, string>>): Rect {
   throw new Error("SVG requires a positive viewBox or numeric width and height");
 }
 
-function inherit(parent: PaintState, attributes: Readonly<Record<string, string>>): PaintState {
+function parseClipPaths(source: string): ReadonlyMap<string, ClipDefinition> {
+  const definitions = new Map<string, ClipDefinition>();
+  for (const match of source.matchAll(/<clipPath\b([^>]*)>([\s\S]*?)<\/clipPath\s*>/gi)) {
+    const attributes = withInlineStyle(svgAttributes(match[1]!));
+    const id = attributes.id?.trim();
+    if (!id) continue;
+    if (definitions.has(id)) throw new Error(`SVG contains duplicate clip path #${id}`);
+    if ((attributes.clipPathUnits ?? "userSpaceOnUse") !== "userSpaceOnUse") {
+      definitions.set(id, { error: `SVG clip path #${id} requires userSpaceOnUse units` });
+      continue;
+    }
+    const body = match[2]!;
+    const rects = [...body.matchAll(/<rect\b([^>]*?)(?:\/\s*>|>\s*<\/rect\s*>)/gi)];
+    const remainder = body.replace(/<rect\b[^>]*?(?:\/\s*>|>\s*<\/rect\s*>)/gi, "").trim();
+    if (rects.length !== 1 || remainder.length > 0) {
+      definitions.set(id, { error: `SVG clip path #${id} requires exactly one rect` });
+      continue;
+    }
+    const rectAttributes = withInlineStyle(svgAttributes(rects[0]![1]!));
+    const values = [Number(rectAttributes.x ?? 0), Number(rectAttributes.y ?? 0),
+      Number(rectAttributes.width), Number(rectAttributes.height)];
+    if (!values.every(Number.isFinite) || values[2]! <= 0 || values[3]! <= 0) {
+      definitions.set(id, { error: `SVG clip path #${id} requires a positive numeric rect` });
+      continue;
+    }
+    if (Number(rectAttributes.rx ?? 0) > 0 || Number(rectAttributes.ry ?? 0) > 0) {
+      definitions.set(id, { error: `SVG clip path #${id} requires polygon clipping for rounded rects` });
+      continue;
+    }
+    definitions.set(id, { rect: { x: values[0]!, y: values[1]!,
+      width: values[2]!, height: values[3]! },
+      transform: multiply(parseTransform(attributes.transform),
+        parseTransform(rectAttributes.transform)) });
+  }
+  return definitions;
+}
+
+function intersectClip(left: Rect | undefined, right: Rect): Rect {
+  if (!left) return right;
+  const x = Math.max(left.x, right.x), y = Math.max(left.y, right.y);
+  const farX = Math.min(left.x + left.width, right.x + right.width);
+  const farY = Math.min(left.y + left.height, right.y + right.height);
+  return { x, y, width: Math.max(0, farX - x), height: Math.max(0, farY - y) };
+}
+
+function transformRectClip(rect: Rect, transform: Matrix, unsupportedMessage: string): Rect {
+  if (Math.abs(transform.b) > 1e-9 || Math.abs(transform.c) > 1e-9)
+    throw new Error(unsupportedMessage);
+  const first = transformPoint(transform, { x: rect.x, y: rect.y });
+  const second = transformPoint(transform,
+    { x: rect.x + rect.width, y: rect.y + rect.height });
+  return { x: Math.min(first.x, second.x), y: Math.min(first.y, second.y),
+    width: Math.abs(second.x - first.x), height: Math.abs(second.y - first.y) };
+}
+
+function inherit(parent: PaintState, attributes: Readonly<Record<string, string>>,
+  clipPaths: ReadonlyMap<string, ClipDefinition>): PaintState {
   const currentColor = parseColor(attributes.color, parent.currentColor) ?? parent.currentColor;
   const gradientId = attributes.fill?.trim().match(/^url\(\s*#([^\s)]+)\s*\)$/i)?.[1];
   const fill = attributes.fill === undefined ? parent.fill : gradientId ? undefined :
@@ -347,19 +411,21 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     const values = internalClip.trim().split(/[\s,]+/).map(Number);
     if (values.length !== 4 || !values.every(Number.isFinite) || values[2]! <= 0 || values[3]! <= 0)
       throw new Error("Invalid internal SVG viewport clip");
-    if (Math.abs(transform.b) > 1e-9 || Math.abs(transform.c) > 1e-9)
-      throw new Error("Rotated or skewed SVG symbol slice requires polygon clipping");
-    const first = transformPoint(transform, { x: values[0]!, y: values[1]! });
-    const second = transformPoint(transform,
-      { x: values[0]! + values[2]!, y: values[1]! + values[3]! });
-    const next = { x: Math.min(first.x, second.x), y: Math.min(first.y, second.y),
-      width: Math.abs(second.x - first.x), height: Math.abs(second.y - first.y) };
-    if (clip) {
-      const x = Math.max(clip.x, next.x), y = Math.max(clip.y, next.y);
-      const right = Math.min(clip.x + clip.width, next.x + next.width);
-      const bottom = Math.min(clip.y + clip.height, next.y + next.height);
-      clip = { x, y, width: Math.max(0, right - x), height: Math.max(0, bottom - y) };
-    } else clip = next;
+    clip = intersectClip(clip, transformRectClip(
+      { x: values[0]!, y: values[1]!, width: values[2]!, height: values[3]! }, transform,
+      "Rotated or skewed SVG symbol slice requires polygon clipping"));
+  }
+  const clipPathValue = attributes["clip-path"]?.trim();
+  if (clipPathValue && clipPathValue !== "none") {
+    const reference = clipPathValue.match(/^url\(\s*#([^\s)]+)\s*\)$/i)?.[1];
+    if (!reference) throw new Error("SVG clip-path requires a local fragment reference");
+    const definition = clipPaths.get(reference);
+    if (!definition) throw new Error(`SVG clip-path references missing #${reference}`);
+    if (definition.error) throw new Error(definition.error);
+    if (!definition.rect) throw new Error(`SVG clip path #${reference} has no rectangle`);
+    clip = intersectClip(clip, transformRectClip(definition.rect,
+      multiply(transform, definition.transform ?? identity),
+      `Rotated or skewed SVG clip path #${reference} requires polygon clipping`));
   }
   return { ...(fill ? { fill } : {}), ...(fillGradientId ? { fillGradientId } : {}),
     ...(stroke ? { stroke } : {}),

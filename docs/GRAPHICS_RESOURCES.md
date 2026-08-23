@@ -73,6 +73,9 @@ or expansion-bomb references are rejected. Symbol `viewBox` coordinates map to
 numeric instance dimensions with aligned `meet`, clipped `slice`, or nonuniform
 `none` scaling. Slice adds only balanced display-list clip commands around the
 cached path reference; rotated and skewed viewport clips await polygon clipping.
+Local `<clipPath>` references containing one numeric `userSpaceOnUse` `<rect>` use
+that same source-space clip field. Nested group clips intersect before the frame is
+encoded; rounded, object-bounding-box, rotated, and skewed clips remain explicit fallbacks.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
 indices. `MeshCreate` uploads and validates them once; `DrawMesh` references the

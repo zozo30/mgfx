@@ -170,6 +170,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     <symbol id="signalGlyph" viewBox="0 0 53 24">
       <polyline points="0,21 11,3 21,21 32,3 43,21 53,3"/>
     </symbol>
+    <clipPath id="contentWindow"><rect x="3" y="3" width="146" height="58"/></clipPath>
           <radialGradient id="orb" r="25%" fx="38%" fy="35%" fr="6%" spreadMethod="reflect">
             <stop offset="0" stop-color="#d8fff0"/>
             <stop offset="0.48" stop-color="#58e6b5"/>
@@ -178,6 +179,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
   <g transform="translate(4 4)">
     <rect x="1" y="1" width="150" height="62" rx="12" fill="url(#panel)"
       stroke="currentColor" stroke-width="2"/>
+    <g clip-path="url(#contentWindow)">
     <circle cx="34" cy="32" r="17" fill="url(#orb)" stroke="url(#orb)" stroke-width="3"
       stroke-dasharray="5 3" stroke-dashoffset="1"/>
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
@@ -185,6 +187,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       preserveAspectRatio="xMidYMid slice"
       stroke="url(#signal)" stroke-width="4" stroke-dasharray="7 4 2 4" stroke-dashoffset="2"
       stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="6"/>
+    </g>
   </g>
 </svg>`;
 

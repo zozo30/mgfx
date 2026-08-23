@@ -63,8 +63,10 @@ frontend into independently transformed path instances; external, missing, and
 cyclic references remain rejected. Symbol `viewBox` coordinates map into numeric
 instance `width` and `height` using aligned `meet`, clipped `slice`, or
 `preserveAspectRatio="none"` behavior.
+Local axis-aligned `<clipPath>` definitions containing one numeric, user-space
+`<rect>` also lower to the same balanced clip stack; nested clips are intersected.
 Frames then contain only `DrawPath` references at the component's current layout
-size. Documents using more complex gradients, masks, text, embedded images, or external content
+size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.
 
 React can also submit indexed normalized `Mesh` geometry directly. Positions,

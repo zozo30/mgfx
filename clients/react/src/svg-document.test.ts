@@ -85,6 +85,29 @@ test("SVG symbol instances reject invalid and non-rectangular viewport clips", (
   /reserved MGFX attribute/);
 });
 
+test("SVG rectangular clip paths transform and intersect through nested groups", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 60 40"><defs>
+    <clipPath id="outer"><rect x="5" y="4" width="30" height="20"/></clipPath>
+    <clipPath id="inner" transform="translate(2 3)"><rect x="10" width="20" height="30"/></clipPath>
+    </defs><g transform="translate(3 2)" clip-path="url(#outer)">
+      <rect width="50" height="35" clip-path="url(#inner)" fill="#20d890"/>
+    </g></svg>`);
+  assert.equal(document.layers.length, 1);
+  assert.deepEqual(document.layers[0]?.clip, { x: 15, y: 6, width: 20, height: 20 });
+});
+
+test("SVG clip paths reject missing, external, and non-rectangular definitions", () => {
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><rect width="10" height="10" clip-path="url(#missing)"/></svg>`),
+  /missing #missing/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 10 10"><rect width="10" height="10" clip-path="url(other.svg#clip)"/></svg>`),
+  /local fragment/);
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 10 10"><defs>
+    <clipPath id="round"><rect width="8" height="8" rx="2"/></clipPath></defs>
+    <rect width="10" height="10" clip-path="url(#round)"/></svg>`), /rounded rects/);
+});
+
 test("SVG local use rejects unresolved and cyclic references", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><use href="#missing"/></svg>`), /missing #missing/);

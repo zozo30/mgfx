@@ -128,15 +128,16 @@ test("React Svg composes a complete document from persistent server paths", () =
   assert.equal(frame.readFloatLE(extendedPathOffset + 16), 2);
 });
 
-test("React Svg clips a sliced symbol around its persistent path draw", () => {
+test("React Svg intersects a sliced symbol with a local clip path around its path draw", () => {
   let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   const surface = new ReactSurface((value) => { frame = value; }, undefined, {
     createPath: () => {},
   });
   surface.render(<Svg source={`<svg viewBox="0 0 100 50"><defs>
     <symbol id="wide" viewBox="0 0 20 10"><rect width="20" height="10"/></symbol>
-    </defs><use href="#wide" x="10" y="5" width="20" height="20"
-      preserveAspectRatio="xMidYMid slice" fill="#20d890"/></svg>`}
+    <clipPath id="window"><rect x="12" y="7" width="16" height="16"/></clipPath>
+    </defs><g clip-path="url(#window)"><use href="#wide" x="10" y="5" width="20" height="20"
+      preserveAspectRatio="xMidYMid slice" fill="#20d890"/></g></svg>`}
     style={{ preferredSize: { width: 200, height: 100 } }} />);
   surface.resize({ width: 200, height: 100 });
   const commands: { opcode: number; offset: number }[] = [];
@@ -146,10 +147,10 @@ test("React Svg clips a sliced symbol around its persistent path draw", () => {
   }
   assert.deepEqual(commands.map(({ opcode }) => opcode), [1, 4, 7, 5, 3]);
   const clipOffset = commands[1]!.offset + 8;
-  assert.ok(Math.abs(frame.readFloatLE(clipOffset) - 0.1) < 1e-6);
-  assert.ok(Math.abs(frame.readFloatLE(clipOffset + 4) - 0.1) < 1e-6);
-  assert.ok(Math.abs(frame.readFloatLE(clipOffset + 8) - 0.3) < 1e-6);
-  assert.ok(Math.abs(frame.readFloatLE(clipOffset + 12) - 0.5) < 1e-6);
+  assert.ok(Math.abs(frame.readFloatLE(clipOffset) - 0.12) < 1e-6);
+  assert.ok(Math.abs(frame.readFloatLE(clipOffset + 4) - 0.14) < 1e-6);
+  assert.ok(Math.abs(frame.readFloatLE(clipOffset + 8) - 0.28) < 1e-6);
+  assert.ok(Math.abs(frame.readFloatLE(clipOffset + 12) - 0.46) < 1e-6);
 });
 
 test("React Mesh uploads indexed geometry once and draws its resource ID", () => {
