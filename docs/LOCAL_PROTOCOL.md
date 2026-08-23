@@ -112,6 +112,7 @@ Custom path miter limits are advertised by `1 << 39`.
 Arbitrary path dash arrays are advertised by `1 << 40`.
 Multi-stop path gradients are advertised by `1 << 41`.
 Path-gradient repeat and reflect spread modes are advertised by `1 << 42`.
+Two-stop radial path gradients are advertised by `1 << 43`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -264,3 +265,9 @@ or reflect (`2`). Dash lengths follow, then each gradient stop as `f32 offset` p
 Each gradient supports 2 through 8 ordered stops in `[0,1]`; at least one side
 must contain more than two or request a non-pad spread. Capability bit 41 covers
 multi-stop paint; bit 42 is required for repeat or reflect.
+
+MGFX opcode `32` (`DrawRadialPath`) preserves the 128-byte `DrawPath` base and
+appends 14 `f32` values: source-space center, two source-space radius vectors,
+inner RGBA, and outer RGBA. Its fixed payload is 184 bytes. The radius-vector
+matrix must be finite and invertible. The current command represents a centered,
+two-stop, pad-spread radial fill; capability bit 43 is required.

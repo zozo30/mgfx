@@ -104,8 +104,8 @@ instead of intrinsic host elements:
   maximum-length handling
 - `Mesh` for explicit application-owned indexed geometry and `Path` for SVG
   path data lowered to persistent canonical server resources
-- `Svg` for bounded multi-layer vector documents, including 2–8 stop linear gradients
-  and local gradient-definition inheritance
+- `Svg` for bounded multi-layer vector documents, including 2–8 stop linear gradients,
+  local gradient-definition inheritance, and centered two-stop radial fills
 
 `src/navigation.tsx` provides an in-memory history `Router`, `useRouter()` with
 push/replace/back operations, and a depth-aware `Dialog`. Dialogs use absolute
@@ -126,6 +126,10 @@ Multi-stop gradients stay native: the protocol carries ordered colors and the
 graphics server splits cached triangles at stop boundaries for exact interpolation.
 SVG `spreadMethod="repeat"` and `"reflect"` use the same server path, including
 hard cycle seams without client-generated triangles.
+Centered two-stop SVG radial fills with `pad` spread also stay native. React sends
+the center and transformed elliptical basis; Metal evaluates radial distance per
+fragment. Offset focal points, extra radial stops, and repeating radial spread use
+the existing raster fallback.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

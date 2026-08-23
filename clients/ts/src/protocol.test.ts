@@ -40,7 +40,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.CustomPathMiterLimits |
     ExtendedServerCapability.ArbitraryPathDashArrays |
     ExtendedServerCapability.MultiStopPathGradients |
-    ExtendedServerCapability.PathGradientSpreadModes;
+    ExtendedServerCapability.PathGradientSpreadModes |
+    ExtendedServerCapability.RadialPathGradients;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -453,6 +454,23 @@ test("canonical paths upload once and frames reference server-side vector geomet
   assert.deepEqual([0, 1, 2, 3].map((index) => bytes.readFloatLE(24 + 192 + index * 4)),
     [7, 4, 2, 4]);
   assert.equal(bytes.readFloatLE(24 + 208 + 20), 0.5);
+});
+
+test("radial path paint carries an affine source-space basis without client geometry", () => {
+  const frame = new FrameEncoder();
+  frame.path(9, { left: 0, top: 1, right: 1, bottom: 0 },
+    { x: 0, y: 0, width: 40, height: 20 }, { fillRadialGradient: {
+      center: { x: 20, y: 10 }, axisX: { x: 20, y: 0 }, axisY: { x: 0, y: 10 },
+      innerColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+      outerColor: { red: 0.1, green: 0.8, blue: 0.5, alpha: 1 },
+    } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 32);
+  assert.equal(bytes.readUInt32LE(20), 184);
+  assert.equal(bytes.readUInt8(28), 17);
+  assert.equal(bytes.readFloatLE(24 + 128), 20);
+  assert.equal(bytes.readFloatLE(24 + 148), 10);
 });
 
 test("indexed meshes upload once and frames reference their resource", () => {

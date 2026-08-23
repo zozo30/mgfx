@@ -23,6 +23,45 @@ fragment float4 fragmentMain(VertexOut in [[stage_in]]) {
     return in.color;
 }
 
+struct RadialPathVertex {
+    packed_float2 position;
+    packed_float2 source;
+    packed_float2 center;
+    packed_float2 axisX;
+    packed_float2 axisY;
+    packed_float4 innerColor;
+    packed_float4 outerColor;
+};
+
+struct RadialPathVertexOut {
+    float4 position [[position]];
+    float2 source;
+    float2 center;
+    float2 axisX;
+    float2 axisY;
+    float4 innerColor;
+    float4 outerColor;
+};
+
+vertex RadialPathVertexOut radialPathVertexMain(
+    const device RadialPathVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const RadialPathVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.source, value.center,
+            value.axisX, value.axisY, value.innerColor, value.outerColor};
+}
+
+fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]]) {
+    const float determinant = in.axisX.x * in.axisY.y - in.axisX.y * in.axisY.x;
+    const float2 delta = in.source - in.center;
+    const float2 radial = abs(determinant) > 0.000001
+        ? float2((delta.x * in.axisY.y - delta.y * in.axisY.x) / determinant,
+                 (in.axisX.x * delta.y - in.axisX.y * delta.x) / determinant)
+        : float2(1.0);
+    const float amount = clamp(length(radial), 0.0, 1.0);
+    const float4 color = mix(in.innerColor, in.outerColor, amount);
+    return float4(color.rgb * color.a, color.a);
+}
+
 struct ImageVertex {
     packed_float2 position;
     packed_float2 uv;

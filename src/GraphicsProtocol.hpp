@@ -42,6 +42,7 @@ enum class Opcode : std::uint16_t {
     drawStyledPath = 29,
     drawDashArrayPath = 30,
     drawMultiGradientPath = 31,
+    drawRadialPath = 32,
 };
 
 enum class Primitive : std::uint8_t {
@@ -270,6 +271,13 @@ struct PathCommand {
     float dashOffset = 0.0F;
     float miterLimit = 4.0F;
     std::vector<float> dashPattern;
+    struct RadialGradient {
+        float centerX, centerY;
+        float axisXX, axisXY, axisYX, axisYY;
+        Color innerColor, outerColor;
+    };
+    bool fillRadialGradient = false;
+    RadialGradient radialGradient{};
 };
 
 enum class FontFamily : std::uint8_t {

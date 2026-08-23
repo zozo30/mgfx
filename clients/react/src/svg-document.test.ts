@@ -81,6 +81,19 @@ test("SVG linear gradients inherit stops and geometry through local references",
     </defs><rect width="10" height="10" fill="url(#a)"/></svg>`), /reference cycle/);
 });
 
+test("SVG centered radial gradients lower to source-space basis paint", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 60 40"><defs>
+    <radialGradient id="orb" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#20d890"/>
+    </radialGradient></defs><ellipse cx="30" cy="20" rx="20" ry="10" fill="url(#orb)"/>
+  </svg>`);
+  const radial = document.layers[0]?.fillRadialGradient;
+  assert.deepEqual(radial?.center, { x: 30, y: 20 });
+  assert.ok(Math.abs((radial?.axisX.x ?? 0) - 20) < 0.001);
+  assert.ok(Math.abs((radial?.axisY.y ?? 0) - 10) < 0.001);
+  assert.equal(document.layers[0]?.fillGradient, undefined);
+});
+
 test("SVG vector lowering reports unresolved gradient paint", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z" fill="url(#missing)"/></svg>`),

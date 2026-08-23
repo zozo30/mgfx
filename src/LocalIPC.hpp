@@ -101,6 +101,7 @@ enum ServerCapability : std::uint64_t {
     arbitraryPathDashArrays = 1ULL << 40U,
     multiStopPathGradients = 1ULL << 41U,
     pathGradientSpreadModes = 1ULL << 42U,
+    radialPathGradients = 1ULL << 43U,
 };
 
 enum class ResourceKind : std::uint8_t {

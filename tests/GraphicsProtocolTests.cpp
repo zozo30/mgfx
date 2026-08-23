@@ -91,6 +91,16 @@ int main() {
                       {1.0F, 0.2F, 0.1F, 1.0F}, {1.0F, 0.9F, 0.2F, 1.0F}, {},
                       gfx::PathGradient::Spread::pad},
                       0.0F, 0.0F, -2.0F, 6.0F, {7.0F, 4.0F, 2.0F, 4.0F}});
+    gfx::PathCommand radialPath{};
+    radialPath.pathId = 12;
+    radialPath.fill = true;
+    radialPath.fillRadialGradient = true;
+    radialPath.tolerance = 0.25F;
+    radialPath.destination = {-0.4F, 0.4F, 0.4F, -0.4F};
+    radialPath.viewBox = {0.0F, 0.0F, 24.0F, 24.0F};
+    radialPath.radialGradient = {12.0F, 12.0F, 10.0F, 0.0F, 0.0F, 8.0F,
+        {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.8F, 0.5F, 1.0F}};
+    encoder.drawPath(radialPath);
     encoder.drawText({gfx::FontFamily::systemRounded, gfx::FontWeight::semibold,
                       gfx::FontStyle::italic,
                       0.08F,
@@ -252,6 +262,14 @@ int main() {
         path.dashPattern != std::vector<float>({7.0F, 4.0F, 2.0F, 4.0F}) ||
         !decoder.next(command)) {
         return fail("Path decoding failed");
+    }
+    gfx::PathCommand radialPathDecoded{};
+    if (!gfx::decodePath(command, radialPathDecoded) ||
+        !radialPathDecoded.fillRadialGradient ||
+        !nearlyEqual(radialPathDecoded.radialGradient.centerX, 12.0F) ||
+        !nearlyEqual(radialPathDecoded.radialGradient.axisYY, 8.0F) ||
+        !decoder.next(command)) {
+        return fail("Radial path decoding failed");
     }
     gfx::TextCommand text{};
     if (!gfx::decodeText(command, text) || text.family != gfx::FontFamily::systemRounded ||

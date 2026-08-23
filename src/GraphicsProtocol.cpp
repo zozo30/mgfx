@@ -343,18 +343,20 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         path.strokeGradientPaint.stops.size() > 2 ||
         path.gradient.spread != PathGradient::Spread::pad ||
         path.strokeGradientPaint.spread != PathGradient::Spread::pad;
+    const bool radialGradient = path.fillRadialGradient;
     const std::size_t multiDashCount = dashArray ? path.dashPattern.size() : dashed ? 2U : 0U;
     const std::uint32_t multiSize = static_cast<std::uint32_t>(192 + multiDashCount * 4 +
         (path.gradient.stops.size() + path.strokeGradientPaint.stops.size()) * 20);
-    beginCommand(multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
+    beginCommand(radialGradient ? Opcode::drawRadialPath : multiGradient ? Opcode::drawMultiGradientPath : dashArray ? Opcode::drawDashArrayPath : styled ? Opcode::drawStyledPath : extended ? Opcode::drawExtendedPath
                          : dashed ? Opcode::drawDashedPath : Opcode::drawPath,
-                 multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
+                 radialGradient ? 184U : multiGradient ? multiSize : dashArray ? static_cast<std::uint32_t>(192 + path.dashPattern.size() * 4) :
                  styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     appendU32(bytes_, path.pathId);
     bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
                                                (path.stroke ? 2U : 0U) |
                                                (path.fillGradient ? 4U : 0U) |
-                                               (path.strokeGradient ? 8U : 0U)));
+                                               (path.strokeGradient ? 8U : 0U) |
+                                               (path.fillRadialGradient ? 16U : 0U)));
     bytes_.push_back(static_cast<std::uint8_t>(path.fillRule));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineCap));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineJoin));
@@ -378,7 +380,16 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                         path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
         appendFloat(bytes_, value);
     }
-    if (extended || styled || dashArray || multiGradient) {
+    if (radialGradient) {
+        for (float value : {path.radialGradient.centerX, path.radialGradient.centerY,
+                            path.radialGradient.axisXX, path.radialGradient.axisXY,
+                            path.radialGradient.axisYX, path.radialGradient.axisYY,
+                            path.radialGradient.innerColor.red, path.radialGradient.innerColor.green,
+                            path.radialGradient.innerColor.blue, path.radialGradient.innerColor.alpha,
+                            path.radialGradient.outerColor.red, path.radialGradient.outerColor.green,
+                            path.radialGradient.outerColor.blue, path.radialGradient.outerColor.alpha})
+            appendFloat(bytes_, value);
+    } else if (extended || styled || dashArray || multiGradient) {
         for (float value : {path.strokeGradientPaint.startX, path.strokeGradientPaint.startY,
                             path.strokeGradientPaint.endX, path.strokeGradientPaint.endY,
                             path.strokeGradientPaint.startColor.red,
@@ -390,7 +401,9 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                             path.strokeGradientPaint.endColor.blue,
                             path.strokeGradientPaint.endColor.alpha}) appendFloat(bytes_, value);
     }
-    if (multiGradient) {
+    if (radialGradient) {
+        return;
+    } else if (multiGradient) {
         appendFloat(bytes_, path.miterLimit);
         appendFloat(bytes_, path.dashOffset);
         appendU16(bytes_, static_cast<std::uint16_t>(multiDashCount));
@@ -837,6 +850,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     const bool styled = command.opcode == Opcode::drawStyledPath;
     const bool dashArray = command.opcode == Opcode::drawDashArrayPath;
     const bool multiGradient = command.opcode == Opcode::drawMultiGradientPath;
+    const bool radialGradient = command.opcode == Opcode::drawRadialPath;
     const bool extendedDashed = extended && command.payloadSize == 192U;
     const bool validDashArraySize = dashArray && command.payloadSize >= 200U &&
         command.payloadSize <= 320U && readU32(command.payload + 184) >= 2U &&
@@ -862,12 +876,14 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         fillSpread <= 2U && strokeSpread <= 2U && readU16(command.payload + 190) == 0U &&
         command.payloadSize == 192U + multiDashCount * 4U +
             (fillStopCount + strokeStopCount) * 20U;
-    if ((!dashed && !extended && !styled && !dashArray && !multiGradient && command.opcode != Opcode::drawPath) ||
-        (!dashArray && !multiGradient && command.payloadSize != (styled ? 208U : extended ? (extendedDashed ? 192U : 176U)
+    if ((!dashed && !extended && !styled && !dashArray && !multiGradient && !radialGradient && command.opcode != Opcode::drawPath) ||
+        (!dashArray && !multiGradient && !radialGradient &&
+         command.payloadSize != (styled ? 208U : extended ? (extendedDashed ? 192U : 176U)
                                                         : dashed ? 144U : 128U)) ||
         (dashArray && !validDashArraySize) ||
         (multiGradient && !validMultiSize) ||
-        command.payload[4] > 15 ||
+        (radialGradient && command.payloadSize != 184U) ||
+        command.payload[4] > (radialGradient ? 31U : 15U) ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::square) ||
         command.payload[7] > static_cast<std::uint8_t>(LineJoin::miter)) return false;
@@ -876,6 +892,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     path.stroke = (command.payload[4] & 2U) != 0;
     path.fillGradient = (command.payload[4] & 4U) != 0;
     path.strokeGradient = (command.payload[4] & 8U) != 0;
+    path.fillRadialGradient = (command.payload[4] & 16U) != 0;
     path.fillRule = static_cast<FillRule>(command.payload[5]);
     path.lineCap = static_cast<LineCap>(command.payload[6]);
     path.lineJoin = static_cast<LineJoin>(command.payload[7]);
@@ -904,6 +921,15 @@ bool decodePath(const CommandView& command, PathCommand& path) {
             {readFloat(command.payload + 160), readFloat(command.payload + 164),
              readFloat(command.payload + 168), readFloat(command.payload + 172)}, {},
             PathGradient::Spread::pad};
+    }
+    if (radialGradient) {
+        path.radialGradient = {readFloat(command.payload + 128), readFloat(command.payload + 132),
+            readFloat(command.payload + 136), readFloat(command.payload + 140),
+            readFloat(command.payload + 144), readFloat(command.payload + 148),
+            {readFloat(command.payload + 152), readFloat(command.payload + 156),
+             readFloat(command.payload + 160), readFloat(command.payload + 164)},
+            {readFloat(command.payload + 168), readFloat(command.payload + 172),
+             readFloat(command.payload + 176), readFloat(command.payload + 180)}};
     }
     const std::size_t dashOffset = (extended || styled) ? 176U : 128U;
     const bool styledDash = styled && (readFloat(command.payload + dashOffset) != 0.0F ||
@@ -966,6 +992,8 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     }
     return path.pathId != 0 && (path.fill || path.stroke) &&
            (!path.fillGradient || path.fill) &&
+           (!path.fillRadialGradient || (radialGradient && path.fill && !path.fillGradient)) &&
+           (!radialGradient || path.fillRadialGradient) &&
            (!extended || path.strokeGradient) &&
            (!path.strokeGradient || ((extended || styled || dashArray || multiGradient) && path.stroke)) &&
            (!(dashArray || (multiGradient && multiDashCount > 0U)) || path.stroke) &&

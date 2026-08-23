@@ -90,6 +90,7 @@ export const ExtendedServerCapability = {
   ArbitraryPathDashArrays: 1n << 40n,
   MultiStopPathGradients: 1n << 41n,
   PathGradientSpreadModes: 1n << 42n,
+  RadialPathGradients: 1n << 43n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -245,6 +246,12 @@ export interface PathGradientPaint {
 export interface PathPaint {
   readonly fill?: Color;
   readonly fillGradient?: PathGradientPaint;
+  readonly fillRadialGradient?: {
+    readonly center: { readonly x: number; readonly y: number };
+    readonly axisX: { readonly x: number; readonly y: number };
+    readonly axisY: { readonly x: number; readonly y: number };
+    readonly innerColor: Color; readonly outerColor: Color;
+  };
   readonly stroke?: Color;
   readonly strokeGradient?: PathGradientPaint;
   readonly strokeWidth?: number;
@@ -748,11 +755,13 @@ export class FrameEncoder {
     viewBox: { readonly x: number; readonly y: number; readonly width: number; readonly height: number },
     paint: PathPaint): void {
     if (!Number.isSafeInteger(pathId) || pathId <= 0 || pathId > 0xffff_ffff ||
-        (!paint.fill && !paint.fillGradient && !paint.stroke && !paint.strokeGradient))
+        (!paint.fill && !paint.fillGradient && !paint.fillRadialGradient &&
+          !paint.stroke && !paint.strokeGradient))
       throw new RangeError("Path draw requires an ID and paint");
     const dashArray = paint.dash !== undefined && "values" in paint.dash;
     const dashed = paint.dash !== undefined && !dashArray;
     const extended = paint.strokeGradient !== undefined;
+    const radialGradient = paint.fillRadialGradient !== undefined;
     const styled = paint.miterLimit !== undefined;
     const fillStops = paint.fillGradient?.stops ?? [];
     const strokeStops = paint.strokeGradient?.stops ?? [];
@@ -766,6 +775,9 @@ export class FrameEncoder {
     const multiGradient = fillStops.length > 2 || strokeStops.length > 2 ||
       (paint.fillGradient?.spread !== undefined && paint.fillGradient.spread !== "pad") ||
       (paint.strokeGradient?.spread !== undefined && paint.strokeGradient.spread !== "pad");
+    if (radialGradient && (paint.fillGradient || paint.strokeGradient || paint.dash ||
+        paint.miterLimit !== undefined))
+      throw new RangeError("Radial path fill cannot yet combine with extended stroke paint");
     if (styled && (!Number.isFinite(paint.miterLimit) || paint.miterLimit < 1 || paint.miterLimit > 1000))
       throw new RangeError("Path miter limit must be between 1 and 1000");
     if (dashArray && (paint.dash.values.length < 2 || paint.dash.values.length > 32 ||
@@ -774,13 +786,13 @@ export class FrameEncoder {
       throw new RangeError("Path dash arrays require 2 through 32 positive values in pairs");
     const multiDash = paint.dash === undefined ? [] : "values" in paint.dash
       ? paint.dash.values : [paint.dash.length, paint.dash.gap];
-    const payload = Buffer.alloc(multiGradient ? 192 + multiDash.length * 4 +
+    const payload = Buffer.alloc(radialGradient ? 184 : multiGradient ? 192 + multiDash.length * 4 +
       (fillStops.length + strokeStops.length) * 20 : dashArray ? 192 + paint.dash.values.length * 4 :
       styled ? 208 : extended ? (dashed ? 192 : 176) : dashed ? 144 : 128);
     payload.writeUInt32LE(pathId, 0);
-    payload.writeUInt8((paint.fill || paint.fillGradient ? 1 : 0) |
+    payload.writeUInt8((paint.fill || paint.fillGradient || paint.fillRadialGradient ? 1 : 0) |
       (paint.stroke || paint.strokeGradient ? 2 : 0) | (paint.fillGradient ? 4 : 0) |
-      (paint.strokeGradient ? 8 : 0), 4);
+      (paint.strokeGradient ? 8 : 0) | (paint.fillRadialGradient ? 16 : 0), 4);
     payload.writeUInt8(paint.fillRule === "evenodd" ? 1 : 0, 5);
     payload.writeUInt8(paint.lineCap === "square" ? 2 : paint.lineCap === "round" ? 1 : 0, 6);
     payload.writeUInt8(paint.lineJoin === "miter" ? 2 : paint.lineJoin === "round" ? 1 : 0, 7);
@@ -803,6 +815,21 @@ export class FrameEncoder {
         if (!Number.isFinite(value)) throw new RangeError("Path draw values must be finite");
         payload.writeFloatLE(value, 16 + index * 4);
       });
+    if (paint.fillRadialGradient) {
+      const radial = paint.fillRadialGradient;
+      [radial.center.x, radial.center.y, radial.axisX.x, radial.axisX.y,
+        radial.axisY.x, radial.axisY.y,
+        radial.innerColor.red, radial.innerColor.green, radial.innerColor.blue, radial.innerColor.alpha,
+        radial.outerColor.red, radial.outerColor.green, radial.outerColor.blue, radial.outerColor.alpha]
+        .forEach((value, index) => {
+          if (!Number.isFinite(value)) throw new RangeError("Radial path values must be finite");
+          payload.writeFloatLE(value, 128 + index * 4);
+        });
+      const determinant = radial.axisX.x * radial.axisY.y - radial.axisX.y * radial.axisY.x;
+      if (Math.abs(determinant) < 0.000001) throw new RangeError("Radial path axes must be invertible");
+      this.command(32, payload);
+      return;
+    }
     if (paint.strokeGradient) {
       [paint.strokeGradient.start.x, paint.strokeGradient.start.y,
         paint.strokeGradient.end.x, paint.strokeGradient.end.y,

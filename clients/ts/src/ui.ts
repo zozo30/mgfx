@@ -249,6 +249,10 @@ export interface PathData {
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect";
   };
+  readonly fillRadialGradient?: {
+    readonly center: Point; readonly axisX: Point; readonly axisY: Point;
+    readonly innerColor: Color; readonly outerColor: Color;
+  };
   readonly stroke?: Color;
   readonly strokeGradient?: {
     readonly start: Point; readonly end: Point;
@@ -800,7 +804,8 @@ function paintServerRoundedRect(encoder: FrameEncoder, bounds: Rect, cornerRadiu
 
 function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefined,
   viewport: Size): void {
-  if (!path || (!path.fill && !path.fillGradient && !path.stroke && !path.strokeGradient) ||
+  if (!path || (!path.fill && !path.fillGradient && !path.fillRadialGradient &&
+      !path.stroke && !path.strokeGradient) ||
       path.viewBox.width <= 0 || path.viewBox.height <= 0) return;
   let destination = bounds;
   if (path.fit === "contain") {
@@ -817,6 +822,7 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
   encoder.path(path.resourceId, normalizedRect(destination, viewport), path.viewBox, {
     ...(path.fill ? { fill: path.fill } : {}),
     ...(path.fillGradient ? { fillGradient: path.fillGradient } : {}),
+    ...(path.fillRadialGradient ? { fillRadialGradient: path.fillRadialGradient } : {}),
     ...(path.stroke ? { stroke: path.stroke } : {}),
     ...(path.strokeGradient ? { strokeGradient: path.strokeGradient } : {}),
     ...(path.strokeWidth !== undefined ? { strokeWidth: path.strokeWidth } : {}),

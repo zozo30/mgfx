@@ -37,7 +37,7 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, sampli
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;
 
-export function Path({ data, color, gradient, strokeColor, strokeGradient, strokeWidth = 0, viewBox, tolerance,
+export function Path({ data, color, gradient, radialGradient, strokeColor, strokeGradient, strokeWidth = 0, viewBox, tolerance,
   fillRule, lineCap = "round", lineJoin = "round", miterLimit, dash, style }: {
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
@@ -45,6 +45,10 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
     readonly startColor: Color; readonly endColor: Color;
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect" };
+  readonly radialGradient?: { readonly center: { readonly x: number; readonly y: number };
+    readonly axisX: { readonly x: number; readonly y: number };
+    readonly axisY: { readonly x: number; readonly y: number };
+    readonly innerColor: Color; readonly outerColor: Color };
   readonly strokeColor?: Color;
   readonly strokeGradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
@@ -63,6 +67,7 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
   const path: PathData = { resourceId: resource.resourceId, segments: resource.segments,
     viewBox: viewBox ?? resource.bounds, fit: "contain",
     ...(color ? { fill: color } : {}), ...(gradient ? { fillGradient: gradient } : {}),
+    ...(radialGradient ? { fillRadialGradient: radialGradient } : {}),
     ...(strokeGradient && strokeWidth > 0 ? { strokeGradient, strokeWidth } : {}),
     ...(strokeColor && strokeWidth > 0
       ? { stroke: strokeColor, strokeWidth } : {}),
@@ -83,6 +88,7 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
     <Path key={`svg-layer-${index}`} data={layer.path} viewBox={document.viewBox}
       {...(layer.fill ? { color: layer.fill } : {})}
       {...(layer.fillGradient ? { gradient: layer.fillGradient } : {})}
+      {...(layer.fillRadialGradient ? { radialGradient: layer.fillRadialGradient } : {})}
       {...(layer.stroke ? { strokeColor: layer.stroke, strokeWidth: layer.strokeWidth } : {})}
       {...(layer.strokeGradient
         ? { strokeGradient: layer.strokeGradient, strokeWidth: layer.strokeWidth } : {})}

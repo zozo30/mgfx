@@ -10,6 +10,7 @@ export interface SvgVectorLayer {
   readonly path: string;
   readonly fill?: Color;
   readonly fillGradient?: LinearGradientPaint;
+  readonly fillRadialGradient?: RadialGradientPaint;
   readonly stroke?: Color;
   readonly strokeGradient?: LinearGradientPaint;
   readonly strokeWidth: number;
@@ -27,6 +28,14 @@ export interface LinearGradientPaint {
   readonly endColor: Color;
   readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   readonly spread?: "pad" | "repeat" | "reflect";
+}
+
+export interface RadialGradientPaint {
+  readonly center: { readonly x: number; readonly y: number };
+  readonly axisX: { readonly x: number; readonly y: number };
+  readonly axisY: { readonly x: number; readonly y: number };
+  readonly innerColor: Color;
+  readonly outerColor: Color;
 }
 
 export interface SvgVectorDocument {
@@ -69,6 +78,13 @@ interface RawGradientDefinition {
   readonly stops: readonly { readonly offset: number; readonly color: Color }[];
 }
 
+interface RadialGradientDefinition {
+  readonly units: "objectBoundingBox" | "userSpaceOnUse";
+  readonly cx: string; readonly cy: string; readonly radius: string;
+  readonly transform: Matrix;
+  readonly innerColor: Color; readonly outerColor: Color;
+}
+
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 const white: Color = { red: 1, green: 1, blue: 1, alpha: 1 };
 const primitiveTags = new Set(["path", "line", "polyline", "polygon", "rect", "circle", "ellipse"]);
@@ -82,6 +98,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
   const rootAttributes = withInlineStyle(svgAttributes(svgMatch[1]!));
   const viewBox = parseViewBox(rootAttributes);
   const gradients = parseLinearGradients(source, defaultColor);
+  const radialGradients = parseRadialGradients(source, defaultColor);
   const initial: PaintState = { fill: { red: 0, green: 0, blue: 0, alpha: 1 },
     strokeWidth: 1, opacity: 1, fillOpacity: 1, strokeOpacity: 1,
     fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
@@ -111,15 +128,19 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     if (!rawPath) continue;
     const path = applyMatrix(rawPath, state.transform);
     const fill = state.fill ? multiplyAlpha(state.fill, state.opacity * state.fillOpacity) : undefined;
-    const fillGradient = state.fillGradientId
+    const fillRadialGradient = state.fillGradientId && radialGradients.has(state.fillGradientId)
+      ? resolveRadialGradient(radialGradients, state.fillGradientId, path, state, viewBox,
+        state.fillOpacity) : undefined;
+    const fillGradient = state.fillGradientId && !fillRadialGradient
       ? resolveGradient(gradients, state.fillGradientId, path, state, viewBox, state.fillOpacity) : undefined;
     const stroke = state.stroke ? multiplyAlpha(state.stroke, state.opacity * state.strokeOpacity) : undefined;
     const strokeGradient = state.strokeGradientId
       ? resolveGradient(gradients, state.strokeGradientId, path, state, viewBox,
         state.strokeOpacity) : undefined;
-    if ((!fill || fill.alpha <= 0) && !fillGradient &&
+    if ((!fill || fill.alpha <= 0) && !fillGradient && !fillRadialGradient &&
         ((!stroke || stroke.alpha <= 0) && !strokeGradient || state.strokeWidth <= 0)) continue;
     layers.push({ path, ...(fill ? { fill } : {}), ...(fillGradient ? { fillGradient } : {}),
+      ...(fillRadialGradient ? { fillRadialGradient } : {}),
       ...(stroke ? { stroke } : {}), ...(strokeGradient ? { strokeGradient } : {}),
       strokeWidth: state.strokeWidth * matrixScale(state.transform), fillRule: state.fillRule,
       lineCap: state.lineCap, lineJoin: state.lineJoin,
@@ -258,6 +279,61 @@ function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<
   };
   for (const id of raw.keys()) resolve(id, new Set());
   return definitions;
+}
+
+function parseRadialGradients(source: string, currentColor: Color): ReadonlyMap<string, RadialGradientDefinition> {
+  const definitions = new Map<string, RadialGradientDefinition>();
+  for (const match of source.matchAll(/<radialGradient\b([^>]*)>([\s\S]*?)<\/radialGradient\s*>/gi)) {
+    const attributes = withInlineStyle(svgAttributes(match[1]!));
+    const id = attributes.id?.trim();
+    if (!id || attributes.spreadMethod && attributes.spreadMethod !== "pad") continue;
+    const cx = attributes.cx ?? "50%", cy = attributes.cy ?? "50%";
+    if ((attributes.fx !== undefined && attributes.fx !== cx) ||
+        (attributes.fy !== undefined && attributes.fy !== cy)) continue;
+    const stops = [...match[2]!.matchAll(/<stop\b([^>]*)\/?\s*>/gi)].map((stop) => {
+      const values = withInlineStyle(svgAttributes(stop[1]!));
+      const color = parseColor(values["stop-color"] ?? "black", currentColor)!;
+      return { offset: unitInterval(values.offset ?? "0"),
+        color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
+    }).sort((left, right) => left.offset - right.offset);
+    if (stops.length !== 2 || stops[0]!.offset !== 0 || stops[1]!.offset !== 1) continue;
+    definitions.set(id, {
+      units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
+      cx, cy, radius: attributes.r ?? "50%", transform: parseTransform(attributes.gradientTransform),
+      innerColor: stops[0]!.color, outerColor: stops[1]!.color,
+    });
+  }
+  return definitions;
+}
+
+function resolveRadialGradient(definitions: ReadonlyMap<string, RadialGradientDefinition>, id: string,
+  path: string, state: PaintState, viewBox: Rect, paintOpacity: number): RadialGradientPaint {
+  const definition = definitions.get(id);
+  if (!definition) throw new Error(`SVG radial gradient #${id} is unsupported`);
+  let center: { x: number; y: number }, edgeX: { x: number; y: number }, edgeY: { x: number; y: number };
+  if (definition.units === "userSpaceOnUse") {
+    const cx = coordinate(definition.cx, viewBox.x, viewBox.width);
+    const cy = coordinate(definition.cy, viewBox.y, viewBox.height);
+    const radius = coordinate(definition.radius, 0, Math.min(viewBox.width, viewBox.height));
+    center = transformPoint(state.transform, transformPoint(definition.transform, { x: cx, y: cy }));
+    edgeX = transformPoint(state.transform, transformPoint(definition.transform, { x: cx + radius, y: cy }));
+    edgeY = transformPoint(state.transform, transformPoint(definition.transform, { x: cx, y: cy + radius }));
+  } else {
+    const bounds = new SVGPathData(path).getBounds();
+    const cx = unitCoordinate(definition.cx), cy = unitCoordinate(definition.cy);
+    const radius = unitCoordinate(definition.radius);
+    const map = (point: { x: number; y: number }) => {
+      const transformed = transformPoint(definition.transform, point);
+      return { x: bounds.minX + transformed.x * (bounds.maxX - bounds.minX),
+        y: bounds.minY + transformed.y * (bounds.maxY - bounds.minY) };
+    };
+    center = map({ x: cx, y: cy }); edgeX = map({ x: cx + radius, y: cy });
+    edgeY = map({ x: cx, y: cy + radius });
+  }
+  return { center, axisX: { x: edgeX.x - center.x, y: edgeX.y - center.y },
+    axisY: { x: edgeY.x - center.x, y: edgeY.y - center.y },
+    innerColor: multiplyAlpha(definition.innerColor, state.opacity * paintOpacity),
+    outerColor: multiplyAlpha(definition.outerColor, state.opacity * paintOpacity) };
 }
 
 function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,

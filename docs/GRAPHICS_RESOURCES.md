@@ -53,10 +53,14 @@ React `<Svg>` implements the selective document path: a bounded parser reads the
 root view box, inherited fill/stroke/opacity state, nested groups, primitive
 shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
 becomes a stable path resource with its own compact paint command. Linear gradients
-gradients resolve from `<defs>` in either SVG user space or object-bounding-box
+resolve from `<defs>` in either SVG user space or object-bounding-box
 space, including stop opacity, gradient transforms, and fragment-only `href` or
 `xlink:href` inheritance, then use native `DrawPath`
-gradient paint. `stroke-dasharray` sequences of up to 32 values plus
+gradient paint. Centered two-stop radial fills with `pad` spread resolve into a
+center and two radius vectors, preserving elliptical and transformed fields without
+client tessellation. Offset focal points, additional radial stops, and repeating
+radial spread deliberately remain on the raster fallback. `stroke-dasharray`
+sequences of up to 32 values plus
 `stroke-dashoffset` lower to native dashed path paint. Odd sequences are repeated
 to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
 masks, text, and embedded images deliberately continue through the high-quality raster fallback.
@@ -205,6 +209,12 @@ radius and corner radius, plus inner and outer colors. A dedicated fragment
 pipeline calculates smooth radial falloff and an antialiased rounded mask. It
 inherits transforms, opacity, and clipping and is advertised by
 `radialGradients`.
+
+`DrawRadialPath` applies the same idea to any persistent path resource. Its center
+and two independent source-space radius vectors define a possibly elliptical or
+rotated basis. Metal inverts that basis per fragment and interpolates the two
+straight-alpha endpoint colors by radial distance. Path tessellation and paint
+remain independent, and support is advertised by `radialPathGradients`.
 
 ## Linear gradients
 

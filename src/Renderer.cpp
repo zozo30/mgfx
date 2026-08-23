@@ -77,6 +77,10 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
 
     auto vertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("vertexMain")));
     auto fragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("fragmentMain")));
+    auto radialPathVertexFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("radialPathVertexMain")));
+    auto radialPathFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("radialPathFragmentMain")));
     auto imageVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageVertexMain")));
     auto imageFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("imageFragmentMain")));
     auto imageSurfaceVertexFunction = NS::TransferPtr(
@@ -113,7 +117,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("conicGradientVertexMain")));
     auto conicGradientFragmentFunction = NS::TransferPtr(
         library->newFunction(MTLSTR("conicGradientFragmentMain")));
-    if (!vertexFunction || !fragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
+    if (!vertexFunction || !fragmentFunction || !radialPathVertexFunction ||
+        !radialPathFragmentFunction || !imageVertexFunction || !imageFragmentFunction ||
         !imageSurfaceVertexFunction || !imageSurfaceFragmentFunction ||
         !shadowVertexFunction || !shadowFragmentFunction ||
         !radialVertexFunction || !radialFragmentFunction ||
@@ -144,6 +149,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     pipelineState_ = NS::TransferPtr(device_->newRenderPipelineState(descriptor.get(), &error));
     if (!pipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the render pipeline", error));
+    }
+
+    auto radialPathDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    radialPathDescriptor->setVertexFunction(radialPathVertexFunction.get());
+    radialPathDescriptor->setFragmentFunction(radialPathFragmentFunction.get());
+    radialPathDescriptor->setRasterSampleCount(sampleCount);
+    auto* radialPathColor = radialPathDescriptor->colorAttachments()->object(0);
+    radialPathColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    radialPathColor->setBlendingEnabled(true);
+    radialPathColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    radialPathColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    radialPathColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    radialPathColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    radialPathPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(radialPathDescriptor.get(), &error));
+    if (!radialPathPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create radial path pipeline", error));
     }
 
     auto imageDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -1188,7 +1210,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                    command.opcode == gfx::Opcode::drawExtendedPath ||
                    command.opcode == gfx::Opcode::drawStyledPath ||
                    command.opcode == gfx::Opcode::drawDashArrayPath ||
-                   command.opcode == gfx::Opcode::drawMultiGradientPath) {
+                   command.opcode == gfx::Opcode::drawMultiGradientPath ||
+                   command.opcode == gfx::Opcode::drawRadialPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1217,6 +1240,22 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     [](float length) { return !std::isfinite(length) || length <= 0.0F; }) ||
                 (path.fillGradient && !finiteGradient(path.gradient)) ||
                 (path.strokeGradient && !finiteGradient(path.strokeGradientPaint)) ||
+                (path.fillRadialGradient && (!std::isfinite(path.radialGradient.centerX) ||
+                    !std::isfinite(path.radialGradient.centerY) ||
+                    !std::isfinite(path.radialGradient.axisXX) ||
+                    !std::isfinite(path.radialGradient.axisXY) ||
+                    !std::isfinite(path.radialGradient.axisYX) ||
+                    !std::isfinite(path.radialGradient.axisYY) ||
+                    !std::isfinite(path.radialGradient.innerColor.red) ||
+                    !std::isfinite(path.radialGradient.innerColor.green) ||
+                    !std::isfinite(path.radialGradient.innerColor.blue) ||
+                    !std::isfinite(path.radialGradient.innerColor.alpha) ||
+                    !std::isfinite(path.radialGradient.outerColor.red) ||
+                    !std::isfinite(path.radialGradient.outerColor.green) ||
+                    !std::isfinite(path.radialGradient.outerColor.blue) ||
+                    !std::isfinite(path.radialGradient.outerColor.alpha) ||
+                    std::fabs(path.radialGradient.axisXX * path.radialGradient.axisYY -
+                              path.radialGradient.axisXY * path.radialGradient.axisYX) < 0.000001F)) ||
                 path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
                 path.viewBox.height <= 0.0F) {
                 throw std::runtime_error("Malformed path command");
@@ -1251,8 +1290,49 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
             const auto drawPathTriangles = [&](const std::vector<gfx::PathPoint>& points,
                                                gfx::Color color,
-                                               const gfx::PathGradient* gradient) {
+                                               const gfx::PathGradient* gradient,
+                                               const gfx::PathCommand::RadialGradient* radial) {
                 if (points.empty()) return;
+                if (radial != nullptr) {
+                    if (encoder == nullptr) {
+                        encoder = commandBuffer->renderCommandEncoder(renderPass);
+                        applyClip();
+                    }
+                    encoder->setRenderPipelineState(radialPathPipelineState_.get());
+                    struct RadialPathVertex {
+                        std::array<float, 2> position, source, center, axisX, axisY;
+                        std::array<float, 4> innerColor, outerColor;
+                    };
+                    constexpr std::size_t maxVertices = (4096 / sizeof(RadialPathVertex) / 3) * 3;
+                    for (std::size_t first = 0; first < points.size();) {
+                        const std::size_t count = std::min(maxVertices, points.size() - first);
+                        std::vector<RadialPathVertex> vertices; vertices.reserve(count);
+                        for (std::size_t index = 0; index < count; ++index) {
+                            const gfx::PathPoint& point = points[first + index];
+                            const float x = path.destination.left +
+                                (point[0] - path.viewBox.x) / path.viewBox.width *
+                                (path.destination.right - path.destination.left);
+                            const float y = path.destination.top +
+                                (point[1] - path.viewBox.y) / path.viewBox.height *
+                                (path.destination.bottom - path.destination.top);
+                            vertices.push_back({transformPoint(currentTransform(), {x, y}), point,
+                                {radial->centerX, radial->centerY},
+                                {radial->axisXX, radial->axisXY}, {radial->axisYX, radial->axisYY},
+                                {radial->innerColor.red, radial->innerColor.green,
+                                 radial->innerColor.blue,
+                                 radial->innerColor.alpha * opacityStack.back()},
+                                {radial->outerColor.red, radial->outerColor.green,
+                                 radial->outerColor.blue,
+                                 radial->outerColor.alpha * opacityStack.back()}});
+                        }
+                        encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(RadialPathVertex), 0);
+                        encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                            static_cast<NS::UInteger>(0),
+                            static_cast<NS::UInteger>(vertices.size()));
+                        first += count;
+                    }
+                    return;
+                }
                 const auto rawAmountAt = [](const gfx::PathPoint& point,
                                             const gfx::PathGradient& paint) {
                     const float dx = paint.endX - paint.startX;
@@ -1412,9 +1492,10 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 }
             };
             if (path.fill) drawPathTriangles(cached->triangles.fill, path.fillColor,
-                                             path.fillGradient ? &path.gradient : nullptr);
+                path.fillGradient ? &path.gradient : nullptr,
+                path.fillRadialGradient ? &path.radialGradient : nullptr);
             if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor,
-                path.strokeGradient ? &path.strokeGradientPaint : nullptr);
+                path.strokeGradient ? &path.strokeGradientPaint : nullptr, nullptr);
         } else if (command.opcode == gfx::Opcode::drawText) {
             gfx::TextCommand text{};
             if (!gfx::decodeText(command, text) || !std::isfinite(text.left) ||
