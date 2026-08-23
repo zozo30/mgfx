@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
 import { Box, Button, Circle, Column, Image, Path, Row, Stack, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
+import { AnimationProvider, useAnimationTime } from "./animation.js";
 
 export function DotGrid({ time }: { readonly time: number }) {
   const ink = rgba(0.55, 0.86, 0.68);
@@ -151,18 +152,18 @@ interface AppProps {
 }
 
 export function App(props: AppProps) {
-  return <Router initialRoute="dashboard" routes={{
+  return <AnimationProvider clock={props.animationClock}><Router initialRoute="dashboard" routes={{
     dashboard: <Dashboard {...props} />,
     graphics: <GraphicsRoute {...props} />,
-  }} />;
+  }} /></AnimationProvider>;
 }
 
-function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
+function Dashboard({ chromeMetrics, headerImageSize, vectorIcons }: AppProps) {
   const [selected, setSelected] = useState(0);
   const [value, setValue] = useState("");
   const [mode, setMode] = useState<WindowMode>("normal");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const animationTime = useAnimationTime(animationClock);
+  const animationTime = useAnimationTime();
   const clipboard = useNativeClipboard();
   const router = useRouter();
   const cards = [
@@ -254,9 +255,9 @@ function Dashboard({ animationClock, chromeMetrics, headerImageSize, vectorIcons
   );
 }
 
-function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps) {
+function GraphicsRoute({ chromeMetrics, vectorIcons }: AppProps) {
   const router = useRouter();
-  const animationTime = useAnimationTime(animationClock);
+  const animationTime = useAnimationTime();
   const draggableHeight = Math.max(82, chromeMetrics.titleBarHeight + 26);
   return (
     <Window title="MGFX Graphics Route" width={1100} height={700}
@@ -301,20 +302,4 @@ function GraphicsRoute({ animationClock, chromeMetrics, vectorIcons }: AppProps)
       </Stack>
     </Window>
   );
-}
-
-function useAnimationTime(clock: AnimationClock): number {
-  const [time, setTime] = useState(0);
-  useEffect(() => {
-    let active = true;
-    let cancel = () => {};
-    const tick = (next: number) => {
-      if (!active) return;
-      setTime(next);
-      cancel = clock.request(tick);
-    };
-    cancel = clock.request(tick);
-    return () => { active = false; cancel(); };
-  }, [clock]);
-  return time;
 }

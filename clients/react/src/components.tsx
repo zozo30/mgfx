@@ -4,6 +4,7 @@ import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style
   type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
 import { canonicalPath } from "./vector-path.js";
+import { useAnimationTime } from "./animation.js";
 
 export interface LayoutProps {
   readonly children?: ReactNode;
@@ -113,7 +114,9 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const [caret, setCaret] = useState([...value].length);
   const [anchor, setAnchor] = useState([...value].length);
   const [dragging, setDragging] = useState(false);
+  const [blinkEpoch, setBlinkEpoch] = useState(0);
   const clipboard = useNativeClipboard();
+  const animationTime = useAnimationTime(focused);
   useNativeCursor("text", hovered);
   const characters = [...value];
   useEffect(() => {
@@ -125,6 +128,8 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const selectionStart = Math.min(anchor, caret);
   const selectionEnd = Math.max(anchor, caret);
   const hasSelection = selectionStart !== selectionEnd;
+  const caretVisible = !focused || (animationTime - blinkEpoch) % 1000 < 600;
+  const wakeCaret = () => setBlinkEpoch(animationTime);
   const fontSize = textStyle?.fontSize ?? 22;
   const fontFamily = textStyle?.fontFamily ?? "system";
   const fontWeight = textStyle?.fontWeight ?? "regular";
@@ -156,9 +161,10 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
       ...characters.slice(selectionEnd)].join(""));
     setCaret(next);
     setAnchor(next);
+    wakeCaret();
   };
   const caretNode = <Box style={{ preferredSize: { width: 2, height: fontSize },
-    background: rgba(0.60, 0.82, 1) }} />;
+    background: caretVisible ? rgba(0.60, 0.82, 1) : rgba(0.60, 0.82, 1, 0) }} />;
   return (
     <mgfx-stack style={{ preferredSize: { height: 48 }, padding: all(12), cornerRadius: 10,
       clip: true, background: focused ? rgba(0.16, 0.28, 0.52) : rgba(0.12, 0.14, 0.21),
@@ -166,16 +172,17 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
       borderColor: focused ? rgba(0.38, 0.62, 1) : rgba(0.24, 0.28, 0.38), ...style }}
       onHoverChange={setHovered}
       onFocusChange={(next) => { setFocused(next); if (next) {
-        setCaret(characters.length); setAnchor(characters.length);
+        setCaret(characters.length); setAnchor(characters.length); wakeCaret();
       } }}
       onPointerDown={(point) => {
-        const index = indexAt(point); setCaret(index); setAnchor(index); setDragging(true);
+        const index = indexAt(point); setCaret(index); setAnchor(index); setDragging(true); wakeCaret();
       }}
       onPointerMove={(point) => { if (dragging) setCaret(indexAt(point)); }}
       onPointerUp={() => setDragging(false)}
       onTextInput={insert}
       onKeyDown={(key, modifiers) => {
         const extending = (modifiers & KeyModifier.Shift) !== 0;
+        wakeCaret();
         if (key === Key.Backspace && hasSelection) {
           onChange([...characters.slice(0, selectionStart), ...characters.slice(selectionEnd)].join(""));
           setCaret(selectionStart); setAnchor(selectionStart);

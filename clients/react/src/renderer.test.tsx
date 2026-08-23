@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
-import { Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
+import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
 import { Button, Path, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { DotGrid } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
+import { AnimationProvider } from "./animation.js";
 
 test("React JSX commits an MGFX binary frame", () => {
   let frame: Buffer | undefined;
@@ -179,6 +180,25 @@ test("TextField extends keyboard selection and supports Select All", () => {
   surface.keyDown({ key: Key.SelectAll, modifiers: KeyModifier.Command, repeat: false });
   surface.textInput("Ω");
   assert.equal(observed, "Ω");
+});
+
+test("focused TextField caret blinks on the native animation clock", async () => {
+  const requests: number[] = [];
+  const clock = new AnimationClock((sequence) => requests.push(sequence));
+  let frame: Buffer = Buffer.alloc(0);
+  const surface = new ReactSurface((next) => { frame = next; });
+  surface.render(<AnimationProvider clock={clock}>
+    <TextField value="blink" onChange={() => {}} />
+  </AnimationProvider>);
+  surface.resize({ width: 260, height: 48 });
+  surface.pointerDown({ x: 240, y: 20 }); surface.pointerUp({ x: 240, y: 20 });
+  assert.equal(requests.length, 1);
+  clock.receive(requests[0]!, 1_000_000_000n);
+  await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  const visible = Buffer.from(frame);
+  clock.receive(requests[1]!, 1_700_000_000n);
+  await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  assert.notDeepEqual(frame, visible);
 });
 
 test("TextField semantic shortcuts use the native clipboard service", async () => {

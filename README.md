@@ -283,6 +283,9 @@ runs. Clicking positions the insertion point; dragging creates a highlighted
 Unicode code-point range. Left/right arrows collapse or move the selection, and
 text input, Backspace, Cut, Copy, and Paste operate on that range.
 Shift+Left/Right extends the range and Command+A selects the complete value.
+The caret blinks from the server's native display-link clock and restarts its
+visible phase after pointer, keyboard, or text-editing activity; unfocused
+fields do not request animation frames.
 
 Native title, initial size, and minimum size are declarative through the React
 `Window` component; its layout effect emits MGIP metadata independently from the

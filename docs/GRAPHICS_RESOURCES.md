@@ -95,6 +95,9 @@ advances map horizontal positions to Unicode code-point indices. Selection and
 editing stay in the component system while the graphics server remains
 responsible only for shaping and draw execution. Keyboard modifiers survive
 focused dispatch, enabling Shift+arrow range extension and semantic Select All.
+React exposes the correlated native animation clock through context. A focused
+text field subscribes for caret blinking and cancels immediately on blur, so
+reusable components share display cadence without owning timers.
 
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
