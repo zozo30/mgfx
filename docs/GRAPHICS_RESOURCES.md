@@ -52,7 +52,7 @@ language client without embedding a complete SVG engine in the server.
 React `<Svg>` implements the selective document path: a bounded parser reads the
 root view box, inherited fill/stroke/opacity state, nested groups, primitive
 shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
-becomes a stable path resource with its own compact paint command. Two-stop linear
+becomes a stable path resource with its own compact paint command. Linear gradients
 gradients resolve from `<defs>` in either SVG user space or object-bounding-box
 space, including stop opacity and gradient transforms, then use native `DrawPath`
 gradient paint. `stroke-dasharray` sequences of up to 32 values plus
@@ -83,6 +83,11 @@ geometry cache; clients still upload only the original canonical path.
 server performs the same exact arc-length splitting and includes the complete
 sequence in its geometry cache key; clients never expand the pattern into line
 segments.
+
+`DrawMultiGradientPath` carries two through eight ordered color stops for fill,
+stroke, or both. The server clips cached triangles at stop boundaries before
+assigning vertex colors, preserving exact piecewise-linear interpolation even
+for a large rectangle whose original mesh has only corner vertices.
 
 Stroke caps are encoded as butt (`0`), round (`1`), or square (`2`), and joins
 as bevel (`0`), round (`1`), or miter (`2`). Square-cap extension and miter

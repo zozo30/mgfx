@@ -104,7 +104,7 @@ instead of intrinsic host elements:
   maximum-length handling
 - `Mesh` for explicit application-owned indexed geometry and `Path` for SVG
   path data lowered to persistent canonical server resources
-- `Svg` for bounded multi-layer vector documents, including two-stop linear gradients
+- `Svg` for bounded multi-layer vector documents, including 2–8 stop linear gradients
 
 `src/navigation.tsx` provides an in-memory history `Router`, `useRouter()` with
 push/replace/back operations, and a depth-aware `Dialog`. Dialogs use absolute
@@ -121,6 +121,8 @@ endpoints and colors travel in each lightweight `DrawPath`, while geometry
 remains cached by the server.
 Fill and stroke gradients are independent, so an SVG primitive may combine a
 gradient interior with a differently oriented gradient outline.
+Multi-stop gradients stay native: the protocol carries ordered colors and the
+graphics server splits cached triangles at stop boundaries for exact interpolation.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

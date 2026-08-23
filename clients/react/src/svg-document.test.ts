@@ -34,6 +34,7 @@ test("SVG documents lower user-space linear gradients to native path paint", () 
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 60" fill="none">
     <defs><linearGradient id="glow" gradientUnits="userSpaceOnUse" x1="5" y1="10" x2="45" y2="30">
       <stop offset="0%" stop-color="#ff8000" stop-opacity="0.5"/>
+      <stop offset="50%" stop-color="#8060ff" stop-opacity="0.9"/>
       <stop offset="100%" style="stop-color: #20d890; stop-opacity: 0.75"/>
     </linearGradient></defs>
     <g transform="translate(10 4)"><rect x="0" y="0" width="50" height="30"
@@ -44,6 +45,8 @@ test("SVG documents lower user-space linear gradients to native path paint", () 
   assert.deepEqual(gradient?.end, { x: 55, y: 34 });
   assert.equal(gradient?.startColor.alpha, 0.4);
   assert.ok(Math.abs((gradient?.endColor.alpha ?? 0) - 0.6) < 1e-9);
+  assert.equal(gradient?.stops?.length, 3);
+  assert.equal(gradient?.stops?.[1]?.offset, 0.5);
   assert.equal(document.layers[0]?.fill, undefined);
 });
 

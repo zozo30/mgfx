@@ -1187,7 +1187,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                    command.opcode == gfx::Opcode::drawDashedPath ||
                    command.opcode == gfx::Opcode::drawExtendedPath ||
                    command.opcode == gfx::Opcode::drawStyledPath ||
-                   command.opcode == gfx::Opcode::drawDashArrayPath) {
+                   command.opcode == gfx::Opcode::drawDashArrayPath ||
+                   command.opcode == gfx::Opcode::drawMultiGradientPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&
@@ -1199,7 +1200,13 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     std::isfinite(gradient.endColor.red) &&
                     std::isfinite(gradient.endColor.green) &&
                     std::isfinite(gradient.endColor.blue) &&
-                    std::isfinite(gradient.endColor.alpha);
+                    std::isfinite(gradient.endColor.alpha) &&
+                    std::all_of(gradient.stops.begin(), gradient.stops.end(),
+                        [](const gfx::PathGradient::Stop& stop) {
+                            return std::isfinite(stop.offset) && std::isfinite(stop.color.red) &&
+                                std::isfinite(stop.color.green) && std::isfinite(stop.color.blue) &&
+                                std::isfinite(stop.color.alpha);
+                        });
             };
             if (!gfx::decodePath(command, path) || !std::isfinite(path.strokeWidth) ||
                 !std::isfinite(path.tolerance) || path.strokeWidth < 0.0F ||
@@ -1246,6 +1253,59 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                                gfx::Color color,
                                                const gfx::PathGradient* gradient) {
                 if (points.empty()) return;
+                const auto amountAt = [](const gfx::PathPoint& point,
+                                         const gfx::PathGradient& paint) {
+                    const float dx = paint.endX - paint.startX;
+                    const float dy = paint.endY - paint.startY;
+                    const float lengthSquared = dx * dx + dy * dy;
+                    return lengthSquared > 0.0F
+                        ? std::clamp(((point[0] - paint.startX) * dx +
+                                      (point[1] - paint.startY) * dy) / lengthSquared,
+                                     0.0F, 1.0F) : 0.0F;
+                };
+                std::vector<gfx::PathPoint> splitPoints;
+                const std::vector<gfx::PathPoint>* renderedPoints = &points;
+                if (gradient != nullptr && gradient->stops.size() > 2) {
+                    std::vector<float> boundaries{0.0F};
+                    for (const auto& stop : gradient->stops) {
+                        if (stop.offset > 0.0F && stop.offset < 1.0F &&
+                            stop.offset != boundaries.back()) boundaries.push_back(stop.offset);
+                    }
+                    if (boundaries.back() != 1.0F) boundaries.push_back(1.0F);
+                    const auto clip = [&](std::vector<gfx::PathPoint> polygon, float boundary,
+                                          bool keepGreater) {
+                        std::vector<gfx::PathPoint> result;
+                        for (std::size_t index = 0; index < polygon.size(); ++index) {
+                            const gfx::PathPoint& start = polygon[index];
+                            const gfx::PathPoint& end = polygon[(index + 1) % polygon.size()];
+                            const float startAmount = amountAt(start, *gradient);
+                            const float endAmount = amountAt(end, *gradient);
+                            const bool startInside = keepGreater ? startAmount >= boundary : startAmount <= boundary;
+                            const bool endInside = keepGreater ? endAmount >= boundary : endAmount <= boundary;
+                            if (startInside) result.push_back(start);
+                            if (startInside != endInside && std::fabs(endAmount - startAmount) > 0.000001F) {
+                                const float ratio = (boundary - startAmount) / (endAmount - startAmount);
+                                result.push_back({start[0] + (end[0] - start[0]) * ratio,
+                                                  start[1] + (end[1] - start[1]) * ratio});
+                            }
+                        }
+                        return result;
+                    };
+                    for (std::size_t triangle = 0; triangle + 2 < points.size(); triangle += 3) {
+                        for (std::size_t interval = 0; interval + 1 < boundaries.size(); ++interval) {
+                            std::vector<gfx::PathPoint> polygon = {
+                                points[triangle], points[triangle + 1], points[triangle + 2]};
+                            polygon = clip(std::move(polygon), boundaries[interval], true);
+                            if (polygon.size() < 3) continue;
+                            polygon = clip(std::move(polygon), boundaries[interval + 1], false);
+                            for (std::size_t index = 1; index + 1 < polygon.size(); ++index) {
+                                splitPoints.insert(splitPoints.end(),
+                                    {polygon[0], polygon[index], polygon[index + 1]});
+                            }
+                        }
+                    }
+                    renderedPoints = &splitPoints;
+                }
                 if (encoder == nullptr) {
                     encoder = commandBuffer->renderCommandEncoder(renderPass);
                     applyClip();
@@ -1254,30 +1314,39 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 constexpr std::size_t maxInlineBytes = 4096;
                 constexpr std::size_t maxVertices =
                     (maxInlineBytes / sizeof(gfx::Vertex) / 3) * 3;
-                for (std::size_t first = 0; first < points.size();) {
-                    const std::size_t count = std::min(maxVertices, points.size() - first);
+                for (std::size_t first = 0; first < renderedPoints->size();) {
+                    const std::size_t count = std::min(maxVertices, renderedPoints->size() - first);
                     std::vector<gfx::Vertex> vertices;
                     vertices.reserve(count);
                     for (std::size_t index = 0; index < count; ++index) {
-                        const gfx::PathPoint& point = points[first + index];
+                        const gfx::PathPoint& point = (*renderedPoints)[first + index];
                         std::array<float, 4> vertexColor = {
                             color.red, color.green, color.blue, color.alpha};
                         if (gradient != nullptr) {
-                            const float dx = gradient->endX - gradient->startX;
-                            const float dy = gradient->endY - gradient->startY;
-                            const float lengthSquared = dx * dx + dy * dy;
-                            const float amount = lengthSquared > 0.0F
-                                ? std::clamp(((point[0] - gradient->startX) * dx +
-                                              (point[1] - gradient->startY) * dy) /
-                                             lengthSquared, 0.0F, 1.0F)
-                                : 0.0F;
-                            const auto mix = [amount](float start, float end) {
-                                return start + (end - start) * amount;
+                            const float amount = amountAt(point, *gradient);
+                            gfx::PathGradient::Stop start{0.0F, gradient->startColor};
+                            gfx::PathGradient::Stop end{1.0F, gradient->endColor};
+                            if (!gradient->stops.empty()) {
+                                start = gradient->stops.front();
+                                end = gradient->stops.back();
+                                for (std::size_t stop = 1; stop < gradient->stops.size(); ++stop) {
+                                    if (amount <= gradient->stops[stop].offset) {
+                                        start = gradient->stops[stop - 1];
+                                        end = gradient->stops[stop];
+                                        break;
+                                    }
+                                }
+                            }
+                            const float span = end.offset - start.offset;
+                            const float localAmount = span > 0.0F
+                                ? std::clamp((amount - start.offset) / span, 0.0F, 1.0F) : 0.0F;
+                            const auto mix = [localAmount](float first, float last) {
+                                return first + (last - first) * localAmount;
                             };
-                            vertexColor = {mix(gradient->startColor.red, gradient->endColor.red),
-                                mix(gradient->startColor.green, gradient->endColor.green),
-                                mix(gradient->startColor.blue, gradient->endColor.blue),
-                                mix(gradient->startColor.alpha, gradient->endColor.alpha)};
+                            vertexColor = {mix(start.color.red, end.color.red),
+                                mix(start.color.green, end.color.green),
+                                mix(start.color.blue, end.color.blue),
+                                mix(start.color.alpha, end.color.alpha)};
                         }
                         vertexColor[3] *= opacityStack.back();
                         const float x = path.destination.left +

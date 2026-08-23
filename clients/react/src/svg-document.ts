@@ -25,6 +25,7 @@ export interface LinearGradientPaint {
   readonly end: { readonly x: number; readonly y: number };
   readonly startColor: Color;
   readonly endColor: Color;
+  readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
 }
 
 export interface SvgVectorDocument {
@@ -58,8 +59,7 @@ interface GradientDefinition {
   readonly x2: string;
   readonly y2: string;
   readonly transform: Matrix;
-  readonly startColor: Color;
-  readonly endColor: Color;
+  readonly stops: readonly { readonly offset: number; readonly color: Color }[];
 }
 
 const identity: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -217,13 +217,13 @@ function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<
       return { offset: unitInterval(values.offset ?? "0"),
         color: multiplyAlpha(color, clamp01(numberAttribute(values["stop-opacity"], 1))) };
     }).sort((left, right) => left.offset - right.offset);
-    if (stops.length !== 2) continue;
+    if (stops.length < 2 || stops.length > 8) continue;
     definitions.set(id, {
       units: attributes.gradientUnits === "userSpaceOnUse" ? "userSpaceOnUse" : "objectBoundingBox",
       x1: attributes.x1 ?? "0%", y1: attributes.y1 ?? "0%",
       x2: attributes.x2 ?? "100%", y2: attributes.y2 ?? "0%",
       transform: parseTransform(attributes.gradientTransform),
-      startColor: stops[0]!.color, endColor: stops[stops.length - 1]!.color,
+      stops,
     });
   }
   return definitions;
@@ -232,7 +232,7 @@ function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<
 function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,
   path: string, state: PaintState, viewBox: Rect, paintOpacity: number): LinearGradientPaint {
   const definition = definitions.get(id);
-  if (!definition) throw new Error(`SVG linear gradient #${id} is not defined or does not have two stops`);
+  if (!definition) throw new Error(`SVG linear gradient #${id} is not defined or has unsupported stops`);
   let start: { x: number; y: number }, end: { x: number; y: number };
   if (definition.units === "userSpaceOnUse") {
     start = { x: coordinate(definition.x1, viewBox.x, viewBox.width),
@@ -252,9 +252,10 @@ function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, i
     end = { x: bounds.minX + normalizedEnd.x * (bounds.maxX - bounds.minX),
       y: bounds.minY + normalizedEnd.y * (bounds.maxY - bounds.minY) };
   }
-  return { start, end,
-    startColor: multiplyAlpha(definition.startColor, state.opacity * paintOpacity),
-    endColor: multiplyAlpha(definition.endColor, state.opacity * paintOpacity) };
+  const stops = definition.stops.map((stop) => ({ offset: stop.offset,
+    color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
+  return { start, end, startColor: stops[0]!.color,
+    endColor: stops[stops.length - 1]!.color, ...(stops.length > 2 ? { stops } : {}) };
 }
 
 function transformPoint(matrix: Matrix, point: { readonly x: number; readonly y: number }) {

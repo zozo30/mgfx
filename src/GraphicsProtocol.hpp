@@ -41,6 +41,7 @@ enum class Opcode : std::uint16_t {
     drawExtendedPath = 28,
     drawStyledPath = 29,
     drawDashArrayPath = 30,
+    drawMultiGradientPath = 31,
 };
 
 enum class Primitive : std::uint8_t {
@@ -241,6 +242,8 @@ struct PathGradient {
     float endY;
     Color startColor;
     Color endColor;
+    struct Stop { float offset; Color color; };
+    std::vector<Stop> stops;
 };
 
 struct PathCommand {

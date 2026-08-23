@@ -147,6 +147,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
   <defs>
     <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="5" y1="5" x2="155" y2="67">
       <stop offset="0%" stop-color="#07111f"/>
+      <stop offset="48%" stop-color="#4b28d7"/>
       <stop offset="100%" stop-color="#183b69"/>
     </linearGradient>
     <linearGradient id="signal" gradientUnits="userSpaceOnUse" x1="78" y1="24" x2="131" y2="42">

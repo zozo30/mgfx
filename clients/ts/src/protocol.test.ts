@@ -38,7 +38,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
   const allCapabilities = capabilities | ExtendedServerCapability.GradientPathStrokes;
   const completeCapabilities = allCapabilities | ExtendedServerCapability.ExtendedPathStrokeStyles |
     ExtendedServerCapability.CustomPathMiterLimits |
-    ExtendedServerCapability.ArbitraryPathDashArrays;
+    ExtendedServerCapability.ArbitraryPathDashArrays |
+    ExtendedServerCapability.MultiStopPathGradients;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -419,7 +420,12 @@ test("canonical paths upload once and frames reference server-side vector geomet
       stroke: { red: 1, green: 0.5, blue: 0.1, alpha: 1 }, strokeWidth: 2,
       fillGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 0 },
         startColor: { red: 0, green: 0.4, blue: 0.8, alpha: 1 },
-        endColor: { red: 0.8, green: 0.2, blue: 1, alpha: 1 } },
+        endColor: { red: 0.8, green: 0.2, blue: 1, alpha: 1 },
+        stops: [
+          { offset: 0, color: { red: 0, green: 0.4, blue: 0.8, alpha: 1 } },
+          { offset: 0.5, color: { red: 0.2, green: 1, blue: 0.6, alpha: 1 } },
+          { offset: 1, color: { red: 0.8, green: 0.2, blue: 1, alpha: 1 } },
+        ] },
       lineCap: "square", lineJoin: "miter",
       miterLimit: 6,
       strokeGradient: { start: { x: 0, y: 0 }, end: { x: 24, y: 24 },
@@ -429,8 +435,8 @@ test("canonical paths upload once and frames reference server-side vector geomet
     });
   frame.endFrame();
   const bytes = frame.finish();
-  assert.equal(bytes.readUInt16LE(16), 30);
-  assert.equal(bytes.readUInt32LE(20), 208);
+  assert.equal(bytes.readUInt16LE(16), 31);
+  assert.equal(bytes.readUInt32LE(20), 268);
   assert.equal(bytes.readUInt32LE(24), 12);
   assert.equal(bytes.readUInt8(28), 15);
   assert.equal(bytes.readUInt8(30), 2);
@@ -439,9 +445,12 @@ test("canonical paths upload once and frames reference server-side vector geomet
   assert.equal(bytes.readFloatLE(24 + 128 + 8), 24);
   assert.equal(bytes.readFloatLE(24 + 176), 6);
   assert.equal(bytes.readFloatLE(24 + 180), -2);
-  assert.equal(bytes.readUInt32LE(24 + 184), 4);
+  assert.equal(bytes.readUInt16LE(24 + 184), 4);
+  assert.equal(bytes.readUInt8(24 + 186), 3);
+  assert.equal(bytes.readUInt8(24 + 187), 0);
   assert.deepEqual([0, 1, 2, 3].map((index) => bytes.readFloatLE(24 + 192 + index * 4)),
     [7, 4, 2, 4]);
+  assert.equal(bytes.readFloatLE(24 + 208 + 20), 0.5);
 });
 
 test("indexed meshes upload once and frames reference their resource", () => {

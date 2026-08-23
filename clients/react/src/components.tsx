@@ -42,11 +42,13 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
-    readonly startColor: Color; readonly endColor: Color };
+    readonly startColor: Color; readonly endColor: Color;
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[] };
   readonly strokeColor?: Color;
   readonly strokeGradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
-    readonly startColor: Color; readonly endColor: Color };
+    readonly startColor: Color; readonly endColor: Color;
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[] };
   readonly strokeWidth?: number; readonly viewBox?: { x: number; y: number;
     width: number; height: number }; readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round" | "square";

@@ -246,11 +246,13 @@ export interface PathData {
   readonly fillGradient?: {
     readonly start: Point; readonly end: Point;
     readonly startColor: Color; readonly endColor: Color;
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   };
   readonly stroke?: Color;
   readonly strokeGradient?: {
     readonly start: Point; readonly end: Point;
     readonly startColor: Color; readonly endColor: Color;
+    readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   };
   readonly strokeWidth?: number;
   readonly tolerance?: number;
