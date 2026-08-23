@@ -57,7 +57,7 @@ export function Path({ data, color, gradient, strokeColor, strokeGradient, strok
   const path: PathData = { resourceId: resource.resourceId, segments: resource.segments,
     viewBox: viewBox ?? resource.bounds, fit: "contain",
     ...(color ? { fill: color } : {}), ...(gradient ? { fillGradient: gradient } : {}),
-    ...(strokeGradient ? { strokeGradient } : {}),
+    ...(strokeGradient && strokeWidth > 0 ? { strokeGradient, strokeWidth } : {}),
     ...(strokeColor && strokeWidth > 0
       ? { stroke: strokeColor, strokeWidth } : {}),
     ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),
