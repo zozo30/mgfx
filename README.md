@@ -275,6 +275,11 @@ The React package also provides higher-level typed layout, shape, `Button`, and
 controlled `TextField` components, so normal application code rarely needs to
 use the renderer's intrinsic `mgfx-*` elements directly.
 
+Focused text fields render a measured caret between independently shaped prefix
+and suffix runs. Left/right arrows move the Unicode code-point insertion
+position; text input, Backspace, and native clipboard Paste edit at that caret
+instead of always appending to the field.
+
 Native title, initial size, and minimum size are declarative through the React
 `Window` component; its layout effect emits MGIP metadata independently from the
 graphics frame.

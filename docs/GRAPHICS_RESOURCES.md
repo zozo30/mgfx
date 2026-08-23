@@ -88,6 +88,12 @@ bold native faces for titles, section labels, dialog headings, and buttons while
 body text remains regular; measurement therefore always matches the geometry
 that is eventually drawn.
 
+Editable text reuses the same measurement path: a focused field shapes the
+prefix and suffix around a visible caret, so cursor movement and insertion do
+not require backend-specific widget code. Editing indices are Unicode code
+points while the graphics server remains responsible only for shaping and draw
+execution.
+
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
 cluster mapping. This keeps line breaking, selection, and accessibility

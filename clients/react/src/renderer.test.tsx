@@ -132,6 +132,22 @@ test("controlled TextField owns focus, UTF-8 input, and Backspace", () => {
   assert.equal(observed, "");
 });
 
+test("TextField edits Unicode at its movable caret", () => {
+  let observed = "abc";
+  function Form() {
+    const [value, setValue] = useState("abc");
+    return <TextField value={value} onChange={(next) => { observed = next; setValue(next); }} />;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Form />); surface.resize({ width: 260, height: 48 });
+  surface.pointerDown({ x: 20, y: 20 }); surface.pointerUp({ x: 20, y: 20 });
+  surface.keyDown({ key: Key.ArrowLeft, modifiers: 0, repeat: false });
+  surface.textInput("Ω");
+  assert.equal(observed, "abΩc");
+  surface.keyDown({ key: Key.Backspace, modifiers: 0, repeat: false });
+  assert.equal(observed, "abc");
+});
+
 test("TextField semantic shortcuts use the native clipboard service", async () => {
   let observed = "hello";
   let copied = "";

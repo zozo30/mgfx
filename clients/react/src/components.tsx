@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Key, type Color } from "@mgfx/demo-client/protocol";
 import type { MeshData, PathData, Style, TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
@@ -109,33 +109,56 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   style = {}, textStyle }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [caret, setCaret] = useState([...value].length);
   const clipboard = useNativeClipboard();
   useNativeCursor("text", hovered);
+  const characters = [...value];
+  useEffect(() => setCaret((index) => Math.min(index, characters.length)), [value]);
   const displayed = value || placeholder;
   const color = value ? textStyle?.color ?? rgba(1, 1, 1) : rgba(0.55, 0.60, 0.70);
+  const insert = (text: string) => {
+    const incoming = [...text];
+    const available = Math.max(0, maxLength - characters.length);
+    const accepted = incoming.slice(0, available);
+    if (accepted.length === 0) return;
+    onChange([...characters.slice(0, caret), ...accepted, ...characters.slice(caret)].join(""));
+    setCaret(caret + accepted.length);
+  };
   return (
     <mgfx-stack style={{ preferredSize: { height: 48 }, padding: all(12), cornerRadius: 10,
       clip: true, background: focused ? rgba(0.16, 0.28, 0.52) : rgba(0.12, 0.14, 0.21),
       borderWidth: focused ? 2 : 1,
       borderColor: focused ? rgba(0.38, 0.62, 1) : rgba(0.24, 0.28, 0.38), ...style }}
       onHoverChange={setHovered}
-      onFocusChange={setFocused}
-      onTextInput={(text) => onChange([...value, ...text].slice(0, maxLength).join(""))}
+      onFocusChange={(next) => { setFocused(next); if (next) setCaret(characters.length); }}
+      onTextInput={insert}
       onKeyDown={(key) => {
-        if (key === Key.Backspace && value.length > 0) {
-          onChange([...value].slice(0, -1).join(""));
+        if (key === Key.Backspace && caret > 0) {
+          onChange([...characters.slice(0, caret - 1), ...characters.slice(caret)].join(""));
+          setCaret(caret - 1);
+        } else if (key === Key.ArrowLeft) {
+          setCaret(Math.max(0, caret - 1));
+        } else if (key === Key.ArrowRight) {
+          setCaret(Math.min(characters.length, caret + 1));
         } else if (key === Key.Copy) {
           clipboard.writeClipboard(value);
         } else if (key === Key.Cut) {
           clipboard.writeClipboard(value);
           onChange("");
+          setCaret(0);
         } else if (key === Key.Paste) {
-          void clipboard.readClipboard().then((text) => {
-            onChange([...value, ...text].slice(0, maxLength).join(""));
-          });
+          void clipboard.readClipboard().then(insert);
         }
       }}>
-      <Text value={displayed} style={{ ...textStyle, color }} />
+      {focused ? <Row style={{ gap: 0, crossAxisAlignment: "center" }}>
+        <Text value={characters.slice(0, caret).join("")}
+          style={{ ...textStyle, color: textStyle?.color ?? rgba(1, 1, 1) }} />
+        <Box style={{ preferredSize: { width: 2, height: textStyle?.fontSize ?? 22 },
+          background: rgba(0.60, 0.82, 1) }} />
+        <Text value={characters.length === 0 ? placeholder : characters.slice(caret).join("")}
+          style={{ ...textStyle, color: characters.length === 0
+            ? rgba(0.55, 0.60, 0.70) : textStyle?.color ?? rgba(1, 1, 1) }} />
+      </Row> : <Text value={displayed} style={{ ...textStyle, color }} />}
     </mgfx-stack>
   );
 }
