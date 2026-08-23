@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { FrameEncoder, Key } from "./protocol.js";
-import { box, cacheNativeTextAdvance, circle, column, Component, ComponentHost, constrain, focusable, mesh, row, scrollView, stack, text, type Element } from "./ui.js";
+import { box, cacheNativeTextAdvance, circle, column, Component, ComponentHost, constrain,
+  focusable, mesh, richText, row, scrollView, stack, text, type Element } from "./ui.js";
 
 test("constraints clamp desired sizes", () => {
   assert.deepEqual(constrain({ width: 200, height: 5 }, {
@@ -268,6 +269,39 @@ test("native metrics drive automatic wrapping and centered line placement", () =
   assert.ok(Math.abs(frame.readFloatLE(28) - -0.2) < 0.0001);
   const secondCommand = 16 + 8 + 32 + Buffer.byteLength("ONE");
   assert.equal(frame.readUInt16LE(secondCommand), 8);
+});
+
+test("styled rich text wraps into aligned compact native lines", () => {
+  cacheNativeTextAdvance("system", "ALPHA", 3);
+  cacheNativeTextAdvance("system", " ", 0.5);
+  cacheNativeTextAdvance("serif", "BETA", 4, "regular", "italic");
+  cacheNativeTextAdvance("serif", " ", 0.5, "regular", "italic");
+  cacheNativeTextAdvance("system", "GAMMA", 4, "bold");
+  class WrappedRichText extends Component {
+    build(): Element {
+      return column([richText([
+        { value: "ALPHA " },
+        { value: "BETA ", style: { fontFamily: "serif", fontStyle: "italic" } },
+        { value: "GAMMA", style: { fontWeight: "bold" } },
+      ], { fontSize: 10, fontFamily: "system", wrap: true, lineHeight: 14,
+        textAlign: "center" })], {
+        padding: { top: 0, right: 20, bottom: 0, left: 20 },
+        crossAxisAlignment: "stretch",
+      });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new WrappedRichText());
+  host.layout({ width: 120, height: 40 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 120, height: 40 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 3);
+  assert.equal(frame.readUInt16LE(16), 24);
+  assert.ok(Math.abs(frame.readFloatLE(24) - -0.625) < 0.0001);
+  const secondCommand = 16 + 8 + frame.readUInt32LE(20);
+  assert.equal(frame.readUInt16LE(secondCommand), 24);
+  assert.ok(Math.abs(frame.readFloatLE(secondCommand + 8) - -1 / 3) < 0.0001);
+  assert.ok(Math.abs(frame.readFloatLE(secondCommand + 12) - 0.3) < 0.0001);
 });
 
 test("cached native advance participates in row measurement", () => {

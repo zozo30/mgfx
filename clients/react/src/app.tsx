@@ -291,11 +291,13 @@ function GraphicsRoute({ chromeMetrics, vectorIcons, customFontResourceId }: App
           <Column style={{ padding: all(22), gap: 12, cornerRadius: 16,
             background: rgba(0.055, 0.07, 0.11), borderWidth: 1,
             borderColor: rgba(0.22, 0.30, 0.46) }}>
-            <RichText style={{ fontSize: 26 }} spans={[
+            <RichText style={{ fontSize: 26, lineHeight: 34, wrap: true,
+              textAlign: "center" }} spans={[
               { value: "RICH ", style: { fontWeight: "bold", color: rgba(0.62, 0.88, 1) } },
               { value: "TEXT ", style: { fontFamily: "serif", fontStyle: "italic",
                 color: rgba(0.95, 0.62, 0.35) } },
-              { value: "RUNS", style: { fontFamily: "system", fontWeight: "semibold",
+              { value: "RUNS WRAP WITH EXACT NATIVE METRICS", style: {
+                fontFamily: "system", fontWeight: "semibold",
                 textDecoration: "underline", color: rgba(0.42, 0.92, 0.68),
                 ...(customFontResourceId === undefined ? {} :
                   { fontResourceId: customFontResourceId }) } },

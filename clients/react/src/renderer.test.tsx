@@ -111,6 +111,31 @@ test("React requests wrapping metrics per unique text run and relayouts once", a
   assert.equal(requests, 6);
 });
 
+test("React measures wrapped rich-text words with each span's native style", async () => {
+  let frames = 0;
+  const requests: string[] = [];
+  const surface = new ReactSurface(() => { frames += 1; }, undefined, {
+    createPath: () => {},
+    measureText: async (family, value, weight, style) => {
+      requests.push(`${family}:${weight}:${style}:${value}`);
+      return value === " " ? 0.5 : 4;
+    },
+  });
+  surface.render(<RichText style={{ fontSize: 20, lineHeight: 26, wrap: true }} spans={[
+    { value: "ASYNC-RICH ", style: { fontWeight: "semibold" } },
+    { value: "SERIF-WORD", style: { fontFamily: "serif", fontStyle: "italic" } },
+  ]} />);
+  surface.resize({ width: 130, height: 60 });
+  const approximateFrames = frames;
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.deepEqual(new Set(requests), new Set([
+    "system:semibold:regular:ASYNC-RICH",
+    "system:semibold:regular: ",
+    "serif:regular:italic:SERIF-WORD",
+  ]));
+  assert.equal(frames, approximateFrames + 1);
+});
+
 test("native router pushes and pops React route history", () => {
   let observed = "";
   function Home() {

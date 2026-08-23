@@ -119,15 +119,19 @@ export function nativeTextMetricRuns(value: string, style: TextStyle): readonly 
   if (!style.fontFamily || style.fontFamily === "pixel") return [];
   if (!style.wrap) return value.split("\n").filter(Boolean);
   const runs = new Set<string>();
-  let wordCount = 0;
   for (const paragraph of value.split("\n")) {
-    for (const word of paragraph.match(/\S+/gu) ?? []) { runs.add(word); wordCount += 1; }
+    for (const word of paragraph.match(/\S+/gu) ?? []) runs.add(word);
   }
-  if (wordCount > 1) runs.add(" ");
+  if (/[^\S\n]/u.test(value)) runs.add(" ");
   return [...runs];
 }
 
 interface LaidOutTextLine { readonly value: string; readonly width: number }
+interface LaidOutRichTextSpan { readonly value: string; readonly style: TextStyle }
+interface LaidOutRichTextLine {
+  readonly spans: readonly LaidOutRichTextSpan[];
+  readonly width: number;
+}
 
 function textRunWidth(value: string, style: TextStyle, fontSize: number): number {
   if (value.length === 0) return 0;
@@ -169,6 +173,54 @@ function layoutTextLines(value: string, style: TextStyle, maximumWidth: number):
     result.push({ value: line, width });
   }
   return result;
+}
+
+function sameRichTextStyle(left: TextStyle, right: TextStyle): boolean {
+  const leftColor = left.color, rightColor = right.color;
+  return left.fontFamily === right.fontFamily && left.fontResourceId === right.fontResourceId &&
+    left.fontWeight === right.fontWeight && left.fontStyle === right.fontStyle &&
+    left.letterSpacing === right.letterSpacing && left.textDecoration === right.textDecoration &&
+    left.fontSize === right.fontSize && leftColor?.red === rightColor?.red &&
+    leftColor?.green === rightColor?.green && leftColor?.blue === rightColor?.blue &&
+    leftColor?.alpha === rightColor?.alpha;
+}
+
+function layoutRichTextLines(spans: readonly RichTextSpan[], base: TextStyle,
+  maximumWidth: number): LaidOutRichTextLine[] {
+  const fontSize = base.fontSize ?? 16;
+  const lines: Array<{ spans: LaidOutRichTextSpan[]; width: number }> =
+    [{ spans: [], width: 0 }];
+  let pendingSpace: { style: TextStyle; width: number } | undefined;
+  const current = () => lines[lines.length - 1]!;
+  const append = (value: string, style: TextStyle, width: number) => {
+    const line = current(), previous = line.spans[line.spans.length - 1];
+    if (previous && sameRichTextStyle(previous.style, style))
+      line.spans[line.spans.length - 1] = { value: previous.value + value, style };
+    else line.spans.push({ value, style });
+    line.width += width;
+  };
+  const breakLine = () => { pendingSpace = undefined; lines.push({ spans: [], width: 0 }); };
+
+  for (const span of spans) {
+    const style: TextStyle = { ...base, ...span.style, fontSize };
+    for (const token of span.value.match(/\n|[^\S\n]+|[^\s]+/gu) ?? []) {
+      if (token === "\n") { breakLine(); continue; }
+      if (/^[^\S\n]+$/u.test(token)) {
+        if (base.wrap) pendingSpace = { style, width: textRunWidth(" ", style, fontSize) };
+        else append(token, style, textRunWidth(token, style, fontSize));
+        continue;
+      }
+      const wordWidth = textRunWidth(token, style, fontSize);
+      const separatorWidth = current().spans.length > 0 ? pendingSpace?.width ?? 0 : 0;
+      if (base.wrap && maximumWidth > 0 && current().spans.length > 0 &&
+          current().width + separatorWidth + wordWidth > maximumWidth) breakLine();
+      else if (pendingSpace && current().spans.length > 0)
+        append(" ", pendingSpace.style, pendingSpace.width);
+      pendingSpace = undefined;
+      append(token, style, wordWidth);
+    }
+  }
+  return lines;
 }
 export interface MeshData {
   readonly resourceId: number;
@@ -433,9 +485,10 @@ class Node {
     }
     if (this.type === "richText" && this.richTextSpans.length > 0) {
       const fontSize = this.textStyle.fontSize ?? 16;
-      width = this.richTextSpans.reduce((sum, span) =>
-        sum + textRunWidth(span.value, { ...this.textStyle, ...span.style, fontSize }, fontSize), 0);
-      height = fontSize;
+      const lines = layoutRichTextLines(this.richTextSpans, this.textStyle, inner.maxWidth);
+      width = Math.max(0, ...lines.map((line) => line.width));
+      const lineHeight = this.textStyle.lineHeight ?? fontSize * 1.2;
+      height = fontSize + Math.max(0, lines.length - 1) * lineHeight;
     }
     let flowCount = 0;
     for (const child of this.children) {
@@ -959,24 +1012,31 @@ function paintRichText(encoder: FrameEncoder, bounds: Rect, spans: readonly Rich
   base: TextStyle, viewport: Size): void {
   if (spans.length === 0) return;
   const fontSize = base.fontSize ?? 16;
-  const visible = spans.filter((span) => span.value.length > 0);
-  if (visible.length === 0) return;
-  encoder.richText(visible.map((span) => {
-    const style = { ...base, ...span.style, fontSize };
-    const decoration = style.textDecoration === "underline" ? TextDecoration.Underline
-      : style.textDecoration === "line-through" ? TextDecoration.LineThrough
-      : style.textDecoration === "underline line-through"
-        ? TextDecoration.Underline | TextDecoration.LineThrough : TextDecoration.None;
-    return {
-      text: span.value,
-      color: style.color ?? { red: 1, green: 1, blue: 1, alpha: 1 },
-      family: !style.fontFamily || style.fontFamily === "pixel" ? "system" as const : style.fontFamily,
-      ...(style.fontWeight ? { weight: style.fontWeight } : {}),
-      ...(style.fontStyle ? { style: style.fontStyle } : {}),
-      letterSpacing: (style.letterSpacing ?? 0) / fontSize,
-      decoration,
-      ...(style.fontResourceId === undefined ? {} : { fontResourceId: style.fontResourceId }),
-    };
-  }), bounds.x / viewport.width * 2 - 1, 1 - bounds.y / viewport.height * 2,
-  fontSize / viewport.height * 2);
+  const lines = layoutRichTextLines(spans, base, bounds.width);
+  const lineHeight = base.lineHeight ?? fontSize * 1.2;
+  const lineX = (width: number) => bounds.x + (base.textAlign === "center"
+    ? (bounds.width - width) / 2 : base.textAlign === "end" ? bounds.width - width : 0);
+  lines.forEach((line, lineIndex) => {
+    if (line.spans.length === 0) return;
+    encoder.richText(line.spans.map((span) => {
+      const style = span.style;
+      const decoration = style.textDecoration === "underline" ? TextDecoration.Underline
+        : style.textDecoration === "line-through" ? TextDecoration.LineThrough
+        : style.textDecoration === "underline line-through"
+          ? TextDecoration.Underline | TextDecoration.LineThrough : TextDecoration.None;
+      return {
+        text: span.value,
+        color: style.color ?? { red: 1, green: 1, blue: 1, alpha: 1 },
+        family: !style.fontFamily || style.fontFamily === "pixel"
+          ? "system" as const : style.fontFamily,
+        ...(style.fontWeight ? { weight: style.fontWeight } : {}),
+        ...(style.fontStyle ? { style: style.fontStyle } : {}),
+        letterSpacing: (style.letterSpacing ?? 0) / fontSize,
+        decoration,
+        ...(style.fontResourceId === undefined ? {} : { fontResourceId: style.fontResourceId }),
+      };
+    }), lineX(line.width) / viewport.width * 2 - 1,
+    1 - (bounds.y + lineIndex * lineHeight) / viewport.height * 2,
+    fontSize / viewport.height * 2);
+  });
 }

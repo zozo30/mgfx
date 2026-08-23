@@ -308,9 +308,11 @@ after replacement, and fonts are released on destroy or disconnect.
 
 React `<RichText>` accepts declarative spans with independent color, family,
 weight, italic, tracking, decoration, and custom font ID. The client lowers the
-whole line to one `DrawRichText` command; Metal-side CoreText shaping advances
-the pen between runs and batches their colored glyph geometry. Exact per-run
-measurements still feed retained layout asynchronously.
+whole visible line to one `DrawRichText` command; Metal-side CoreText shaping
+advances the pen between runs and batches their colored glyph geometry. Explicit
+newlines plus optional word wrapping, line height, and start/center/end alignment
+share the native metric cache with plain text. Each resulting line remains one
+compact command, and exact per-run measurements feed retained layout asynchronously.
 
 ## Requirements
 
