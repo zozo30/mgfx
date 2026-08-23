@@ -22,6 +22,9 @@ PathTriangles tessellatePath(const std::vector<mgfx::ipc::PathSegment>& segments
                              LineCap lineCap,
                              LineJoin lineJoin,
                              float strokeWidth,
-                             float tolerance);
+                             float tolerance,
+                             float dashLength = 0.0F,
+                             float gapLength = 0.0F,
+                             float dashOffset = 0.0F);
 
 } // namespace gfx

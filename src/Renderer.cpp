@@ -1183,10 +1183,14 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                         static_cast<NS::UInteger>(vertices.size()));
                 first += count;
             }
-        } else if (command.opcode == gfx::Opcode::drawPath) {
+        } else if (command.opcode == gfx::Opcode::drawPath ||
+                   command.opcode == gfx::Opcode::drawDashedPath) {
             gfx::PathCommand path{};
             if (!gfx::decodePath(command, path) || !std::isfinite(path.strokeWidth) ||
                 !std::isfinite(path.tolerance) || path.strokeWidth < 0.0F ||
+                !std::isfinite(path.dashLength) || !std::isfinite(path.gapLength) ||
+                !std::isfinite(path.dashOffset) || path.dashLength < 0.0F ||
+                path.gapLength < 0.0F ||
                 path.tolerance <= 0.0F || path.viewBox.width <= 0.0F ||
                 path.viewBox.height <= 0.0F) {
                 throw std::runtime_error("Malformed path command");
@@ -1198,16 +1202,21 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 return cached.fill == path.fill && cached.stroke == path.stroke &&
                        cached.fillRule == path.fillRule && cached.lineCap == path.lineCap &&
                        cached.lineJoin == path.lineJoin && cached.strokeWidth == path.strokeWidth &&
-                       cached.tolerance == path.tolerance;
+                       cached.tolerance == path.tolerance &&
+                       cached.dashLength == path.dashLength &&
+                       cached.gapLength == path.gapLength &&
+                       cached.dashOffset == path.dashOffset;
             };
             auto cached = std::find_if(resource.cache.begin(), resource.cache.end(), sameStyle);
             if (cached == resource.cache.end()) {
                 if (resource.cache.size() >= 16) resource.cache.erase(resource.cache.begin());
                 resource.cache.push_back({path.fill, path.stroke, path.fillRule, path.lineCap,
                     path.lineJoin, path.strokeWidth, path.tolerance,
+                    path.dashLength, path.gapLength, path.dashOffset,
                     gfx::tessellatePath(resource.segments, path.fill, path.stroke,
                         path.fillRule, path.lineCap, path.lineJoin,
-                        path.strokeWidth, path.tolerance)});
+                        path.strokeWidth, path.tolerance,
+                        path.dashLength, path.gapLength, path.dashOffset)});
                 cached = std::prev(resource.cache.end());
             }
             const auto drawPathTriangles = [&](const std::vector<gfx::PathPoint>& points,

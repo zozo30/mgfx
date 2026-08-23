@@ -83,6 +83,7 @@ export const ExtendedServerCapability = {
   ResourceStatusEvents: 1n << 33n,
   LinearGradientCircles: 1n << 34n,
   GridPatterns: 1n << 35n,
+  DashedPathStrokes: 1n << 36n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -240,6 +241,7 @@ export interface PathPaint {
   readonly fillRule?: "nonzero" | "evenodd";
   readonly lineCap?: "butt" | "round";
   readonly lineJoin?: "bevel" | "round";
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 
 export type FontFamily = "system" | "monospace" | "serif" | "rounded";
@@ -735,7 +737,8 @@ export class FrameEncoder {
     if (!Number.isSafeInteger(pathId) || pathId <= 0 || pathId > 0xffff_ffff ||
         (!paint.fill && !paint.fillGradient && !paint.stroke))
       throw new RangeError("Path draw requires an ID and paint");
-    const payload = Buffer.alloc(128);
+    const dashed = paint.dash !== undefined;
+    const payload = Buffer.alloc(dashed ? 144 : 128);
     payload.writeUInt32LE(pathId, 0);
     payload.writeUInt8((paint.fill || paint.fillGradient ? 1 : 0) |
       (paint.stroke ? 2 : 0) | (paint.fillGradient ? 4 : 0), 4);
@@ -761,7 +764,14 @@ export class FrameEncoder {
         if (!Number.isFinite(value)) throw new RangeError("Path draw values must be finite");
         payload.writeFloatLE(value, 16 + index * 4);
       });
-    this.command(7, payload);
+    if (paint.dash) {
+      const values = [paint.dash.length, paint.dash.gap, paint.dash.offset ?? 0];
+      if (!paint.stroke || values.some((value) => !Number.isFinite(value)) ||
+          paint.dash.length <= 0 || paint.dash.gap <= 0)
+        throw new RangeError("Dashed path requires a stroke and positive finite dash lengths");
+      values.forEach((value, index) => payload.writeFloatLE(value, 128 + index * 4));
+    }
+    this.command(dashed ? 27 : 7, payload);
   }
 
   richText(runs: readonly RichTextRun[], left: number, top: number, fontSize: number): void {

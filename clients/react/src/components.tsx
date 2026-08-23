@@ -38,7 +38,7 @@ export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?
   <mgfx-mesh mesh={data} style={style ?? {}} />;
 
 export function Path({ data, color, gradient, strokeColor, strokeWidth = 0, viewBox, tolerance,
-  fillRule, lineCap = "round", lineJoin = "round", style }: {
+  fillRule, lineCap = "round", lineJoin = "round", dash, style }: {
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
@@ -48,6 +48,7 @@ export function Path({ data, color, gradient, strokeColor, strokeWidth = 0, view
     width: number; height: number }; readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round";
   readonly lineJoin?: "bevel" | "round"; readonly style?: Style;
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }) {
   const resource = useMemo(() => canonicalPath(data), [data]);
   const path: PathData = { resourceId: resource.resourceId, segments: resource.segments,
@@ -56,7 +57,7 @@ export function Path({ data, color, gradient, strokeColor, strokeWidth = 0, view
     ...(strokeColor && strokeWidth > 0
       ? { stroke: strokeColor, strokeWidth } : {}),
     ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),
-    lineCap, lineJoin };
+    ...(dash ? { dash } : {}), lineCap, lineJoin };
   return <mgfx-path path={path} style={style ?? {}} />;
 }
 
@@ -72,6 +73,7 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
       {...(layer.fill ? { color: layer.fill } : {})}
       {...(layer.fillGradient ? { gradient: layer.fillGradient } : {})}
       {...(layer.stroke ? { strokeColor: layer.stroke, strokeWidth: layer.strokeWidth } : {})}
+      {...(layer.dash ? { dash: layer.dash } : {})}
       fillRule={layer.fillRule} lineCap={layer.lineCap} lineJoin={layer.lineJoin}
       tolerance={tolerance} style={{ position: "absolute", inset: all(0) }} />)}
   </Stack>;

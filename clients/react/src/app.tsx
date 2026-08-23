@@ -156,7 +156,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     <circle cx="34" cy="32" r="17" fill="#16c784" stroke="#b9ffe0" stroke-width="3"/>
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
     <polyline points="78,42 89,24 99,42 110,24 121,42 131,24"
-      stroke="#ff8a1e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      stroke="#ff8a1e" stroke-width="4" stroke-dasharray="7 4" stroke-dashoffset="2"
+      stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>`;
 

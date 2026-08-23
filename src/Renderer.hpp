@@ -59,6 +59,9 @@ private:
         gfx::LineJoin lineJoin;
         float strokeWidth;
         float tolerance;
+        float dashLength;
+        float gapLength;
+        float dashOffset;
         gfx::PathTriangles triangles;
     };
     struct PathResource {

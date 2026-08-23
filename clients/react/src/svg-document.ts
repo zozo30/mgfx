@@ -12,6 +12,7 @@ export interface SvgVectorLayer {
   readonly fillRule: "nonzero" | "evenodd";
   readonly lineCap: "butt" | "round";
   readonly lineJoin: "bevel" | "round";
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 
 export interface LinearGradientPaint {
@@ -40,6 +41,7 @@ interface PaintState {
   readonly lineJoin: "bevel" | "round";
   readonly currentColor: Color;
   readonly transform: Matrix;
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 
 interface GradientDefinition {
@@ -103,7 +105,8 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     layers.push({ path, ...(fill ? { fill } : {}), ...(fillGradient ? { fillGradient } : {}),
       ...(stroke ? { stroke } : {}),
       strokeWidth: state.strokeWidth * matrixScale(state.transform), fillRule: state.fillRule,
-      lineCap: state.lineCap, lineJoin: state.lineJoin });
+      lineCap: state.lineCap, lineJoin: state.lineJoin,
+      ...(stroke && state.dash ? { dash: scaleDash(state.dash, matrixScale(state.transform)) } : {}) });
     if (layers.length > 1024) throw new RangeError("SVG exceeds 1024 vector layers");
   }
   if (layers.length === 0) throw new Error("SVG has no supported vector layers");
@@ -145,10 +148,31 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     attributes["stroke-linecap"] === "butt" ? "butt" : parent.lineCap;
   const lineJoin = attributes["stroke-linejoin"] === "round" ? "round" :
     attributes["stroke-linejoin"] ? "bevel" : parent.lineJoin;
+  const dash = attributes["stroke-dasharray"] === undefined ? parent.dash :
+    parseDash(attributes["stroke-dasharray"], attributes["stroke-dashoffset"] ??
+      (parent.dash?.offset !== undefined ? String(parent.dash.offset) : undefined));
+  const inheritedDash = dash && attributes["stroke-dashoffset"] !== undefined
+    ? { ...dash, offset: finiteNumber(attributes["stroke-dashoffset"], 0) } : dash;
   return { ...(fill ? { fill } : {}), ...(fillGradientId ? { fillGradientId } : {}),
     ...(stroke ? { stroke } : {}), strokeWidth, opacity, fillOpacity, strokeOpacity,
-    fillRule, lineCap, lineJoin, currentColor,
+    fillRule, lineCap, lineJoin, currentColor, ...(inheritedDash ? { dash: inheritedDash } : {}),
     transform: multiply(parent.transform, parseTransform(attributes.transform)) };
+}
+
+function parseDash(value: string, offset: string | undefined) {
+  if (value.trim().toLowerCase() === "none") return undefined;
+  const values = value.trim().split(/[\s,]+/).filter(Boolean).map(Number);
+  if ((values.length !== 1 && values.length !== 2) ||
+      values.some((item) => !Number.isFinite(item) || item <= 0))
+    throw new Error(`SVG vector strokes support one or two positive dash lengths, got ${value}`);
+  return { length: values[0]!, gap: values[1] ?? values[0]!,
+    ...(offset !== undefined ? { offset: finiteNumber(offset, 0) } : {}) };
+}
+
+function scaleDash(dash: { readonly length: number; readonly gap: number; readonly offset?: number },
+  scale: number) {
+  return { length: dash.length * scale, gap: dash.gap * scale,
+    ...(dash.offset !== undefined ? { offset: dash.offset * scale } : {}) };
 }
 
 function parseLinearGradients(source: string, currentColor: Color): ReadonlyMap<string, GradientDefinition> {
@@ -311,6 +335,12 @@ function numberAttribute(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;
   const result = Number(value);
   if (!Number.isFinite(result) || result < 0) throw new Error(`Invalid SVG number ${value}`);
+  return result;
+}
+function finiteNumber(value: string | undefined, fallback: number): number {
+  if (value === undefined) return fallback;
+  const result = Number(value);
+  if (!Number.isFinite(result)) throw new Error(`Invalid SVG number ${value}`);
   return result;
 }
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));

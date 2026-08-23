@@ -4,7 +4,7 @@ import { parseSvgVectorDocument } from "./svg-document.js";
 
 test("SVG documents lower inherited paint, primitives, and group transforms to vector layers", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 120 80" fill="none"
-      stroke="currentColor" stroke-width="2">
+      stroke="currentColor" stroke-width="2" stroke-dasharray="3 2" stroke-dashoffset="-1">
     <g transform="translate(10 5) scale(2)">
       <rect x="0" y="0" width="20" height="12" rx="3" />
       <circle cx="28" cy="10" r="6" fill="#20d890" stroke="none" opacity="0.5" />
@@ -13,6 +13,8 @@ test("SVG documents lower inherited paint, primitives, and group transforms to v
   assert.deepEqual(document.viewBox, { x: 0, y: 0, width: 120, height: 80 });
   assert.equal(document.layers.length, 2);
   assert.equal(document.layers[0]?.strokeWidth, 4);
+  assert.deepEqual(document.layers[0]?.dash, { length: 6, gap: 4, offset: -2 });
+  assert.equal(document.layers[1]?.dash, undefined);
   assert.deepEqual(document.layers[0]?.stroke,
     { red: 0.4, green: 0.8, blue: 1, alpha: 1 });
   assert.equal(document.layers[1]?.fill?.alpha, 0.5);

@@ -253,6 +253,7 @@ export interface PathData {
   readonly fillRule?: "nonzero" | "evenodd";
   readonly lineCap?: "butt" | "round";
   readonly lineJoin?: "bevel" | "round";
+  readonly dash?: { readonly length: number; readonly gap: number; readonly offset?: number };
 }
 export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richText" | "scroll" | "circle" | "mesh" | "path";
 export interface Element {
@@ -812,6 +813,7 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
     ...(path.fillRule ? { fillRule: path.fillRule } : {}),
     ...(path.lineCap ? { lineCap: path.lineCap } : {}),
     ...(path.lineJoin ? { lineJoin: path.lineJoin } : {}),
+    ...(path.dash ? { dash: path.dash } : {}),
   });
 }
 

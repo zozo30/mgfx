@@ -71,7 +71,8 @@ test("React Svg composes a complete document from persistent server paths", () =
   const surface = new ReactSurface((value) => { frame = value; }, undefined, {
     createPath: () => { uploads += 1; },
   });
-  surface.render(<Svg source={`<svg viewBox="0 0 40 24" fill="none" stroke="currentColor">
+  surface.render(<Svg source={`<svg viewBox="0 0 40 24" fill="none" stroke="currentColor"
+      stroke-dasharray="3 2">
     <rect x="1" y="1" width="38" height="22" rx="4"/>
     <circle cx="12" cy="12" r="6" fill="#22cc88" stroke="none"/>
   </svg>`} color={{ red: 0.3, green: 0.8, blue: 1, alpha: 1 }}
@@ -80,7 +81,12 @@ test("React Svg composes a complete document from persistent server paths", () =
   assert.equal(uploads, 2);
   assert.ok(frame);
   assert.equal(frame.readUInt32LE(12), 4);
-  assert.equal(frame.readUInt16LE(40), 7);
+  const opcodes: number[] = [];
+  for (let offset = 16; offset < frame.length;) {
+    opcodes.push(frame.readUInt16LE(offset));
+    offset += 8 + frame.readUInt32LE(offset + 4);
+  }
+  assert.ok(opcodes.includes(27));
 });
 
 test("React Mesh uploads indexed geometry once and draws its resource ID", () => {

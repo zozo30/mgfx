@@ -89,6 +89,13 @@ int main() {
         std::cerr << "Butt-capped stroke contains gaps or overlapping triangles\n";
         return 1;
     }
+    const gfx::PathTriangles dashedStroke = gfx::tessellatePath(strokePath, false, true,
+        gfx::FillRule::nonzero, gfx::LineCap::butt, gfx::LineJoin::bevel,
+        2, 0.25F, 4, 2, 0);
+    if (std::fabs(triangleArea(dashedStroke.stroke) - 28.0) > 0.001) {
+        std::cerr << "Server dash splitting did not preserve exact painted length\n";
+        return 1;
+    }
     const double roundArea = triangleArea(stroke.stroke);
     if (roundArea <= 43.0 || roundArea >= 43.2) {
         std::cerr << "Round caps do not form a non-overlapping semicircle pair\n";

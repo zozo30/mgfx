@@ -119,6 +119,10 @@ does not generate icon triangles or image textures.
 Path paint can be a solid color or a source-space linear gradient. Gradient
 endpoints and colors travel in each lightweight `DrawPath`, while geometry
 remains cached by the server.
+`Path` also accepts a `{ length, gap, offset }` dash style. Inline SVG maps
+one- or two-value `stroke-dasharray` and signed `stroke-dashoffset` onto it;
+the Metal server splits and tessellates the stroke rather than receiving segments
+or triangles from React.
 
 ```tsx
 const [name, setName] = useState("");

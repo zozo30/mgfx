@@ -104,6 +104,7 @@ mask. Bits 0–31 exactly mirror the legacy `ServerHello` word.
 Native resource readiness events are advertised by `1 << 33`.
 Server-rendered linear-gradient circles are advertised by `1 << 34`.
 Server-rendered technical grid patterns are advertised by `1 << 35`.
+Server-tessellated dashed path strokes are advertised by `1 << 36`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -218,3 +219,8 @@ MGFX opcode `26` (`DrawGridPattern`) carries a destination, pixel spacing, minor
 and major widths, two-dimensional pixel offset, integer major-line interval,
 rounded-corner radius, and minor/major straight-alpha colors. Its payload remains
 76 bytes regardless of the destination area or number of visible grid lines.
+
+MGFX opcode `27` (`DrawDashedPath`) preserves the complete 128-byte `DrawPath`
+payload and appends dash length, gap length, signed phase, and one reserved `f32`.
+The fixed 144-byte command references the original path resource; the backend
+performs arc-length splitting and stroke tessellation.

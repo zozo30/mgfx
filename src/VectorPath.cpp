@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 
 namespace gfx {
@@ -359,16 +360,80 @@ void appendStroke(const std::vector<Contour>& contours, float width,
     }
 }
 
+PathPoint interpolate(const PathPoint& start, const PathPoint& end, float amount) {
+    return {start[0] + (end[0] - start[0]) * amount,
+            start[1] + (end[1] - start[1]) * amount};
+}
+
+std::vector<Contour> dashContours(const std::vector<Contour>& contours,
+                                  float dashLength, float gapLength, float offset) {
+    std::vector<Contour> result;
+    const float period = dashLength + gapLength;
+    if (dashLength <= 0.0F || gapLength <= 0.0F || period <= 0.0F) return contours;
+    for (const Contour& contour : contours) {
+        if (contour.points.size() < 2) continue;
+        float phase = std::fmod(offset, period);
+        if (phase < 0.0F) phase += period;
+        bool drawing = phase < dashLength;
+        float remaining = drawing ? dashLength - phase : period - phase;
+        std::vector<Contour> pieces;
+        std::vector<PathPoint> active;
+        const std::size_t segmentCount = contour.closed
+            ? contour.points.size() : contour.points.size() - 1;
+        for (std::size_t index = 0; index < segmentCount; ++index) {
+            const PathPoint& start = contour.points[index];
+            const PathPoint& end = contour.points[(index + 1) % contour.points.size()];
+            const float length = std::hypot(end[0] - start[0], end[1] - start[1]);
+            if (length <= 0.00001F) continue;
+            float consumed = 0.0F;
+            while (consumed < length - 0.00001F) {
+                const float amount = std::min(remaining, length - consumed);
+                const PathPoint from = interpolate(start, end, consumed / length);
+                const PathPoint to = interpolate(start, end, (consumed + amount) / length);
+                if (drawing) {
+                    if (active.empty()) active.push_back(from);
+                    if (active.back() != to) active.push_back(to);
+                }
+                consumed += amount;
+                remaining -= amount;
+                if (remaining <= 0.00001F) {
+                    if (drawing && active.size() > 1) pieces.push_back({std::move(active), false});
+                    active.clear();
+                    drawing = !drawing;
+                    remaining = drawing ? dashLength : gapLength;
+                }
+            }
+        }
+        if (drawing && active.size() > 1) pieces.push_back({std::move(active), false});
+        if (contour.closed && pieces.size() > 1 &&
+            pieces.front().points.front() == contour.points.front() &&
+            pieces.back().points.back() == contour.points.front()) {
+            std::vector<PathPoint> joined = std::move(pieces.back().points);
+            joined.insert(joined.end(), std::next(pieces.front().points.begin()),
+                          pieces.front().points.end());
+            pieces.front().points = std::move(joined);
+            pieces.pop_back();
+        }
+        result.insert(result.end(), std::make_move_iterator(pieces.begin()),
+                      std::make_move_iterator(pieces.end()));
+    }
+    return result;
+}
+
 } // namespace
 
 PathTriangles tessellatePath(const std::vector<mgfx::ipc::PathSegment>& segments,
                              bool fillEnabled, bool strokeEnabled, FillRule fillRule,
                              LineCap lineCap, LineJoin lineJoin,
-                             float strokeWidth, float tolerance) {
+                             float strokeWidth, float tolerance,
+                             float dashLength, float gapLength, float dashOffset) {
     PathTriangles result;
     const std::vector<Contour> contours = flatten(segments, std::max(0.01F, tolerance));
     if (fillEnabled) appendFill(contours, fillRule, result.fill);
-    if (strokeEnabled) appendStroke(contours, strokeWidth, lineCap, lineJoin, result.stroke);
+    if (strokeEnabled) appendStroke(
+        dashLength > 0.0F && gapLength > 0.0F
+            ? dashContours(contours, dashLength, gapLength, dashOffset) : contours,
+        strokeWidth, lineCap, lineJoin, result.stroke);
     return result;
 }
 

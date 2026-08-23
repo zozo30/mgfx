@@ -55,7 +55,8 @@ shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
 becomes a stable path resource with its own compact paint command. Two-stop linear
 gradients resolve from `<defs>` in either SVG user space or object-bounding-box
 space, including stop opacity and gradient transforms, then use native `DrawPath`
-gradient paint. Executable or external content is rejected, while complex gradients,
+gradient paint. One- and two-value `stroke-dasharray` plus `stroke-dashoffset`
+lower to native dashed path paint. Executable or external content is rejected, while complex gradients,
 masks, text, and embedded images deliberately continue through the high-quality raster fallback.
 
 Reusable `Mesh` resources now contain positions, vertex colors, and triangle
@@ -69,6 +70,11 @@ features that the vector path does not yet support.
 The current `DrawPath` paint supports a two-stop source-space linear gradient.
 Gradient endpoints and colors are deliberately excluded from the tessellation
 cache key, allowing paint animation without rebuilding path geometry.
+
+`DrawDashedPath` extends the same paint with dash length, gap, and signed phase.
+The server splits flattened contours at exact arc-length boundaries before using
+the ordinary cap/join stroke tessellator. Dash style participates in the bounded
+geometry cache; clients still upload only the original canonical path.
 
 MGFX colors are specified as straight RGBA. Backends must premultiply before
 interpolation and use source-over compositing. Texture uploads remain

@@ -50,7 +50,8 @@ React also exposes a selective vector `<Svg>` path for complete inline documents
 It lowers paths, lines, polylines, polygons, rectangles, circles, and ellipses;
 inherits fill/stroke presentation attributes through nested groups; applies affine
 group transforms in source coordinates; resolves two-stop `<linearGradient>` definitions
-in user space or object-bounding-box space; and uploads every canonical layer once.
+in user space or object-bounding-box space; lowers one- or two-value SVG dash arrays;
+and uploads every canonical layer once.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.
@@ -74,7 +75,9 @@ layout changes reuse geometry. Compound paths support SVG `evenodd` and
 `nonzero` fill rules, while strokes support configurable width, butt or round
 caps, and bevel or round joins. `DrawPath` also supports source-space linear
 gradient fills: the server derives vertex colors from cached source geometry,
-so changing gradient colors does not invalidate tessellation. The demo loads several icons from the
+so changing gradient colors does not invalidate tessellation. Dashed strokes use
+the compact `DrawDashedPath` extension: dash splitting, curve flattening, joins,
+and caps all remain server-owned and cached. The demo loads several icons from the
 ISC-licensed `lucide-static` package through this path pipeline.
 
 All colored geometry uses source-over alpha compositing. Straight-alpha MGFX

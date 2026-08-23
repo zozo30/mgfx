@@ -335,7 +335,8 @@ void CommandEncoder::drawMesh(const MeshCommand& mesh) {
 }
 
 void CommandEncoder::drawPath(const PathCommand& path) {
-    beginCommand(Opcode::drawPath, 128);
+    const bool dashed = path.dashLength > 0.0F && path.gapLength > 0.0F;
+    beginCommand(dashed ? Opcode::drawDashedPath : Opcode::drawPath, dashed ? 144 : 128);
     appendU32(bytes_, path.pathId);
     bytes_.push_back(static_cast<std::uint8_t>((path.fill ? 1U : 0U) |
                                                (path.stroke ? 2U : 0U) |
@@ -362,6 +363,12 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                         path.gradient.endColor.red, path.gradient.endColor.green,
                         path.gradient.endColor.blue, path.gradient.endColor.alpha}) {
         appendFloat(bytes_, value);
+    }
+    if (dashed) {
+        appendFloat(bytes_, path.dashLength);
+        appendFloat(bytes_, path.gapLength);
+        appendFloat(bytes_, path.dashOffset);
+        appendFloat(bytes_, 0.0F);
     }
 }
 
@@ -761,7 +768,9 @@ bool decodeMesh(const CommandView& command, MeshCommand& mesh) {
 }
 
 bool decodePath(const CommandView& command, PathCommand& path) {
-    if (command.opcode != Opcode::drawPath || command.payloadSize != 128 ||
+    const bool dashed = command.opcode == Opcode::drawDashedPath;
+    if ((!dashed && command.opcode != Opcode::drawPath) ||
+        command.payloadSize != (dashed ? 144U : 128U) ||
         command.payload[4] > 7 ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::round) ||
@@ -789,8 +798,13 @@ bool decodePath(const CommandView& command, PathCommand& path) {
                       readFloat(command.payload + 104), readFloat(command.payload + 108)},
                      {readFloat(command.payload + 112), readFloat(command.payload + 116),
                       readFloat(command.payload + 120), readFloat(command.payload + 124)}};
+    path.dashLength = dashed ? readFloat(command.payload + 128) : 0.0F;
+    path.gapLength = dashed ? readFloat(command.payload + 132) : 0.0F;
+    path.dashOffset = dashed ? readFloat(command.payload + 136) : 0.0F;
+    if (dashed && readU32(command.payload + 140) != 0U) return false;
     return path.pathId != 0 && (path.fill || path.stroke) &&
-           (!path.fillGradient || path.fill);
+           (!path.fillGradient || path.fill) &&
+           (!dashed || (path.stroke && path.dashLength > 0.0F && path.gapLength > 0.0F));
 }
 
 bool decodeText(const CommandView& command, TextCommand& text) {
