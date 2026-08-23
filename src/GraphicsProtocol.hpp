@@ -285,6 +285,7 @@ struct PathCommand {
         float focalRadius = 0.0F;
     };
     bool fillRadialGradient = false;
+    bool strokeRadialGradient = false;
     RadialGradient radialGradient{};
 };
 

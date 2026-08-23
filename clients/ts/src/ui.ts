@@ -1,5 +1,6 @@
 import { FrameEncoder, Key, TextDecoration,
-  type ClipRect, type Color, type PathSegment, type Vertex } from "./protocol.js";
+  type ClipRect, type Color, type PathRadialGradientPaint,
+  type PathSegment, type Vertex } from "./protocol.js";
 
 export interface Point { readonly x: number; readonly y: number }
 export interface Size { readonly width: number; readonly height: number }
@@ -249,14 +250,7 @@ export interface PathData {
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect";
   };
-  readonly fillRadialGradient?: {
-    readonly center: Point; readonly axisX: Point; readonly axisY: Point;
-    readonly innerColor: Color; readonly outerColor: Color;
-    readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
-    readonly spread?: "pad" | "repeat" | "reflect";
-    readonly focal?: Point;
-    readonly focalRadius?: number;
-  };
+  readonly fillRadialGradient?: PathRadialGradientPaint;
   readonly stroke?: Color;
   readonly strokeGradient?: {
     readonly start: Point; readonly end: Point;
@@ -264,6 +258,7 @@ export interface PathData {
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect";
   };
+  readonly strokeRadialGradient?: PathRadialGradientPaint;
   readonly strokeWidth?: number;
   readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd";
@@ -809,7 +804,7 @@ function paintServerRoundedRect(encoder: FrameEncoder, bounds: Rect, cornerRadiu
 function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefined,
   viewport: Size): void {
   if (!path || (!path.fill && !path.fillGradient && !path.fillRadialGradient &&
-      !path.stroke && !path.strokeGradient) ||
+      !path.stroke && !path.strokeGradient && !path.strokeRadialGradient) ||
       path.viewBox.width <= 0 || path.viewBox.height <= 0) return;
   let destination = bounds;
   if (path.fit === "contain") {
@@ -829,6 +824,7 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
     ...(path.fillRadialGradient ? { fillRadialGradient: path.fillRadialGradient } : {}),
     ...(path.stroke ? { stroke: path.stroke } : {}),
     ...(path.strokeGradient ? { strokeGradient: path.strokeGradient } : {}),
+    ...(path.strokeRadialGradient ? { strokeRadialGradient: path.strokeRadialGradient } : {}),
     ...(path.strokeWidth !== undefined ? { strokeWidth: path.strokeWidth } : {}),
     ...(path.tolerance !== undefined ? { tolerance: path.tolerance } : {}),
     ...(path.fillRule ? { fillRule: path.fillRule } : {}),

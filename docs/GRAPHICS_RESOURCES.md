@@ -229,6 +229,9 @@ approximations. Support is advertised by `focalRadialPathGradients`.
 radius. Metal solves the quadratic formed by the interpolated center and radius;
 pixels inside the focal circle receive the first stop. Support is advertised by
 `twoCircleRadialPathGradients`.
+All radial path forms may target fill or stroke triangles. Independent radial
+fill and stroke paints are separate draw commands over the same cached path
+resource; support is advertised by `radialPathGradientStrokes`.
 
 ## Linear gradients
 

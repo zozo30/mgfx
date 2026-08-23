@@ -13,6 +13,7 @@ export interface SvgVectorLayer {
   readonly fillRadialGradient?: RadialGradientPaint;
   readonly stroke?: Color;
   readonly strokeGradient?: LinearGradientPaint;
+  readonly strokeRadialGradient?: RadialGradientPaint;
   readonly strokeWidth: number;
   readonly fillRule: "nonzero" | "evenodd";
   readonly lineCap: "butt" | "round" | "square";
@@ -146,18 +147,23 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     const fillGradient = state.fillGradientId && !fillRadialGradient
       ? resolveGradient(gradients, state.fillGradientId, path, state, viewBox, state.fillOpacity) : undefined;
     const stroke = state.stroke ? multiplyAlpha(state.stroke, state.opacity * state.strokeOpacity) : undefined;
-    const strokeGradient = state.strokeGradientId
+    const strokeRadialGradient = state.strokeGradientId && radialGradients.has(state.strokeGradientId)
+      ? resolveRadialGradient(radialGradients, state.strokeGradientId, path, state, viewBox,
+        state.strokeOpacity) : undefined;
+    const strokeGradient = state.strokeGradientId && !strokeRadialGradient
       ? resolveGradient(gradients, state.strokeGradientId, path, state, viewBox,
         state.strokeOpacity) : undefined;
     if ((!fill || fill.alpha <= 0) && !fillGradient && !fillRadialGradient &&
-        ((!stroke || stroke.alpha <= 0) && !strokeGradient || state.strokeWidth <= 0)) continue;
+        ((!stroke || stroke.alpha <= 0) && !strokeGradient && !strokeRadialGradient ||
+         state.strokeWidth <= 0)) continue;
     layers.push({ path, ...(fill ? { fill } : {}), ...(fillGradient ? { fillGradient } : {}),
       ...(fillRadialGradient ? { fillRadialGradient } : {}),
       ...(stroke ? { stroke } : {}), ...(strokeGradient ? { strokeGradient } : {}),
+      ...(strokeRadialGradient ? { strokeRadialGradient } : {}),
       strokeWidth: state.strokeWidth * matrixScale(state.transform), fillRule: state.fillRule,
       lineCap: state.lineCap, lineJoin: state.lineJoin,
       ...(state.miterLimit !== undefined ? { miterLimit: state.miterLimit } : {}),
-      ...((stroke || strokeGradient) && state.dash
+      ...((stroke || strokeGradient || strokeRadialGradient) && state.dash
         ? { dash: scaleDash(state.dash, matrixScale(state.transform)) } : {}) });
     if (layers.length > 1024) throw new RangeError("SVG exceeds 1024 vector layers");
   }

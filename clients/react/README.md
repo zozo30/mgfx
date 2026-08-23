@@ -133,6 +133,9 @@ interval per fragment. Offset `fx`/`fy` and nonzero `fr` use Metal's native
 two-circle solver; the client normalizes focal radius against outer radius and
 sends no gradient geometry. Radial `href`/`xlink:href` chains inherit geometry,
 transforms, spread, and stops before lowering to that same command.
+Radial definitions also work as SVG strokes. The server shades its cached stroke
+tessellation directly; when fill and stroke use independent radial paints, React
+emits two draws sharing the same persistent path resource.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

@@ -343,7 +343,7 @@ void CommandEncoder::drawPath(const PathCommand& path) {
         path.strokeGradientPaint.stops.size() > 2 ||
         path.gradient.spread != PathGradient::Spread::pad ||
         path.strokeGradientPaint.spread != PathGradient::Spread::pad;
-    const bool radialGradient = path.fillRadialGradient;
+    const bool radialGradient = path.fillRadialGradient || path.strokeRadialGradient;
     const bool twoCircleRadialGradient = radialGradient && path.radialGradient.hasFocalPoint &&
         path.radialGradient.focalRadius > 0.0F;
     const bool focalRadialGradient = radialGradient && path.radialGradient.hasFocalPoint &&
@@ -372,7 +372,8 @@ void CommandEncoder::drawPath(const PathCommand& path) {
                                                (path.stroke ? 2U : 0U) |
                                                (path.fillGradient ? 4U : 0U) |
                                                (path.strokeGradient ? 8U : 0U) |
-                                               (path.fillRadialGradient ? 16U : 0U)));
+                                               (path.fillRadialGradient ? 16U : 0U) |
+                                               (path.strokeRadialGradient ? 32U : 0U)));
     bytes_.push_back(static_cast<std::uint8_t>(path.fillRule));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineCap));
     bytes_.push_back(static_cast<std::uint8_t>(path.lineJoin));
@@ -955,7 +956,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
         (multiRadialGradient && !validMultiRadialSize) ||
         (focalRadialGradient && !validFocalRadialSize) ||
         (twoCircleRadialGradient && !validTwoCircleRadialSize) ||
-        command.payload[4] > (anyRadialGradient ? 31U : 15U) ||
+        command.payload[4] > (anyRadialGradient ? 63U : 15U) ||
         command.payload[5] > static_cast<std::uint8_t>(FillRule::evenodd) ||
         command.payload[6] > static_cast<std::uint8_t>(LineCap::square) ||
         command.payload[7] > static_cast<std::uint8_t>(LineJoin::miter)) return false;
@@ -965,6 +966,7 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     path.fillGradient = (command.payload[4] & 4U) != 0;
     path.strokeGradient = (command.payload[4] & 8U) != 0;
     path.fillRadialGradient = (command.payload[4] & 16U) != 0;
+    path.strokeRadialGradient = (command.payload[4] & 32U) != 0;
     path.fillRule = static_cast<FillRule>(command.payload[5]);
     path.lineCap = static_cast<LineCap>(command.payload[6]);
     path.lineJoin = static_cast<LineJoin>(command.payload[7]);
@@ -1099,7 +1101,9 @@ bool decodePath(const CommandView& command, PathCommand& path) {
     return path.pathId != 0 && (path.fill || path.stroke) &&
            (!path.fillGradient || path.fill) &&
            (!path.fillRadialGradient || (anyRadialGradient && path.fill && !path.fillGradient)) &&
-           (!anyRadialGradient || path.fillRadialGradient) &&
+           (!path.strokeRadialGradient ||
+            (anyRadialGradient && path.stroke && !path.strokeGradient)) &&
+           (!anyRadialGradient || path.fillRadialGradient || path.strokeRadialGradient) &&
            (!extended || path.strokeGradient) &&
            (!path.strokeGradient || ((extended || styled || dashArray || multiGradient) && path.stroke)) &&
            (!(dashArray || (multiGradient && multiDashCount > 0U)) || path.stroke) &&

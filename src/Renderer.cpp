@@ -1243,7 +1243,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     [](float length) { return !std::isfinite(length) || length <= 0.0F; }) ||
                 (path.fillGradient && !finiteGradient(path.gradient)) ||
                 (path.strokeGradient && !finiteGradient(path.strokeGradientPaint)) ||
-                (path.fillRadialGradient && (!std::isfinite(path.radialGradient.centerX) ||
+                ((path.fillRadialGradient || path.strokeRadialGradient) &&
+                   (!std::isfinite(path.radialGradient.centerX) ||
                     !std::isfinite(path.radialGradient.centerY) ||
                     !std::isfinite(path.radialGradient.axisXX) ||
                     !std::isfinite(path.radialGradient.axisXY) ||
@@ -1549,7 +1550,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 path.fillGradient ? &path.gradient : nullptr,
                 path.fillRadialGradient ? &path.radialGradient : nullptr);
             if (path.stroke) drawPathTriangles(cached->triangles.stroke, path.strokeColor,
-                path.strokeGradient ? &path.strokeGradientPaint : nullptr, nullptr);
+                path.strokeGradient ? &path.strokeGradientPaint : nullptr,
+                path.strokeRadialGradient ? &path.radialGradient : nullptr);
         } else if (command.opcode == gfx::Opcode::drawText) {
             gfx::TextCommand text{};
             if (!gfx::decodeText(command, text) || !std::isfinite(text.left) ||

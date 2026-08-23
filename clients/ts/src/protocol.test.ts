@@ -45,7 +45,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.MultiStopRadialPathGradients |
     ExtendedServerCapability.RadialPathGradientSpreadModes |
     ExtendedServerCapability.FocalRadialPathGradients |
-    ExtendedServerCapability.TwoCircleRadialPathGradients;
+    ExtendedServerCapability.TwoCircleRadialPathGradients |
+    ExtendedServerCapability.RadialPathGradientStrokes;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -475,6 +476,22 @@ test("radial path paint carries an affine source-space basis without client geom
   assert.equal(bytes.readUInt8(28), 17);
   assert.equal(bytes.readFloatLE(24 + 128), 20);
   assert.equal(bytes.readFloatLE(24 + 148), 10);
+});
+
+test("radial path paint targets cached server stroke geometry", () => {
+  const frame = new FrameEncoder();
+  frame.path(9, { left: 0, top: 1, right: 1, bottom: 0 },
+    { x: 0, y: 0, width: 40, height: 20 }, { strokeWidth: 2,
+      strokeRadialGradient: {
+        center: { x: 20, y: 10 }, axisX: { x: 20, y: 0 }, axisY: { x: 0, y: 10 },
+        innerColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+        outerColor: { red: 0.1, green: 0.8, blue: 0.5, alpha: 1 },
+      } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 32);
+  assert.equal(bytes.readUInt32LE(20), 184);
+  assert.equal(bytes.readUInt8(28), 34);
 });
 
 test("multi-stop radial path paint remains one bounded native command", () => {

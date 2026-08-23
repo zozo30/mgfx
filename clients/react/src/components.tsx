@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Key, KeyModifier, type Color } from "@mgfx/demo-client/protocol";
+import { Key, KeyModifier, type Color,
+  type PathRadialGradientPaint } from "@mgfx/demo-client/protocol";
 import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style,
   type RichTextSpan, type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
 import { canonicalPath } from "./vector-path.js";
-import { parseSvgVectorDocument } from "./svg-document.js";
+import { parseSvgVectorDocument, type SvgVectorLayer } from "./svg-document.js";
 import { useAnimationTime } from "./animation.js";
 
 export interface LayoutProps {
@@ -37,7 +38,8 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, sampli
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;
 
-export function Path({ data, color, gradient, radialGradient, strokeColor, strokeGradient, strokeWidth = 0, viewBox, tolerance,
+export function Path({ data, color, gradient, radialGradient, strokeColor, strokeGradient,
+  strokeRadialGradient, strokeWidth = 0, viewBox, tolerance,
   fillRule, lineCap = "round", lineJoin = "round", miterLimit, dash, style }: {
   readonly data: string; readonly color?: Color;
   readonly gradient?: { readonly start: { readonly x: number; readonly y: number };
@@ -45,16 +47,14 @@ export function Path({ data, color, gradient, radialGradient, strokeColor, strok
     readonly startColor: Color; readonly endColor: Color;
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect" };
-  readonly radialGradient?: { readonly center: { readonly x: number; readonly y: number };
-    readonly axisX: { readonly x: number; readonly y: number };
-    readonly axisY: { readonly x: number; readonly y: number };
-    readonly innerColor: Color; readonly outerColor: Color };
+  readonly radialGradient?: PathRadialGradientPaint;
   readonly strokeColor?: Color;
   readonly strokeGradient?: { readonly start: { readonly x: number; readonly y: number };
     readonly end: { readonly x: number; readonly y: number };
     readonly startColor: Color; readonly endColor: Color;
     readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
     readonly spread?: "pad" | "repeat" | "reflect" };
+  readonly strokeRadialGradient?: PathRadialGradientPaint;
   readonly strokeWidth?: number; readonly viewBox?: { x: number; y: number;
     width: number; height: number }; readonly tolerance?: number;
   readonly fillRule?: "nonzero" | "evenodd"; readonly lineCap?: "butt" | "round" | "square";
@@ -69,6 +69,7 @@ export function Path({ data, color, gradient, radialGradient, strokeColor, strok
     ...(color ? { fill: color } : {}), ...(gradient ? { fillGradient: gradient } : {}),
     ...(radialGradient ? { fillRadialGradient: radialGradient } : {}),
     ...(strokeGradient && strokeWidth > 0 ? { strokeGradient, strokeWidth } : {}),
+    ...(strokeRadialGradient && strokeWidth > 0 ? { strokeRadialGradient, strokeWidth } : {}),
     ...(strokeColor && strokeWidth > 0
       ? { stroke: strokeColor, strokeWidth } : {}),
     ...(tolerance !== undefined ? { tolerance } : {}), ...(fillRule ? { fillRule } : {}),
@@ -84,18 +85,28 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
   const currentColor = color ?? rgba(1, 1, 1);
   const document = useMemo(() => parseSvgVectorDocument(source, currentColor),
     [source, currentColor.red, currentColor.green, currentColor.blue, currentColor.alpha]);
-  return <Stack style={style ?? {}}>{document.layers.map((layer, index) =>
-    <Path key={`svg-layer-${index}`} data={layer.path} viewBox={document.viewBox}
-      {...(layer.fill ? { color: layer.fill } : {})}
-      {...(layer.fillGradient ? { gradient: layer.fillGradient } : {})}
-      {...(layer.fillRadialGradient ? { radialGradient: layer.fillRadialGradient } : {})}
-      {...(layer.stroke ? { strokeColor: layer.stroke, strokeWidth: layer.strokeWidth } : {})}
-      {...(layer.strokeGradient
+  const renderLayer = (layer: SvgVectorLayer, index: number, includeFill: boolean,
+    includeStroke: boolean, suffix = "") => <Path key={`svg-layer-${index}${suffix}`}
+      data={layer.path} viewBox={document.viewBox}
+      {...(includeFill && layer.fill ? { color: layer.fill } : {})}
+      {...(includeFill && layer.fillGradient ? { gradient: layer.fillGradient } : {})}
+      {...(includeFill && layer.fillRadialGradient
+        ? { radialGradient: layer.fillRadialGradient } : {})}
+      {...(includeStroke && layer.stroke
+        ? { strokeColor: layer.stroke, strokeWidth: layer.strokeWidth } : {})}
+      {...(includeStroke && layer.strokeGradient
         ? { strokeGradient: layer.strokeGradient, strokeWidth: layer.strokeWidth } : {})}
-      {...(layer.dash ? { dash: layer.dash } : {})}
-      {...(layer.miterLimit !== undefined ? { miterLimit: layer.miterLimit } : {})}
+      {...(includeStroke && layer.strokeRadialGradient
+        ? { strokeRadialGradient: layer.strokeRadialGradient, strokeWidth: layer.strokeWidth } : {})}
+      {...(includeStroke && layer.dash ? { dash: layer.dash } : {})}
+      {...(includeStroke && layer.miterLimit !== undefined ? { miterLimit: layer.miterLimit } : {})}
       fillRule={layer.fillRule} lineCap={layer.lineCap} lineJoin={layer.lineJoin}
-      tolerance={tolerance} style={{ position: "absolute", inset: all(0) }} />)}
+      tolerance={tolerance} style={{ position: "absolute", inset: all(0) }} />;
+  return <Stack style={style ?? {}}>{document.layers.flatMap((layer, index) =>
+    layer.fillRadialGradient && (layer.strokeGradient || layer.strokeRadialGradient)
+      ? [renderLayer(layer, index, true, false, "-fill"),
+        renderLayer(layer, index, false, true, "-stroke")]
+      : [renderLayer(layer, index, true, true)])}
   </Stack>;
 }
 

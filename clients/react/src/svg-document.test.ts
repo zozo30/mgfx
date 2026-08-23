@@ -127,6 +127,19 @@ test("SVG radial gradients inherit local geometry, spread, and stops", () => {
     </defs><rect width="10" height="10" fill="url(#a)"/></svg>`), /reference cycle/);
 });
 
+test("SVG radial gradient strokes remain native path paint", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 40 20"><defs>
+    <radialGradient id="ring"><stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#20d890"/></radialGradient></defs>
+    <rect x="2" y="2" width="36" height="16" fill="#081018"
+      stroke="url(#ring)" stroke-width="3"/></svg>`);
+  const layer = document.layers[0];
+  assert.equal(layer?.strokeGradient, undefined);
+  assert.deepEqual(layer?.strokeRadialGradient?.center, { x: 20, y: 10 });
+  assert.ok(Math.abs((layer?.strokeRadialGradient?.axisX.x ?? 0) - 18) < 0.001);
+  assert.equal(layer?.strokeWidth, 3);
+});
+
 test("SVG vector lowering reports unresolved gradient paint", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><path d="M0 0H10V10Z" fill="url(#missing)"/></svg>`),

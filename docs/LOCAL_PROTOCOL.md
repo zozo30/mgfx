@@ -117,6 +117,7 @@ Multi-stop radial path gradients are advertised by `1 << 44`.
 Radial path repeat and reflect spread modes are advertised by `1 << 45`.
 Offset focal points for radial path gradients are advertised by `1 << 46`.
 Two-circle radial path gradients with nonzero focal radius are advertised by `1 << 47`.
+Radial gradient paint on path strokes is advertised by `1 << 48`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -294,3 +295,8 @@ MGFX opcode `35` (`DrawTwoCircleRadialPath`) extends opcode 34 with normalized
 stops at byte 176, and payload size is `176 + stopCount * 20`. Focal radius must
 be in `(0,1)`, and the complete focal circle must lie inside the outer ellipse.
 Capability bit 47 is required.
+
+For opcodes 32 through 35, path flag bit 4 selects radial fill and bit 5 selects
+radial stroke. At least one must be set. Both targets share the command's radial
+paint; clients needing independent paints send two draws referencing the same
+path resource. Capability bit 48 is required before setting bit 5.

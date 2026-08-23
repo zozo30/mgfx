@@ -102,6 +102,13 @@ int main() {
         {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.8F, 0.5F, 1.0F}, {},
         gfx::PathGradient::Spread::pad, false, 0.0F, 0.0F, 0.0F};
     encoder.drawPath(radialPath);
+    gfx::PathCommand radialStrokePath = radialPath;
+    radialStrokePath.fill = false;
+    radialStrokePath.fillRadialGradient = false;
+    radialStrokePath.stroke = true;
+    radialStrokePath.strokeRadialGradient = true;
+    radialStrokePath.strokeWidth = 2.0F;
+    encoder.drawPath(radialStrokePath);
     gfx::PathCommand multiRadialPath = radialPath;
     multiRadialPath.radialGradient.stops = {
         {0.0F, {1.0F, 1.0F, 1.0F, 1.0F}},
@@ -287,6 +294,15 @@ int main() {
         !nearlyEqual(radialPathDecoded.radialGradient.axisYY, 8.0F) ||
         !decoder.next(command)) {
         return fail("Radial path decoding failed");
+    }
+    gfx::PathCommand radialStrokePathDecoded{};
+    if (!gfx::decodePath(command, radialStrokePathDecoded) ||
+        radialStrokePathDecoded.fill || !radialStrokePathDecoded.stroke ||
+        radialStrokePathDecoded.fillRadialGradient ||
+        !radialStrokePathDecoded.strokeRadialGradient ||
+        !nearlyEqual(radialStrokePathDecoded.radialGradient.axisYY, 8.0F) ||
+        !decoder.next(command)) {
+        return fail("Radial stroke path decoding failed");
     }
     gfx::PathCommand multiRadialPathDecoded{};
     if (!gfx::decodePath(command, multiRadialPathDecoded) ||
