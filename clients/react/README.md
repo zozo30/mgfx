@@ -136,6 +136,9 @@ transforms, spread, and stops before lowering to that same command.
 Radial definitions also work as SVG strokes. The server shades its cached stroke
 tessellation directly; when fill and stroke use independent radial paints, React
 emits two draws sharing the same persistent path resource.
+Radial strokes also retain SVG dash arrays, signed dash offset, caps, joins, and
+custom miter limits. The server performs dash splitting and stroke tessellation;
+React sends the original path, paint, and style values only.
 `Path` accepts either `{ length, gap, offset }` or `{ values, offset }` dash
 styles. Inline SVG maps sequences of up to 32 `stroke-dasharray` values and
 signed `stroke-dashoffset` onto them;

@@ -96,6 +96,7 @@ export const ExtendedServerCapability = {
   FocalRadialPathGradients: 1n << 46n,
   TwoCircleRadialPathGradients: 1n << 47n,
   RadialPathGradientStrokes: 1n << 48n,
+  StyledRadialPathPaint: 1n << 49n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -773,6 +774,7 @@ export class FrameEncoder {
     const dashArray = paint.dash !== undefined && "values" in paint.dash;
     const dashed = paint.dash !== undefined && !dashArray;
     const extended = paint.strokeGradient !== undefined;
+    const styled = paint.miterLimit !== undefined;
     if (paint.fillRadialGradient && paint.strokeRadialGradient)
       throw new RangeError("One path command can carry only one radial paint");
     const radialPaint = paint.fillRadialGradient ?? paint.strokeRadialGradient;
@@ -787,13 +789,13 @@ export class FrameEncoder {
     const multiRadialGradient = !twoCircleRadialGradient && !focalRadialGradient &&
       (radialStops.length > 0 ||
       (radialPaint?.spread !== undefined && radialPaint.spread !== "pad"));
-    const extendedRadialGradient = twoCircleRadialGradient || focalRadialGradient ||
-      multiRadialGradient;
+    const styledRadialGradient = radialGradient && (paint.dash !== undefined || styled);
+    const extendedRadialGradient = styledRadialGradient || twoCircleRadialGradient ||
+      focalRadialGradient || multiRadialGradient;
     const encodedRadialStops = radialStops.length > 0 ? radialStops : radialPaint ? [
       { offset: 0, color: radialPaint.innerColor },
       { offset: 1, color: radialPaint.outerColor },
     ] : [];
-    const styled = paint.miterLimit !== undefined;
     const fillStops = paint.fillGradient?.stops ?? [];
     const strokeStops = paint.strokeGradient?.stops ?? [];
     const validateStops = (stops: readonly { readonly offset: number; readonly color: Color }[]) =>
@@ -807,8 +809,8 @@ export class FrameEncoder {
     const multiGradient = fillStops.length > 2 || strokeStops.length > 2 ||
       (paint.fillGradient?.spread !== undefined && paint.fillGradient.spread !== "pad") ||
       (paint.strokeGradient?.spread !== undefined && paint.strokeGradient.spread !== "pad");
-    if ((paint.fillRadialGradient && paint.fillGradient) || (radialGradient &&
-        (paint.strokeGradient || paint.dash || paint.miterLimit !== undefined)))
+    if ((paint.fillRadialGradient && paint.fillGradient) ||
+        (radialGradient && paint.strokeGradient))
       throw new RangeError("Radial path paint cannot yet combine with extended stroke paint");
     if (styled && (!Number.isFinite(paint.miterLimit) || paint.miterLimit < 1 || paint.miterLimit > 1000))
       throw new RangeError("Path miter limit must be between 1 and 1000");
@@ -816,9 +818,18 @@ export class FrameEncoder {
         paint.dash.values.length % 2 !== 0 ||
         paint.dash.values.some((value) => !Number.isFinite(value) || value <= 0)))
       throw new RangeError("Path dash arrays require 2 through 32 positive values in pairs");
+    if (paint.dash && !("values" in paint.dash) &&
+        (!Number.isFinite(paint.dash.length) || !Number.isFinite(paint.dash.gap) ||
+         paint.dash.length <= 0 || paint.dash.gap <= 0) ||
+        paint.dash?.offset !== undefined && !Number.isFinite(paint.dash.offset))
+      throw new RangeError("Path dash values must be positive and finite");
     const multiDash = paint.dash === undefined ? [] : "values" in paint.dash
       ? paint.dash.values : [paint.dash.length, paint.dash.gap];
-    const payload = Buffer.alloc(twoCircleRadialGradient ? 176 + encodedRadialStops.length * 20 :
+    if (paint.dash && !paint.stroke && !paint.strokeGradient && !paint.strokeRadialGradient)
+      throw new RangeError("Dashed path requires stroke paint");
+    const payload = Buffer.alloc(styledRadialGradient
+      ? 184 + multiDash.length * 4 + encodedRadialStops.length * 20 :
+      twoCircleRadialGradient ? 176 + encodedRadialStops.length * 20 :
       focalRadialGradient ? 168 + encodedRadialStops.length * 20 :
       multiRadialGradient ? 160 + encodedRadialStops.length * 20 :
       radialGradient ? 184 : multiGradient ? 192 + multiDash.length * 4 +
@@ -856,7 +867,9 @@ export class FrameEncoder {
       const focal = radial.focal ?? radial.center;
       const radialHeader = [radial.center.x, radial.center.y, radial.axisX.x, radial.axisX.y,
         radial.axisY.x, radial.axisY.y];
-      const radialValues = twoCircleRadialGradient ? [...radialHeader, focal.x, focal.y,
+      const radialValues = styledRadialGradient ? [...radialHeader, focal.x, focal.y,
+        focalRadius, paint.miterLimit ?? 4, paint.dash?.offset ?? 0] :
+        twoCircleRadialGradient ? [...radialHeader, focal.x, focal.y,
         focalRadius, 0] : focalRadialGradient ? [...radialHeader, focal.x, focal.y] :
         multiRadialGradient ? radialHeader : [...radialHeader,
         radial.innerColor.red, radial.innerColor.green, radial.innerColor.blue, radial.innerColor.alpha,
@@ -868,13 +881,31 @@ export class FrameEncoder {
         });
       const determinant = radial.axisX.x * radial.axisY.y - radial.axisX.y * radial.axisY.x;
       if (Math.abs(determinant) < 0.000001) throw new RangeError("Radial path axes must be invertible");
-      if (focalRadialGradient || twoCircleRadialGradient) {
+      if (focalRadialGradient || twoCircleRadialGradient ||
+          (styledRadialGradient && (radial.focal !== undefined || focalRadius > 0))) {
         const dx = focal.x - radial.center.x, dy = focal.y - radial.center.y;
         const focalX = (dx * radial.axisY.y - dy * radial.axisY.x) / determinant;
         const focalY = (radial.axisX.x * dy - radial.axisX.y * dx) / determinant;
         if (!Number.isFinite(focalX) || !Number.isFinite(focalY) ||
             Math.hypot(focalX, focalY) + focalRadius >= 1)
           throw new RangeError("Radial focal circle must lie inside its field");
+      }
+      if (styledRadialGradient) {
+        payload.writeUInt16LE(multiDash.length, 172);
+        payload.writeUInt8(encodedRadialStops.length, 174);
+        payload.writeUInt8(radial.spread === "repeat" ? 1 : radial.spread === "reflect" ? 2 : 0,
+          175);
+        payload.writeUInt8(focalRadius > 0 ? 2 : radial.focal !== undefined ? 1 : 0, 176);
+        multiDash.forEach((value, index) => payload.writeFloatLE(value, 184 + index * 4));
+        const stopsOffset = 184 + multiDash.length * 4;
+        encodedRadialStops.forEach((stop, index) => {
+          const offset = stopsOffset + index * 20;
+          payload.writeFloatLE(stop.offset, offset);
+          [stop.color.red, stop.color.green, stop.color.blue, stop.color.alpha]
+            .forEach((value, channel) => payload.writeFloatLE(value, offset + 4 + channel * 4));
+        });
+        this.command(36, payload);
+        return;
       }
       if (extendedRadialGradient) {
         const headerOffset = twoCircleRadialGradient ? 168 : focalRadialGradient ? 160 : 152;

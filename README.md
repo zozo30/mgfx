@@ -89,6 +89,8 @@ two source-space radius vectors, and up to eight ordered colors, while Metal
 evaluates the elliptical falloff per fragment over the server-owned path mesh.
 The same radial paint can target cached stroke geometry; independently painted
 radial fill and stroke lower to two small draws sharing one path resource.
+Dash arrays, phase, joins, caps, and custom miter limits remain server-owned when
+that stroke uses radial paint.
 The same gradient paint is available for strokes, so changing gradient colors
 does not invalidate tessellation. Two-value dashed strokes use the compact
 `DrawDashedPath` extension, while longer rhythms use `DrawDashArrayPath`: dash

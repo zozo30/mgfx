@@ -118,6 +118,7 @@ Radial path repeat and reflect spread modes are advertised by `1 << 45`.
 Offset focal points for radial path gradients are advertised by `1 << 46`.
 Two-circle radial path gradients with nonzero focal radius are advertised by `1 << 47`.
 Radial gradient paint on path strokes is advertised by `1 << 48`.
+Styled and dashed radial path paint is advertised by `1 << 49`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -300,3 +301,12 @@ For opcodes 32 through 35, path flag bit 4 selects radial fill and bit 5 selects
 radial stroke. At least one must be set. Both targets share the command's radial
 paint; clients needing independent paints send two draws referencing the same
 path resource. Capability bit 48 is required before setting bit 5.
+
+MGFX opcode `36` (`DrawStyledRadialPath`) starts with the 128-byte `DrawPath`
+base, then six radial-basis `f32` values, two focal-point `f32` values, normalized
+`f32 focalRadius`, `f32 miterLimit`, `f32 dashOffset`, `u16 dashCount`,
+`u8 stopCount`, `u8 spread`, and `u8 radialMode` (centered `0`, focal `1`,
+two-circle `2`) followed by seven reserved zero bytes. Dash lengths start at byte
+184 and stops follow them. Payload size is
+`184 + dashCount * 4 + stopCount * 20`; dash count is zero or an even 2–32 and
+stop count is 2–8. Capability bit 49 is required.

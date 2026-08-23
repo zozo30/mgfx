@@ -109,6 +109,21 @@ int main() {
     radialStrokePath.strokeRadialGradient = true;
     radialStrokePath.strokeWidth = 2.0F;
     encoder.drawPath(radialStrokePath);
+    gfx::PathCommand styledRadialStrokePath = radialStrokePath;
+    styledRadialStrokePath.miterLimit = 6.0F;
+    styledRadialStrokePath.dashOffset = -2.0F;
+    styledRadialStrokePath.dashPattern = {7.0F, 4.0F, 2.0F, 4.0F};
+    styledRadialStrokePath.radialGradient.hasFocalPoint = true;
+    styledRadialStrokePath.radialGradient.focalX = 9.0F;
+    styledRadialStrokePath.radialGradient.focalY = 10.0F;
+    styledRadialStrokePath.radialGradient.focalRadius = 0.2F;
+    styledRadialStrokePath.radialGradient.spread = gfx::PathGradient::Spread::reflect;
+    styledRadialStrokePath.radialGradient.stops = {
+        {0.0F, {1.0F, 1.0F, 1.0F, 1.0F}},
+        {0.4F, {0.2F, 0.9F, 0.7F, 1.0F}},
+        {1.0F, {0.1F, 0.8F, 0.5F, 1.0F}},
+    };
+    encoder.drawPath(styledRadialStrokePath);
     gfx::PathCommand multiRadialPath = radialPath;
     multiRadialPath.radialGradient.stops = {
         {0.0F, {1.0F, 1.0F, 1.0F, 1.0F}},
@@ -303,6 +318,19 @@ int main() {
         !nearlyEqual(radialStrokePathDecoded.radialGradient.axisYY, 8.0F) ||
         !decoder.next(command)) {
         return fail("Radial stroke path decoding failed");
+    }
+    gfx::PathCommand styledRadialStrokePathDecoded{};
+    if (!gfx::decodePath(command, styledRadialStrokePathDecoded) ||
+        !styledRadialStrokePathDecoded.strokeRadialGradient ||
+        styledRadialStrokePathDecoded.dashPattern !=
+            std::vector<float>({7.0F, 4.0F, 2.0F, 4.0F}) ||
+        !nearlyEqual(styledRadialStrokePathDecoded.dashOffset, -2.0F) ||
+        !nearlyEqual(styledRadialStrokePathDecoded.miterLimit, 6.0F) ||
+        styledRadialStrokePathDecoded.radialGradient.spread !=
+            gfx::PathGradient::Spread::reflect ||
+        styledRadialStrokePathDecoded.radialGradient.stops.size() != 3U ||
+        !decoder.next(command)) {
+        return fail("Styled radial stroke path decoding failed");
     }
     gfx::PathCommand multiRadialPathDecoded{};
     if (!gfx::decodePath(command, multiRadialPathDecoded) ||

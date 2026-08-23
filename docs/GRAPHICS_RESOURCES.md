@@ -232,6 +232,10 @@ pixels inside the focal circle receive the first stop. Support is advertised by
 All radial path forms may target fill or stroke triangles. Independent radial
 fill and stroke paints are separate draw commands over the same cached path
 resource; support is advertised by `radialPathGradientStrokes`.
+`DrawStyledRadialPath` combines any radial model with the existing server-owned
+stroke styles: up to 32 dash lengths, signed phase, caps, joins, and a custom
+miter limit. Geometry-cache keys include stroke style but remain independent of
+the radial stop colors. Support is advertised by `styledRadialPathPaint`.
 
 ## Linear gradients
 

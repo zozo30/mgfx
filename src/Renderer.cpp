@@ -1214,7 +1214,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                    command.opcode == gfx::Opcode::drawRadialPath ||
                    command.opcode == gfx::Opcode::drawMultiRadialPath ||
                    command.opcode == gfx::Opcode::drawFocalRadialPath ||
-                   command.opcode == gfx::Opcode::drawTwoCircleRadialPath) {
+                   command.opcode == gfx::Opcode::drawTwoCircleRadialPath ||
+                   command.opcode == gfx::Opcode::drawStyledRadialPath) {
             gfx::PathCommand path{};
             const auto finiteGradient = [](const gfx::PathGradient& gradient) {
                 return std::isfinite(gradient.startX) && std::isfinite(gradient.startY) &&

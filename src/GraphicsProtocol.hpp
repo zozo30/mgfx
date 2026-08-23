@@ -46,6 +46,7 @@ enum class Opcode : std::uint16_t {
     drawMultiRadialPath = 33,
     drawFocalRadialPath = 34,
     drawTwoCircleRadialPath = 35,
+    drawStyledRadialPath = 36,
 };
 
 enum class Primitive : std::uint8_t {

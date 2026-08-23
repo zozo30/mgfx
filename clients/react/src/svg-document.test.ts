@@ -132,12 +132,13 @@ test("SVG radial gradient strokes remain native path paint", () => {
     <radialGradient id="ring"><stop offset="0" stop-color="#ffffff"/>
       <stop offset="1" stop-color="#20d890"/></radialGradient></defs>
     <rect x="2" y="2" width="36" height="16" fill="#081018"
-      stroke="url(#ring)" stroke-width="3"/></svg>`);
+      stroke="url(#ring)" stroke-width="3" stroke-dasharray="5 3"/></svg>`);
   const layer = document.layers[0];
   assert.equal(layer?.strokeGradient, undefined);
   assert.deepEqual(layer?.strokeRadialGradient?.center, { x: 20, y: 10 });
   assert.ok(Math.abs((layer?.strokeRadialGradient?.axisX.x ?? 0) - 18) < 0.001);
   assert.equal(layer?.strokeWidth, 3);
+  assert.deepEqual(layer?.dash, { length: 5, gap: 3 });
 });
 
 test("SVG vector lowering reports unresolved gradient paint", () => {
