@@ -346,7 +346,8 @@ void CommandEncoder::drawText(const TextCommand& text) {
                  static_cast<std::uint32_t>(headerSize + text.text.size()));
     bytes_.push_back(static_cast<std::uint8_t>(text.family));
     bytes_.push_back(static_cast<std::uint8_t>(text.weight));
-    bytes_.insert(bytes_.end(), 2, 0);
+    bytes_.push_back(static_cast<std::uint8_t>(text.style));
+    bytes_.push_back(0);
     for (float value : {text.left, text.top, text.fontSize,
                         text.color.red, text.color.green,
                         text.color.blue, text.color.alpha}) {
@@ -692,12 +693,14 @@ bool decodeText(const CommandView& command, TextCommand& text) {
     if (command.opcode != Opcode::drawText || command.payloadSize <= headerSize ||
         command.payloadSize > headerSize + 65536 ||
         command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemMonospace) ||
-        command.payload[1] > static_cast<std::uint8_t>(FontWeight::bold) ||
-        command.payload[2] != 0 || command.payload[3] != 0) {
+        command.payload[1] > static_cast<std::uint8_t>(FontWeight::semibold) ||
+        command.payload[2] > static_cast<std::uint8_t>(FontStyle::italic) ||
+        command.payload[3] != 0) {
         return false;
     }
     text.family = static_cast<FontFamily>(command.payload[0]);
     text.weight = static_cast<FontWeight>(command.payload[1]);
+    text.style = static_cast<FontStyle>(command.payload[2]);
     text.left = readFloat(command.payload + 4);
     text.top = readFloat(command.payload + 8);
     text.fontSize = readFloat(command.payload + 12);

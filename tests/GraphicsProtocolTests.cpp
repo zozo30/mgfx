@@ -75,7 +75,8 @@ int main() {
                       {0.0F, 0.0F, 0.0F, 0.0F}, {1.0F, 0.5F, 0.1F, 1.0F}, true,
                       {0.0F, 0.0F, 24.0F, 0.0F,
                        {0.0F, 0.4F, 0.8F, 1.0F}, {0.8F, 0.2F, 1.0F, 1.0F}}});
-    encoder.drawText({gfx::FontFamily::systemMonospace, gfx::FontWeight::bold,
+    encoder.drawText({gfx::FontFamily::systemMonospace, gfx::FontWeight::semibold,
+                      gfx::FontStyle::italic,
                       -0.8F, 0.7F, 0.08F,
                       {0.7F, 0.9F, 1.0F, 1.0F}, "Hello — Ω"});
     encoder.endFrame();
@@ -205,7 +206,7 @@ int main() {
     }
     gfx::TextCommand text{};
     if (!gfx::decodeText(command, text) || text.family != gfx::FontFamily::systemMonospace ||
-        text.weight != gfx::FontWeight::bold ||
+        text.weight != gfx::FontWeight::semibold || text.style != gfx::FontStyle::italic ||
         text.text != "Hello — Ω" || !nearlyEqual(text.fontSize, 0.08F) ||
         !decoder.next(command) || command.opcode != gfx::Opcode::endFrame ||
         decoder.next(command) || !decoder.valid()) {

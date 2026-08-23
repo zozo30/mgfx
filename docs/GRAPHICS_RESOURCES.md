@@ -64,9 +64,10 @@ premultiplied RGBA8, giving vector and image draws the same blending result.
 
 The built-in 5×7 font remains a bootstrap and diagnostic path. The implemented
 `DrawText` command carries UTF-8, a portable system-family choice, position,
-regular/bold weight, size, and color. The macOS server shapes it with CoreText, converts glyph
-outlines through the shared path tessellator, and caches geometry by family and
-string. Metal therefore receives compact cached vector text instead of one
+regular/medium/semibold/bold weight, regular/italic style, size, and color. The
+macOS server shapes it with CoreText, converts glyph outlines through the shared
+path tessellator, and caches geometry by family, weight, style, and string.
+Metal therefore receives compact cached vector text instead of one
 rectangle pair per lit pixel. Other native hosts can execute the same command
 through DirectWrite or a HarfBuzz/FreeType service.
 

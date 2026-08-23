@@ -200,6 +200,7 @@ test("system text lowers to one server-shaped UTF-8 command", () => {
   class TextComponent extends Component {
     build(): Element {
       return text("Árvíztűrő — Ω", { fontSize: 20, fontFamily: "system",
+        fontWeight: "semibold", fontStyle: "italic",
         color: { red: 0.6, green: 0.9, blue: 1, alpha: 1 } });
     }
   }
@@ -211,6 +212,8 @@ test("system text lowers to one server-shaped UTF-8 command", () => {
   encoder.endFrame();
   const frame = encoder.finish();
   assert.equal(frame.readUInt16LE(16), 8);
+  assert.equal(frame.readUInt8(25), 3);
+  assert.equal(frame.readUInt8(26), 1);
   assert.equal(frame.subarray(56, 56 + Buffer.byteLength("Árvíztűrő — Ω")).toString(),
     "Árvíztűrő — Ω");
 });

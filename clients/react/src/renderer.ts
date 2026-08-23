@@ -1,7 +1,7 @@
 import { createContext, createElement, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
 import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants.js";
-import { FrameEncoder, type FontFamily, type FontWeight, type Key, type KeyEvent,
+import { FrameEncoder, type FontFamily, type FontStyle, type FontWeight, type Key, type KeyEvent,
   type MeshUploadVertex, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
   box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
@@ -188,7 +188,7 @@ export class ReactSurface {
                 readonly createMesh?: (id: number, vertices: readonly MeshUploadVertex[],
                   indices: readonly number[]) => void;
                 readonly measureText?: (family: FontFamily, text: string,
-                  weight?: FontWeight) => Promise<number>;
+                  weight?: FontWeight, style?: FontStyle) => Promise<number>;
               }) {
     this.container = { children: [], surface: this };
     this.snapshot = new SnapshotComponent(this.container);
@@ -262,16 +262,17 @@ export class ReactSurface {
       if (child.type === "mgfx-text") {
         const family = child.props.textStyle?.fontFamily;
         const weight = child.props.textStyle?.fontWeight ?? "regular";
+        const style = child.props.textStyle?.fontStyle ?? "regular";
         const value = child.props.value ?? child.children
           .filter((item): item is TextNode => item.kind === "text").map((item) => item.value).join("");
         if (family === "system" || family === "monospace") {
           for (const run of nativeTextMetricRuns(value, child.props.textStyle ?? {})) {
-            if (nativeTextAdvance(family, run, weight) !== undefined) continue;
-            const key = `${family}\0${weight}\0${run}`;
+            if (nativeTextAdvance(family, run, weight, style) !== undefined) continue;
+            const key = `${family}\0${weight}\0${style}\0${run}`;
             if (!this.requestedTextMetrics.has(key) && this.resourceCommands?.measureText) {
               this.requestedTextMetrics.add(key);
-              void this.resourceCommands.measureText(family, run, weight).then((advance) => {
-                cacheNativeTextAdvance(family, run, advance, weight);
+              void this.resourceCommands.measureText(family, run, weight, style).then((advance) => {
+                cacheNativeTextAdvance(family, run, advance, weight, style);
                 if (!this.metricRelayoutScheduled) {
                   this.metricRelayoutScheduled = true;
                   queueMicrotask(() => {

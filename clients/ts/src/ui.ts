@@ -81,7 +81,8 @@ export interface TextStyle {
   fontSize?: number;
   color?: Color;
   fontFamily?: "pixel" | "system" | "monospace";
-  fontWeight?: "regular" | "bold";
+  fontWeight?: "regular" | "medium" | "semibold" | "bold";
+  fontStyle?: "regular" | "italic";
   lineHeight?: number;
   wrap?: boolean;
   textAlign?: "start" | "center" | "end";
@@ -89,15 +90,18 @@ export interface TextStyle {
 
 const nativeTextAdvances = new Map<string, number>();
 const nativeTextKey = (family: "system" | "monospace", value: string,
-  weight: "regular" | "bold" = "regular") => `${family}\0${weight}\0${value}`;
+  weight: "regular" | "medium" | "semibold" | "bold" = "regular",
+  style: "regular" | "italic" = "regular") => `${family}\0${weight}\0${style}\0${value}`;
 export function cacheNativeTextAdvance(family: "system" | "monospace", value: string,
-  advance: number, weight: "regular" | "bold" = "regular"): void {
+  advance: number, weight: "regular" | "medium" | "semibold" | "bold" = "regular",
+  style: "regular" | "italic" = "regular"): void {
   if (Number.isFinite(advance) && advance >= 0)
-    nativeTextAdvances.set(nativeTextKey(family, value, weight), advance);
+    nativeTextAdvances.set(nativeTextKey(family, value, weight, style), advance);
 }
 export function nativeTextAdvance(family: "system" | "monospace", value: string,
-  weight: "regular" | "bold" = "regular"): number | undefined {
-  return nativeTextAdvances.get(nativeTextKey(family, value, weight));
+  weight: "regular" | "medium" | "semibold" | "bold" = "regular",
+  style: "regular" | "italic" = "regular"): number | undefined {
+  return nativeTextAdvances.get(nativeTextKey(family, value, weight, style));
 }
 
 export function nativeTextMetricRuns(value: string, style: TextStyle): readonly string[] {
@@ -117,7 +121,7 @@ interface LaidOutTextLine { readonly value: string; readonly width: number }
 function textRunWidth(value: string, style: TextStyle, fontSize: number): number {
   if (value.length === 0) return 0;
   if (style.fontFamily && style.fontFamily !== "pixel") {
-    const exact = nativeTextAdvance(style.fontFamily, value, style.fontWeight);
+    const exact = nativeTextAdvance(style.fontFamily, value, style.fontWeight, style.fontStyle);
     const average = style.fontFamily === "monospace" ? 0.60 : 0.56;
     return (exact ?? [...value].length * average) * fontSize;
   }
@@ -903,7 +907,7 @@ function paintText(encoder: FrameEncoder, bounds: Rect, value: string, style: Te
       if (line.value.length === 0) return;
       encoder.systemText(line.value, lineX(line.width) / viewport.width * 2 - 1,
         1 - (bounds.y + index * lineHeight) / viewport.height * 2,
-        fontSize / viewport.height * 2, color, family, style.fontWeight);
+        fontSize / viewport.height * 2, color, family, style.fontWeight, style.fontStyle);
     });
     return;
   }

@@ -55,7 +55,7 @@ const surface = new ReactSurface(
       encodePathCreate(id, segments)),
     createMesh: (id, vertices, indices) => sendMessage(socket, MessageType.MeshCreate,
       encodeMeshCreate(id, vertices, indices)),
-    measureText: (family, text, weight) => textMetrics.measure(family, text, weight),
+    measureText: (family, text, weight, style) => textMetrics.measure(family, text, weight, style),
   },
 );
 let chromeMetrics = { leadingInset: 132, titleBarHeight: 56 };

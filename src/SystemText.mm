@@ -9,6 +9,12 @@ namespace gfx {
 namespace {
 
 constexpr float designSize = 1000.0F;
+// CoreText expresses descriptor weights on the same normalized axis used by
+// AppKit. Keep the values here so the renderer does not otherwise depend on
+// AppKit just to select a font face.
+constexpr CGFloat mediumWeight = 0.23;
+constexpr CGFloat semiboldWeight = 0.30;
+constexpr CGFloat boldWeight = 0.40;
 
 struct PathBuilder {
     std::vector<mgfx::ipc::PathSegment> segments;
@@ -65,28 +71,40 @@ void appendPathElement(void* context, const CGPathElement* element) {
     }
 }
 
-CTFontRef createFont(FontFamily family, FontWeight weight) {
+CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style) {
     const CTFontUIFontType type = family == FontFamily::systemMonospace
-        ? kCTFontUIFontUserFixedPitch
-        : weight == FontWeight::bold ? kCTFontUIFontEmphasizedSystem : kCTFontUIFontSystem;
+        ? kCTFontUIFontUserFixedPitch : kCTFontUIFontSystem;
     CTFontRef font = CTFontCreateUIFontForLanguage(type, designSize, nullptr);
-    if (font != nullptr && family == FontFamily::systemMonospace && weight == FontWeight::bold) {
-        CTFontRef bold = CTFontCreateCopyWithSymbolicTraits(
-            font, designSize, nullptr, kCTFontBoldTrait, kCTFontBoldTrait);
-        if (bold != nullptr) { CFRelease(font); font = bold; }
+    if (font != nullptr && weight != FontWeight::regular) {
+        const CGFloat traitWeight = weight == FontWeight::bold ? boldWeight
+            : weight == FontWeight::semibold ? semiboldWeight : mediumWeight;
+        NSDictionary* traits = @{(__bridge id)kCTFontWeightTrait: @(traitWeight)};
+        NSDictionary* attributes = @{(__bridge id)kCTFontTraitsAttribute: traits};
+        CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithAttributes(
+            (__bridge CFDictionaryRef)attributes);
+        CTFontRef weighted = CTFontCreateCopyWithAttributes(
+            font, designSize, nullptr, descriptor);
+        CFRelease(descriptor);
+        if (weighted != nullptr) { CFRelease(font); font = weighted; }
+    }
+    if (font != nullptr && style == FontStyle::italic) {
+        CTFontRef italic = CTFontCreateCopyWithSymbolicTraits(
+            font, designSize, nullptr, kCTFontItalicTrait, kCTFontItalicTrait);
+        if (italic != nullptr) { CFRelease(font); font = italic; }
     }
     return font;
 }
 
 } // namespace
 
-ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeight weight) {
+ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
+                            FontStyle style) {
     ShapedText shaped;
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
                                             encoding:NSUTF8StringEncoding];
     if (string == nil || string.length == 0) return shaped;
-    CTFontRef baseFont = createFont(family, weight);
+    CTFontRef baseFont = createFont(family, weight, style);
     if (baseFont == nullptr) return shaped;
     NSDictionary* attributes = @{(__bridge id)kCTFontAttributeName: (__bridge id)baseFont};
     NSAttributedString* attributed = [[NSAttributedString alloc] initWithString:string
@@ -136,12 +154,13 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
     return shaped;
 }
 
-float measureSystemText(const std::string& utf8, FontFamily family, FontWeight weight) {
+float measureSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
+                        FontStyle style) {
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
                                             encoding:NSUTF8StringEncoding];
     if (string == nil || string.length == 0) return 0.0F;
-    CTFontRef font = createFont(family, weight);
+    CTFontRef font = createFont(family, weight, style);
     if (font == nullptr) return 0.0F;
     NSDictionary* attributes = @{(__bridge id)kCTFontAttributeName: (__bridge id)font};
     NSAttributedString* attributed = [[NSAttributedString alloc] initWithString:string

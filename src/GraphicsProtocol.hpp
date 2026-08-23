@@ -234,11 +234,13 @@ struct PathCommand {
 };
 
 enum class FontFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
-enum class FontWeight : std::uint8_t { regular = 0, bold = 1 };
+enum class FontWeight : std::uint8_t { regular = 0, bold = 1, medium = 2, semibold = 3 };
+enum class FontStyle : std::uint8_t { regular = 0, italic = 1 };
 
 struct TextCommand {
     FontFamily family;
     FontWeight weight;
+    FontStyle style;
     float left;
     float top;
     float fontSize;

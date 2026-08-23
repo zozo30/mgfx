@@ -80,14 +80,17 @@ enum ServerCapability : std::uint32_t {
     waveDots = 1U << 23U,
     meshResources = 1U << 24U,
     conicGradients = 1U << 25U,
+    typographyStyles = 1U << 26U,
 };
 
 enum class TextFamily : std::uint8_t { systemSans = 0, systemMonospace = 1 };
-enum class TextWeight : std::uint8_t { regular = 0, bold = 1 };
+enum class TextWeight : std::uint8_t { regular = 0, bold = 1, medium = 2, semibold = 3 };
+enum class TextStyle : std::uint8_t { regular = 0, italic = 1 };
 
 struct TextMeasure {
     TextFamily family;
     TextWeight weight;
+    TextStyle style;
     std::string text;
 };
 

@@ -25,6 +25,15 @@ int main() {
         std::cerr << "Bold system font produced no shaped geometry\n";
         return 1;
     }
+    const gfx::ShapedText semiboldItalic = gfx::shapeSystemText(
+        "Native typography", gfx::FontFamily::systemSans,
+        gfx::FontWeight::semibold, gfx::FontStyle::italic);
+    if (semiboldItalic.triangles.empty() || semiboldItalic.advance <= 0.0F ||
+        gfx::measureSystemText("Native typography", gfx::FontFamily::systemSans,
+            gfx::FontWeight::semibold, gfx::FontStyle::italic) <= 0.0F) {
+        std::cerr << "Semibold italic system font produced no shaped geometry\n";
+        return 1;
+    }
     for (const gfx::PathPoint& point : sans.triangles) {
         if (!std::isfinite(point[0]) || !std::isfinite(point[1])) {
             std::cerr << "System glyph outline contains non-finite geometry\n";

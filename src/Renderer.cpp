@@ -1169,10 +1169,12 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 text.fontSize <= 0.0F) {
                 throw std::runtime_error("Malformed text command");
             }
-            std::string cacheKey{static_cast<char>(text.family), static_cast<char>(text.weight)};
+            std::string cacheKey{static_cast<char>(text.family), static_cast<char>(text.weight),
+                                 static_cast<char>(text.style)};
             cacheKey += text.text;
             auto [found, inserted] = textCache_.try_emplace(cacheKey);
-            if (inserted) found->second = gfx::shapeSystemText(text.text, text.family, text.weight);
+            if (inserted) found->second = gfx::shapeSystemText(
+                text.text, text.family, text.weight, text.style);
             const std::vector<gfx::PathPoint>& points = found->second.triangles;
             if (points.empty() || clipEmpty()) continue;
             if (encoder == nullptr) {

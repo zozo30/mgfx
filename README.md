@@ -272,10 +272,12 @@ one backend-level quality setting. React typography uses Retina-appropriate
 drawable sizes (22 px body text and 32 px titles in the demo) rather than the
 too-small bootstrap values.
 
-`fontWeight` supports regular and bold native faces end to end. The weight is
+`fontWeight` supports regular, medium, semibold, and bold native faces end to
+end, while `fontStyle` selects regular or italic shaping. Both attributes are
 encoded in `DrawText`, included in asynchronous measurement requests, and used
-as part of server/client cache keys, so bold UI hierarchy does not compromise
-layout accuracy.
+as part of server/client cache keys, so styled UI hierarchy does not compromise
+layout accuracy. Servers advertise this extension with the
+`typographyStyles` capability bit.
 
 ## Requirements
 

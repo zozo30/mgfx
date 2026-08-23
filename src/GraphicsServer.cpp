@@ -340,7 +340,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::dotGrids |
             mgfx::ipc::ServerCapability::waveDots |
             mgfx::ipc::ServerCapability::meshResources |
-            mgfx::ipc::ServerCapability::conicGradients;
+            mgfx::ipc::ServerCapability::conicGradients |
+            mgfx::ipc::ServerCapability::typographyStyles;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -475,8 +476,12 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
                     mgfx::ipc::TextFamily::systemMonospace
                     ? gfx::FontFamily::systemMonospace : gfx::FontFamily::systemSans;
                 const gfx::FontWeight weight = measure.weight == mgfx::ipc::TextWeight::bold
-                    ? gfx::FontWeight::bold : gfx::FontWeight::regular;
-                const float advance = gfx::measureSystemText(measure.text, family, weight);
+                    ? gfx::FontWeight::bold : measure.weight == mgfx::ipc::TextWeight::medium
+                    ? gfx::FontWeight::medium : measure.weight == mgfx::ipc::TextWeight::semibold
+                    ? gfx::FontWeight::semibold : gfx::FontWeight::regular;
+                const gfx::FontStyle style = measure.style == mgfx::ipc::TextStyle::italic
+                    ? gfx::FontStyle::italic : gfx::FontStyle::regular;
+                const float advance = gfx::measureSystemText(measure.text, family, weight, style);
                 active->send(mgfx::ipc::MessageType::textMetrics,
                              mgfx::ipc::encodeTextMetrics(advance), message.sequence);
             }
