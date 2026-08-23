@@ -20,7 +20,8 @@ export interface HostProps {
   readonly onFocusChange?: (value: boolean) => void; readonly onScroll?: (x: number, y: number) => void;
   readonly onPointerDown?: (point: Point) => void; readonly onPointerMove?: (point: Point) => void;
   readonly onPointerUp?: (point: Point) => void;
-  readonly onKeyDown?: (key: Key) => void; readonly onTextInput?: (value: string) => void;
+  readonly onKeyDown?: (key: Key, modifiers: number) => void;
+  readonly onTextInput?: (value: string) => void;
   readonly mesh?: MeshData;
   readonly path?: PathData;
 }
@@ -204,7 +205,8 @@ export class ReactSurface {
   pointerDown(point: Point): void { reconciler.flushSyncFromReconciler(() => this.host.pointerDown(point)); }
   pointerUp(point: Point): void { reconciler.flushSyncFromReconciler(() => this.host.pointerUp(point)); }
   keyDown(event: KeyEvent): void {
-    reconciler.flushSyncFromReconciler(() => this.host.keyDown(event.key, (event.modifiers & 1) !== 0, event.repeat));
+    reconciler.flushSyncFromReconciler(() => this.host.keyDown(event.key,
+      (event.modifiers & 1) !== 0, event.repeat, event.modifiers));
   }
   keyUp(event: KeyEvent): void { reconciler.flushSyncFromReconciler(() => this.host.keyUp(event.key)); }
   scroll(event: ScrollEvent): void {

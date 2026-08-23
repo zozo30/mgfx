@@ -17,7 +17,7 @@ export interface MGFXProps {
   readonly onPointerMove?: (point: Point) => void;
   readonly onPointerUp?: (point: Point) => void;
   readonly onScroll?: (deltaX: number, deltaY: number) => void;
-  readonly onKeyDown?: (key: Key) => void;
+  readonly onKeyDown?: (key: Key, modifiers: number) => void;
   readonly onTextInput?: (text: string) => void;
   readonly mesh?: MeshData;
   readonly path?: PathData;

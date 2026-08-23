@@ -138,7 +138,8 @@ export class TypeScriptDemo {
     return this.host.needsRebuild();
   }
   keyDown(event: KeyEvent): boolean {
-    this.host.keyDown(event.key, (event.modifiers & KeyModifier.Shift) !== 0, event.repeat);
+    this.host.keyDown(event.key, (event.modifiers & KeyModifier.Shift) !== 0, event.repeat,
+      event.modifiers);
     return this.host.needsRebuild();
   }
   keyUp(event: KeyEvent): boolean {

@@ -22,6 +22,7 @@ mgfx::ipc::Key semanticKey(NSEvent* event) {
         case 'c': case 'C': return mgfx::ipc::Key::copy;
         case 'x': case 'X': return mgfx::ipc::Key::cut;
         case 'v': case 'V': return mgfx::ipc::Key::paste;
+        case 'a': case 'A': return mgfx::ipc::Key::selectAll;
         default: break;
         }
     }

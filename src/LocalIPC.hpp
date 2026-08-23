@@ -144,6 +144,7 @@ enum class Key : std::uint16_t {
     copy = 10,
     cut = 11,
     paste = 12,
+    selectAll = 13,
 };
 
 enum KeyModifier : std::uint16_t {

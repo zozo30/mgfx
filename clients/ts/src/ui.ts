@@ -147,7 +147,7 @@ export interface Element {
   onPointerUp?: (point: Point) => void;
   onFocusChange?: (focused: boolean) => void;
   onScroll?: (deltaX: number, deltaY: number) => void; scrollOffsetY?: number;
-  onKeyDown?: (key: Key) => void; onTextInput?: (text: string) => void;
+  onKeyDown?: (key: Key, modifiers: number) => void; onTextInput?: (text: string) => void;
   mesh?: MeshData;
   path?: PathData;
 }
@@ -180,7 +180,7 @@ export const clickable = (element: Element, onClick: () => void,
   });
 export const focusable = (element: Element, handlers: {
   onFocusChange?: (focused: boolean) => void;
-  onKeyDown?: (key: Key) => void;
+  onKeyDown?: (key: Key, modifiers: number) => void;
   onTextInput?: (text: string) => void;
 }): Element => ({ ...element, ...handlers });
 
@@ -243,7 +243,7 @@ export class ComponentHost {
     if (this.root?.hitTarget(point) === pressed) pressed.onClick?.();
     return true;
   }
-  keyDown(key: Key, shift: boolean, repeat: boolean): boolean {
+  keyDown(key: Key, shift: boolean, repeat: boolean, modifiers = shift ? 1 : 0): boolean {
     if (key === Key.Tab) {
       if (!repeat) this.focusNext(shift);
       return true;
@@ -256,7 +256,7 @@ export class ComponentHost {
       return true;
     }
     if (this.focused?.onKeyDown) {
-      this.focused.onKeyDown(key);
+      this.focused.onKeyDown(key, modifiers);
       return true;
     }
     return false;
@@ -323,7 +323,7 @@ class Node {
   onPointerUp: ((point: Point) => void) | undefined;
   onScroll: ((deltaX: number, deltaY: number) => void) | undefined;
   scrollOffsetY = 0;
-  onKeyDown: ((key: Key) => void) | undefined;
+  onKeyDown: ((key: Key, modifiers: number) => void) | undefined;
   onTextInput: ((text: string) => void) | undefined;
   mesh: MeshData | undefined = undefined;
   path: PathData | undefined = undefined;

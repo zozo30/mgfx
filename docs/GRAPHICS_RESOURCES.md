@@ -93,7 +93,8 @@ around a visible caret and highlighted selection. Captured pointer movement is
 translated to element-local coordinates by the retained UI host, then character
 advances map horizontal positions to Unicode code-point indices. Selection and
 editing stay in the component system while the graphics server remains
-responsible only for shaping and draw execution.
+responsible only for shaping and draw execution. Keyboard modifiers survive
+focused dispatch, enabling Shift+arrow range extension and semantic Select All.
 
 Deterministic application fonts will use uploaded font-byte resources and
 explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and

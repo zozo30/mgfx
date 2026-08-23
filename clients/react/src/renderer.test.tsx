@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
-import { Key, type WindowConfig } from "@mgfx/demo-client/protocol";
+import { Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
 import { Button, Path, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { DotGrid } from "./app.js";
@@ -161,6 +161,24 @@ test("TextField positions and replaces a pointer-dragged selection", () => {
   surface.pointerUp({ x: 62, y: 20 });
   surface.textInput("X");
   assert.equal(observed, "aXe");
+});
+
+test("TextField extends keyboard selection and supports Select All", () => {
+  let observed = "abc";
+  function Form() {
+    const [value, setValue] = useState("abc");
+    return <TextField value={value} onChange={(next) => { observed = next; setValue(next); }} />;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Form />); surface.resize({ width: 260, height: 48 });
+  surface.pointerDown({ x: 240, y: 20 }); surface.pointerUp({ x: 240, y: 20 });
+  surface.keyDown({ key: Key.ArrowLeft, modifiers: KeyModifier.Shift, repeat: false });
+  surface.keyDown({ key: Key.ArrowLeft, modifiers: KeyModifier.Shift, repeat: false });
+  surface.textInput("X");
+  assert.equal(observed, "aX");
+  surface.keyDown({ key: Key.SelectAll, modifiers: KeyModifier.Command, repeat: false });
+  surface.textInput("Ω");
+  assert.equal(observed, "Ω");
 });
 
 test("TextField semantic shortcuts use the native clipboard service", async () => {

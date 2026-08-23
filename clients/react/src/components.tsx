@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Key, type Color } from "@mgfx/demo-client/protocol";
+import { Key, KeyModifier, type Color } from "@mgfx/demo-client/protocol";
 import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style,
   type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
@@ -174,7 +174,8 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
       onPointerMove={(point) => { if (dragging) setCaret(indexAt(point)); }}
       onPointerUp={() => setDragging(false)}
       onTextInput={insert}
-      onKeyDown={(key) => {
+      onKeyDown={(key, modifiers) => {
+        const extending = (modifiers & KeyModifier.Shift) !== 0;
         if (key === Key.Backspace && hasSelection) {
           onChange([...characters.slice(0, selectionStart), ...characters.slice(selectionEnd)].join(""));
           setCaret(selectionStart); setAnchor(selectionStart);
@@ -182,11 +183,13 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
           onChange([...characters.slice(0, caret - 1), ...characters.slice(caret)].join(""));
           setCaret(caret - 1); setAnchor(caret - 1);
         } else if (key === Key.ArrowLeft) {
-          const next = hasSelection ? selectionStart : Math.max(0, caret - 1);
-          setCaret(next); setAnchor(next);
+          const next = !extending && hasSelection ? selectionStart : Math.max(0, caret - 1);
+          setCaret(next); if (!extending) setAnchor(next);
         } else if (key === Key.ArrowRight) {
-          const next = hasSelection ? selectionEnd : Math.min(characters.length, caret + 1);
-          setCaret(next); setAnchor(next);
+          const next = !extending && hasSelection ? selectionEnd : Math.min(characters.length, caret + 1);
+          setCaret(next); if (!extending) setAnchor(next);
+        } else if (key === Key.SelectAll) {
+          setAnchor(0); setCaret(characters.length);
         } else if (key === Key.Copy) {
           clipboard.writeClipboard(hasSelection
             ? characters.slice(selectionStart, selectionEnd).join("") : value);

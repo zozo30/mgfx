@@ -142,7 +142,8 @@ drag selection and other gestures without exposing window-space layout details.
 Keyboard events use backend-neutral logical keys. Clickable TypeScript elements
 participate in Tab/Shift-Tab focus traversal and activate with Enter or Space;
 focus and keyboard-pressed state use the same retained component identity as
-pointer interaction.
+pointer interaction. Modifier bits remain attached during focused dispatch, so
+components can implement Shift selection and platform semantic shortcuts.
 
 Printable input travels as a separate validated UTF-8 event and is routed only
 to the focused TypeScript node. The demo includes an editable field with a
@@ -281,6 +282,7 @@ Focused text fields render a measured caret between independently shaped text
 runs. Clicking positions the insertion point; dragging creates a highlighted
 Unicode code-point range. Left/right arrows collapse or move the selection, and
 text input, Backspace, Cut, Copy, and Paste operate on that range.
+Shift+Left/Right extends the range and Command+A selects the complete value.
 
 Native title, initial size, and minimum size are declarative through the React
 `Window` component; its layout effect emits MGIP metadata independently from the

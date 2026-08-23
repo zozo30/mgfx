@@ -64,6 +64,7 @@ export enum Key {
   ArrowLeft = 5, ArrowRight = 6, ArrowUp = 7, ArrowDown = 8,
   Backspace = 9,
   Copy = 10, Cut = 11, Paste = 12,
+  SelectAll = 13,
 }
 
 export enum KeyModifier {
