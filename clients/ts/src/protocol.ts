@@ -39,6 +39,7 @@ export enum MessageType {
   MeshDestroy = 31,
   FontCreate = 32,
   FontDestroy = 33,
+  ServerCapabilities = 34,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -76,6 +77,9 @@ export enum ServerCapability {
   FontResources = 1 << 30,
   RichTextRuns = 1 << 31,
 }
+export const ExtendedServerCapability = {
+  CapabilityWords64: 1n << 32n,
+} as const;
 export interface ServerHello {
   readonly version: number;
   readonly backend: GraphicsBackend;
@@ -558,6 +562,11 @@ export function decodeServerHello(payload: Buffer): ServerHello {
     backend: backend as GraphicsBackend,
     capabilities: payload.readUInt32LE(4),
   };
+}
+
+export function decodeServerCapabilities(payload: Buffer): bigint {
+  if (payload.length !== 8) throw new Error("ServerCapabilities payload must be 8 bytes");
+  return payload.readBigUInt64LE(0);
 }
 
 export function decodeAnimationTime(payload: Buffer): bigint {

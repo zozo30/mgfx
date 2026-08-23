@@ -77,6 +77,7 @@ created or shown a drawable surface.
 | 31 | `MeshDestroy` | client → server | Nonzero `u32` resource ID |
 | 32 | `FontCreate` | client → server | Nonzero `u32` ID followed by at most 16 MiB of native font bytes |
 | 33 | `FontDestroy` | client → server | Nonzero `u32` resource ID |
+| 34 | `ServerCapabilities` | server → client | Full `u64` capability mask; sent after legacy `ServerHello` |
 
 Backend is `1` Metal, `2` Vulkan, or `3` DirectX. Capability bits are client
 window lifecycle (`1 << 0`), pointer input (`1 << 1`), keyboard input (`1 << 2`),
@@ -97,6 +98,8 @@ Native font-metric underline and line-through are advertised by `1 << 28`.
 Portable serif and rounded system families are advertised by `1 << 29`.
 Persistent client font resources are advertised by `1 << 30`.
 Compact rich-text runs are advertised by `1 << 31`.
+The 64-bit capability companion itself is advertised by `1 << 32` in its full
+mask. Bits 0–31 exactly mirror the legacy `ServerHello` word.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.

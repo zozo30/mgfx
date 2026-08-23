@@ -9,7 +9,7 @@ import {
   decodeScroll,
   decodeText,
   decodeSize,
-  decodeServerHello,
+  decodeServerCapabilities, decodeServerHello,
   GraphicsBackend,
   FramePacer,
   encodeCursor,
@@ -55,6 +55,8 @@ socket.on("data", (chunk) => {
         const hello = decodeServerHello(message.payload);
         const backend = GraphicsBackend[hello.backend] ?? `backend-${hello.backend}`;
         console.log(`MGFX server ready: protocol ${hello.version}, ${backend}, capabilities 0x${hello.capabilities.toString(16)}`);
+      } else if (message.type === MessageType.ServerCapabilities) {
+        console.log(`MGFX extended capabilities 0x${decodeServerCapabilities(message.payload).toString(16)}`);
       } else if (message.type === MessageType.FramePresented) {
         framePacer.presented(message.sequence);
       } else if (message.type === MessageType.AnimationFrame) {

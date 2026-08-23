@@ -39,6 +39,15 @@ int main() {
         std::cerr << "Server hello payload round trip failed\n";
         return 1;
     }
+    constexpr std::uint64_t extendedCapabilities =
+        0xFFFF'FFFFULL | mgfx::ipc::ServerCapability::capabilityWords64;
+    std::uint64_t decodedCapabilities = 0;
+    if (!mgfx::ipc::decodeServerCapabilities(
+            mgfx::ipc::encodeServerCapabilities(extendedCapabilities), decodedCapabilities) ||
+        decodedCapabilities != extendedCapabilities) {
+        std::cerr << "Extended server capabilities round trip failed\n";
+        return 1;
+    }
 
     mgfx::ipc::WindowState windowState{};
     if (!mgfx::ipc::decodeWindowState(

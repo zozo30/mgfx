@@ -315,7 +315,7 @@ void GraphicsServer::run() {
         }
         gfx::clearFontResources();
         clientDisconnected_ = false;
-        constexpr std::uint32_t capabilities =
+        constexpr std::uint64_t capabilities =
             mgfx::ipc::ServerCapability::clientWindowLifecycle |
             mgfx::ipc::ServerCapability::pointerInput |
             mgfx::ipc::ServerCapability::keyboardInput |
@@ -347,11 +347,14 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::textDecorations |
             mgfx::ipc::ServerCapability::portableFontFamilies |
             mgfx::ipc::ServerCapability::fontResources |
-            mgfx::ipc::ServerCapability::richTextRuns;
+            mgfx::ipc::ServerCapability::richTextRuns |
+            mgfx::ipc::ServerCapability::capabilityWords64;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
-                                                   capabilities}));
+                                                   static_cast<std::uint32_t>(capabilities)}));
+        active->send(mgfx::ipc::MessageType::serverCapabilities,
+                     mgfx::ipc::encodeServerCapabilities(capabilities));
         {
             const std::lock_guard<std::mutex> lock(sizeMutex_);
             if (width_ > 0 && height_ > 0) {

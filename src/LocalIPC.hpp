@@ -47,6 +47,7 @@ enum class MessageType : std::uint16_t {
     meshDestroy = 31,
     fontCreate = 32,
     fontDestroy = 33,
+    serverCapabilities = 34,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -55,8 +56,8 @@ enum class GraphicsBackend : std::uint16_t {
     directX = 3,
 };
 
-enum ServerCapability : std::uint32_t {
-    clientWindowLifecycle = 1U << 0U,
+enum ServerCapability : std::uint64_t {
+    clientWindowLifecycle = 1ULL << 0U,
     pointerInput = 1U << 1U,
     keyboardInput = 1U << 2U,
     textInputCapability = 1U << 3U,
@@ -87,7 +88,8 @@ enum ServerCapability : std::uint32_t {
     textDecorations = 1U << 28U,
     portableFontFamilies = 1U << 29U,
     fontResources = 1U << 30U,
-    richTextRuns = 1U << 31U,
+    richTextRuns = 1ULL << 31U,
+    capabilityWords64 = 1ULL << 32U,
 };
 
 enum class TextFamily : std::uint8_t {
@@ -292,6 +294,9 @@ std::vector<std::uint8_t> encodeWindowState(WindowState state);
 bool decodeWindowState(const std::vector<std::uint8_t>& payload, WindowState& state);
 std::vector<std::uint8_t> encodeServerHello(ServerHello hello);
 bool decodeServerHello(const std::vector<std::uint8_t>& payload, ServerHello& hello);
+std::vector<std::uint8_t> encodeServerCapabilities(std::uint64_t capabilities);
+bool decodeServerCapabilities(const std::vector<std::uint8_t>& payload,
+                              std::uint64_t& capabilities);
 std::vector<std::uint8_t> encodeAnimationTime(std::uint64_t nanoseconds);
 bool decodeAnimationTime(const std::vector<std::uint8_t>& payload,
                          std::uint64_t& nanoseconds);

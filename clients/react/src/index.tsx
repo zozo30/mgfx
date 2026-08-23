@@ -7,7 +7,7 @@ import { ReactSurface } from "./renderer.js";
 import { decodeImageFile, type DecodedImage } from "./image-codec.js";
 import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
-  decodeServerHello, decodeSize, decodeText, decodeTextMetrics, decodeWindowChromeMetrics,
+  decodeServerCapabilities, decodeServerHello, decodeSize, decodeText, decodeTextMetrics, decodeWindowChromeMetrics,
   encodeCursor, encodeFontCreate, encodeMeshCreate, encodePathCreate, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
   MessageType, sendMessage, TextMetricsClient } from "@mgfx/demo-client/protocol";
@@ -95,6 +95,9 @@ socket.on("data", (chunk) => {
         console.log(`MGFX server ready: protocol ${hello.version}, ${GraphicsBackend[hello.backend]}, capabilities 0x${hello.capabilities.toString(16)}`);
         break;
       }
+      case MessageType.ServerCapabilities:
+        console.log(`MGFX extended capabilities 0x${decodeServerCapabilities(message.payload).toString(16)}`);
+        break;
       case MessageType.FramePresented: framePacer.presented(message.sequence); break;
       case MessageType.AnimationFrame:
         animationClock.receive(message.sequence, decodeAnimationTime(message.payload)); break;

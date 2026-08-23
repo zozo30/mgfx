@@ -430,6 +430,19 @@ bool decodeServerHello(const std::vector<std::uint8_t>& payload, ServerHello& he
     return true;
 }
 
+std::vector<std::uint8_t> encodeServerCapabilities(std::uint64_t capabilities) {
+    std::vector<std::uint8_t> payload(8);
+    writeU64(payload.data(), capabilities);
+    return payload;
+}
+
+bool decodeServerCapabilities(const std::vector<std::uint8_t>& payload,
+                              std::uint64_t& capabilities) {
+    if (payload.size() != 8) return false;
+    capabilities = readU64(payload.data());
+    return true;
+}
+
 std::vector<std::uint8_t> encodeAnimationTime(std::uint64_t nanoseconds) {
     std::vector<std::uint8_t> payload(8);
     writeU64(payload.data(), nanoseconds);

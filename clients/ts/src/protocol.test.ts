@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeServerCapabilities, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, ExtendedServerCapability, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -28,6 +28,14 @@ test("server hello identifies backend and portable capabilities", () => {
       ServerCapability.TransformStack,
   });
   assert.throws(() => decodeServerHello(Buffer.alloc(7)));
+});
+
+test("extended capabilities preserve bits beyond the legacy hello word", () => {
+  const payload = Buffer.alloc(8);
+  const capabilities = 0xffff_ffffn | ExtendedServerCapability.CapabilityWords64;
+  payload.writeBigUInt64LE(capabilities);
+  assert.equal(decodeServerCapabilities(payload), capabilities);
+  assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
 });
 
 test("frame pacer keeps only the newest frame while one is in flight", () => {

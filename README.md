@@ -98,6 +98,11 @@ active graphics backend, and feature bits. Frontends can therefore target
 capabilities rather than Metal, Vulkan, or DirectX by name. The first positive
 `Resize` is also the acknowledgement that the requested drawable is ready.
 
+The original 32-bit `ServerHello` remains byte-for-byte stable and is followed
+by an optional `ServerCapabilities` message carrying the complete 64-bit mask.
+Legacy clients safely ignore that companion; current clients gain bits 32–63
+without spending protocol version 2 merely to add feature space.
+
 Frames use the MGIP sequence field for presentation pacing. The server sends
 `FramePresented` after Metal completes the submitted command buffer. TypeScript
 and React keep one frame in flight and collapse a burst of pending commits to its
