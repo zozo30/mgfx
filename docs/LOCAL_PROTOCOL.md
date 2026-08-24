@@ -238,6 +238,9 @@ Bit 30 of the encoded run count extends every run header from 32 to 36 bytes;
 the added `f32` at byte 32 is a positive font-size scale in `(0, 16]`. The backend
 uses scaled native advances for anchoring and aligns each scaled ascent to the
 same baseline. Capability bit 54 advertises this run-metrics extension.
+Bit 29 adds another `f32` after the optional scale: a signed baseline shift in
+units of the command's base font size. Positive values move a run upward without
+changing its horizontal advance. Capability bit 55 advertises baseline shifts.
 
 MGFX opcode `25` (`DrawLinearGradientCircle`) carries a destination rectangle,
 horizontal/vertical/diagonal direction, and two straight-alpha colors. Backends

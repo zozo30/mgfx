@@ -621,12 +621,16 @@ void CommandEncoder::drawRichText(const RichTextCommand& text) {
     const bool scaledRuns = std::any_of(text.runs.begin(), text.runs.end(), [](const RichTextRun& run) {
         return run.fontScale != 1.0F;
     });
+    const bool shiftedRuns = std::any_of(text.runs.begin(), text.runs.end(), [](const RichTextRun& run) {
+        return run.baselineShift != 0.0F;
+    });
     const std::size_t headerSize = placed ? 20 : 16;
-    const std::size_t runHeaderSize = scaledRuns ? 36 : 32;
+    const std::size_t runHeaderSize = 32 + (scaledRuns ? 4 : 0) + (shiftedRuns ? 4 : 0);
     std::size_t payloadSize = headerSize;
     for (const RichTextRun& run : text.runs) {
         if (run.text.empty() || run.text.size() > 65536 ||
             !std::isfinite(run.fontScale) || run.fontScale <= 0.0F || run.fontScale > 16.0F ||
+            !std::isfinite(run.baselineShift) || std::fabs(run.baselineShift) > 16.0F ||
             payloadSize > std::numeric_limits<std::uint32_t>::max() - runHeaderSize - run.text.size()) {
             throw std::length_error("Rich text command is empty or too large");
         }
@@ -638,7 +642,8 @@ void CommandEncoder::drawRichText(const RichTextCommand& text) {
     beginCommand(Opcode::drawRichText, static_cast<std::uint32_t>(payloadSize));
     appendFloat(bytes_, text.left); appendFloat(bytes_, text.top); appendFloat(bytes_, text.fontSize);
     appendU32(bytes_, static_cast<std::uint32_t>(text.runs.size()) |
-                      (placed ? 0x80000000U : 0U) | (scaledRuns ? 0x40000000U : 0U));
+                      (placed ? 0x80000000U : 0U) | (scaledRuns ? 0x40000000U : 0U) |
+                      (shiftedRuns ? 0x20000000U : 0U));
     if (placed) {
         bytes_.push_back(static_cast<std::uint8_t>(text.anchor));
         bytes_.push_back(static_cast<std::uint8_t>(text.baseline));
@@ -656,6 +661,7 @@ void CommandEncoder::drawRichText(const RichTextCommand& text) {
         }
         appendU32(bytes_, static_cast<std::uint32_t>(run.text.size()));
         if (scaledRuns) appendFloat(bytes_, run.fontScale);
+        if (shiftedRuns) appendFloat(bytes_, run.baselineShift);
         bytes_.insert(bytes_.end(), run.text.begin(), run.text.end());
     }
 }
@@ -1388,8 +1394,9 @@ bool decodeRichText(const CommandView& command, RichTextCommand& text) {
     const std::uint32_t encodedCount = readU32(command.payload + 12);
     const bool placed = (encodedCount & 0x80000000U) != 0;
     const bool scaledRuns = (encodedCount & 0x40000000U) != 0;
-    const std::uint32_t count = encodedCount & 0x3fffffffU;
-    const std::size_t runHeaderSize = scaledRuns ? 36 : 32;
+    const bool shiftedRuns = (encodedCount & 0x20000000U) != 0;
+    const std::uint32_t count = encodedCount & 0x1fffffffU;
+    const std::size_t runHeaderSize = 32 + (scaledRuns ? 4 : 0) + (shiftedRuns ? 4 : 0);
     const std::size_t headerSize = placed ? extendedHeaderSize : baseHeaderSize;
     if (placed && (command.payloadSize <= extendedHeaderSize || command.payload[16] > 2 ||
                    command.payload[17] > 1 || command.payload[18] != 0 || command.payload[19] != 0))
@@ -1418,12 +1425,14 @@ bool decodeRichText(const CommandView& command, RichTextCommand& text) {
                      readFloat(bytes + 20), readFloat(bytes + 24)};
         const std::uint32_t length = readU32(bytes + 28);
         run.fontScale = scaledRuns ? readFloat(bytes + 32) : 1.0F;
+        run.baselineShift = shiftedRuns ? readFloat(bytes + 32 + (scaledRuns ? 4 : 0)) : 0.0F;
         offset += runHeaderSize;
         if (length == 0 || length > 65536 || length > command.payloadSize - offset ||
             !std::isfinite(run.color.red) || !std::isfinite(run.color.green) ||
             !std::isfinite(run.color.blue) || !std::isfinite(run.color.alpha) ||
             !std::isfinite(run.letterSpacing) || std::fabs(run.letterSpacing) > 10.0F ||
-            !std::isfinite(run.fontScale) || run.fontScale <= 0.0F || run.fontScale > 16.0F)
+            !std::isfinite(run.fontScale) || run.fontScale <= 0.0F || run.fontScale > 16.0F ||
+            !std::isfinite(run.baselineShift) || std::fabs(run.baselineShift) > 16.0F)
             return false;
         run.text.assign(reinterpret_cast<const char*>(command.payload + offset), length);
         if (run.text.find('\0') != std::string::npos) return false;

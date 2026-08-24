@@ -80,7 +80,8 @@ into the normalized display-list transform stack around the text command. Direct
 lower to anchored `DrawRichText` run lists. A span with an explicit numeric `x`
 can restart the native pen and apply `y/dx/dy`, covering multiline SVG labels
 without client glyph metrics. Nested spans inherit styles normally, and underline
-or line-through decorations use native font positions and thicknesses. Text
+or line-through decorations use native font positions and thicknesses. Numeric,
+percentage, `super`, and `sub` baseline shifts remain semantic run metrics. Text
 strokes and gradients remain explicit fallbacks.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content

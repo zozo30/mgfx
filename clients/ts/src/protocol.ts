@@ -102,6 +102,7 @@ export const ExtendedServerCapability = {
   NativeTextPlacement: 1n << 52n,
   NativeRichTextPlacement: 1n << 53n,
   RichTextRunMetrics: 1n << 54n,
+  RichTextBaselineShift: 1n << 55n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -317,6 +318,7 @@ export interface RichTextRun {
   readonly decoration?: TextDecoration;
   readonly fontResourceId?: number;
   readonly fontScale?: number;
+  readonly baselineShift?: number;
 }
 const fontWeightCode = (weight: FontWeight): number =>
   weight === "bold" ? 1 : weight === "medium" ? 2 : weight === "semibold" ? 3 : 0;
@@ -1077,8 +1079,9 @@ export class FrameEncoder {
     const encoded = runs.map((run) => Buffer.from(run.text, "utf8"));
     const placed = anchor !== "start" || baseline !== "top";
     const scaledRuns = runs.some((run) => (run.fontScale ?? 1) !== 1);
+    const shiftedRuns = runs.some((run) => (run.baselineShift ?? 0) !== 0);
     const headerSize = placed ? 20 : 16;
-    const runHeaderSize = scaledRuns ? 36 : 32;
+    const runHeaderSize = 32 + (scaledRuns ? 4 : 0) + (shiftedRuns ? 4 : 0);
     const payload = Buffer.alloc(headerSize + encoded.reduce(
       (size, text) => size + runHeaderSize + text.length, 0));
     [left, top, fontSize].forEach((value, index) => {
@@ -1087,7 +1090,7 @@ export class FrameEncoder {
       payload.writeFloatLE(value, index * 4);
     });
     payload.writeUInt32LE(runs.length + (placed ? 0x8000_0000 : 0) +
-      (scaledRuns ? 0x4000_0000 : 0), 12);
+      (scaledRuns ? 0x4000_0000 : 0) + (shiftedRuns ? 0x2000_0000 : 0), 12);
     if (placed) {
       payload.writeUInt8(anchor === "middle" ? 1 : anchor === "end" ? 2 : 0, 16);
       payload.writeUInt8(baseline === "alphabetic" ? 1 : 0, 17);
@@ -1101,10 +1104,12 @@ export class FrameEncoder {
       const decoration = run.decoration ?? TextDecoration.None;
       const fontId = run.fontResourceId ?? 0;
       const fontScale = run.fontScale ?? 1;
+      const baselineShift = run.baselineShift ?? 0;
       const colors = [run.color.red, run.color.green, run.color.blue, run.color.alpha];
       if (!Number.isFinite(spacing) || Math.abs(spacing) > 10 || decoration < 0 || decoration > 3 ||
           !Number.isInteger(fontId) || fontId < 0 || fontId > 0xffff_ffff ||
           !Number.isFinite(fontScale) || fontScale <= 0 || fontScale > 16 ||
+          !Number.isFinite(baselineShift) || Math.abs(baselineShift) > 16 ||
           colors.some((value) => !Number.isFinite(value)))
         throw new RangeError("Invalid rich text run style");
       payload.writeUInt8(fontFamilyCode(run.family ?? "system"), offset);
@@ -1117,6 +1122,7 @@ export class FrameEncoder {
         .forEach((value, colorIndex) => payload.writeFloatLE(value, offset + 12 + colorIndex * 4));
       payload.writeUInt32LE(text.length, offset + 28);
       if (scaledRuns) payload.writeFloatLE(fontScale, offset + 32);
+      if (shiftedRuns) payload.writeFloatLE(baselineShift, offset + 32 + (scaledRuns ? 4 : 0));
       text.copy(payload, offset + runHeaderSize);
       offset += runHeaderSize + text.length;
     });

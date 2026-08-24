@@ -384,7 +384,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::texturePathPaint |
             mgfx::ipc::ServerCapability::nativeTextPlacement |
             mgfx::ipc::ServerCapability::nativeRichTextPlacement |
-            mgfx::ipc::ServerCapability::richTextRunMetrics;
+            mgfx::ipc::ServerCapability::richTextRunMetrics |
+            mgfx::ipc::ServerCapability::richTextBaselineShift;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

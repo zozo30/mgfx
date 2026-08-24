@@ -76,6 +76,7 @@ interface PaintState {
   readonly fontStyle: "regular" | "italic";
   readonly letterSpacing: number;
   readonly textDecoration: TextDecoration;
+  readonly baselineShift: number;
   readonly textAnchor: "start" | "middle" | "end";
   readonly fillOpacity: number;
   readonly strokeOpacity: number;
@@ -270,7 +271,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     strokeWidth: 1, opacity: 1, displayed: true, visible: true,
     fillOpacity: 1, strokeOpacity: 1,
     fontSize: 16, fontFamily: "system", fontWeight: "regular", fontStyle: "regular",
-    letterSpacing: 0, textDecoration: TextDecoration.None, textAnchor: "start",
+    letterSpacing: 0, textDecoration: TextDecoration.None, baselineShift: 0, textAnchor: "start",
     fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
     currentColor: defaultColor, transform: identity };
   const stack: PaintState[] = [initial];
@@ -386,7 +387,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const value = visiblePieces.map((piece) => piece.value).join("");
       if (!value) continue;
       const placement = {
-        x: baseX, y: baseY, fontSize: state.fontSize,
+        x: baseX, y: hasSpans ? baseY : baseY - state.baselineShift, fontSize: state.fontSize,
         ...(state.textAnchor !== "start" ? { anchor: state.textAnchor } : {}),
         ...(state.transform.a !== 1 || state.transform.b !== 0 || state.transform.c !== 0 ||
           state.transform.d !== 1 || state.transform.e !== 0 || state.transform.f !== 0
@@ -416,6 +417,8 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
             ? { decoration: piece.state.textDecoration } : {}),
           ...(piece.state.fontSize !== state.fontSize
             ? { fontScale: piece.state.fontSize / state.fontSize } : {}),
+          ...(piece.state.baselineShift !== 0
+            ? { baselineShift: piece.state.baselineShift / state.fontSize } : {}),
           ...(piece.state.letterSpacing !== 0
             ? { letterSpacing: piece.state.letterSpacing / piece.state.fontSize } : {}) });
       }
@@ -475,7 +478,8 @@ const cssProperties = new Set(["color", "fill", "stroke", "opacity", "fill-opaci
   "stroke-opacity", "stroke-width", "fill-rule", "stroke-linecap", "stroke-linejoin",
   "stroke-miterlimit", "stroke-dasharray", "stroke-dashoffset", "clip-path", "transform",
   "stop-color", "stop-opacity", "display", "visibility", "font-size", "font-family",
-  "font-weight", "font-style", "letter-spacing", "text-decoration", "text-anchor"]);
+  "font-weight", "font-style", "letter-spacing", "text-decoration", "baseline-shift",
+  "text-anchor"]);
 
 function parseSvgStyles(source: string): readonly CssRule[] {
   const rules: CssRule[] = [];
@@ -659,6 +663,17 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     : decorationValue === "none" ? TextDecoration.None
       : (decorationTokens.includes("underline") ? TextDecoration.Underline : 0) |
         (decorationTokens.includes("line-through") ? TextDecoration.LineThrough : 0);
+  const shiftValue = attributes["baseline-shift"]?.trim().toLowerCase();
+  let baselineShift = parent.baselineShift;
+  if (shiftValue === "baseline") baselineShift = 0;
+  else if (shiftValue === "super") baselineShift += fontSize * 0.5;
+  else if (shiftValue === "sub") baselineShift -= fontSize * 0.25;
+  else if (shiftValue !== undefined) {
+    const parsed = shiftValue.endsWith("%")
+      ? Number(shiftValue.slice(0, -1)) / 100 * fontSize : Number(shiftValue);
+    if (!Number.isFinite(parsed)) throw new Error(`Unsupported SVG baseline-shift ${shiftValue}`);
+    baselineShift += parsed;
+  }
   const anchorValue = attributes["text-anchor"]?.trim().toLowerCase();
   const textAnchor = anchorValue === undefined ? parent.textAnchor
     : anchorValue === "middle" ? "middle" : anchorValue === "end" ? "end" : "start";
@@ -707,7 +722,7 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     ...(stroke ? { stroke } : {}),
     ...(inheritedStrokeGradientId ? { strokeGradientId: inheritedStrokeGradientId } : {}),
     strokeWidth, opacity, displayed, visible, fontSize, fontFamily, fontWeight, fontStyle,
-    letterSpacing, textDecoration, textAnchor, fillOpacity, strokeOpacity,
+    letterSpacing, textDecoration, baselineShift, textAnchor, fillOpacity, strokeOpacity,
     fillRule, lineCap, lineJoin, currentColor,
     ...(miterLimit !== undefined ? { miterLimit } : {}),
     ...(inheritedDash ? { dash: inheritedDash } : {}),

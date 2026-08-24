@@ -162,6 +162,8 @@ existing underline and line-through flags, whose geometry comes from native font
 metrics on the server. A bounded per-run font scale preserves nested `font-size`
 changes; Metal scales cached native outlines and advances, then baseline-aligns
 mixed sizes without any client-side glyph measurement.
+Per-run baseline shifts support SVG numeric/percentage shifts plus `super` and
+`sub`; the server offsets cached geometry while preserving shaped advances.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is

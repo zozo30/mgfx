@@ -52,7 +52,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.TexturePathPaint |
     ExtendedServerCapability.NativeTextPlacement |
     ExtendedServerCapability.NativeRichTextPlacement |
-    ExtendedServerCapability.RichTextRunMetrics;
+    ExtendedServerCapability.RichTextRunMetrics |
+    ExtendedServerCapability.RichTextBaselineShift;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -744,6 +745,23 @@ test("rich-text run metrics carry mixed native font sizes without glyph geometry
   assert.equal(bytes.readFloatLE(40 + 32), 0.75);
   const second = 40 + 36 + Buffer.byteLength("small ");
   assert.equal(bytes.readFloatLE(second + 32), 1.5);
+});
+
+test("rich-text baseline shifts preserve semantic superscript runs", () => {
+  const frame = new FrameEncoder();
+  frame.richText([
+    { text: "MGFX", color: { red: 1, green: 1, blue: 1, alpha: 1 } },
+    { text: "2", color: { red: 1, green: 0.5, blue: 0.1, alpha: 1 },
+      fontScale: 0.65, baselineShift: 0.45 },
+  ], -0.5, 0.2, 0.1);
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt32LE(36), 0x6000_0002);
+  assert.equal(bytes.readFloatLE(40 + 32), 1);
+  assert.equal(bytes.readFloatLE(40 + 36), 0);
+  const second = 40 + 40 + Buffer.byteLength("MGFX");
+  assert.ok(Math.abs(bytes.readFloatLE(second + 32) - 0.65) < 0.00001);
+  assert.ok(Math.abs(bytes.readFloatLE(second + 36) - 0.45) < 0.00001);
 });
 
 test("native text metrics correlate asynchronous measurement replies", async () => {

@@ -1804,8 +1804,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 const gfx::RichTextRun& run = rich.runs[runIndex];
                 const gfx::ShapedText& shaped = *shapedRuns[runIndex];
                 const float runFontSize = rich.fontSize * run.fontScale;
-                const float richTop = rich.baseline == gfx::TextBaseline::alphabetic
-                    ? rich.top + shaped.ascent * runFontSize : rich.top;
+                const float richTop = (rich.baseline == gfx::TextBaseline::alphabetic
+                    ? rich.top + shaped.ascent * runFontSize : rich.top) +
+                    run.baselineShift * rich.fontSize;
                 const std::array<float, 4> color = {run.color.red, run.color.green, run.color.blue,
                                                      run.color.alpha * opacityStack.back()};
                 vertices.reserve(vertices.size() + shaped.triangles.size());

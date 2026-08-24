@@ -162,12 +162,13 @@ test("SVG CSS styles retain symbol paint and compose use transforms with instanc
 test("SVG text lowers native typography, baseline position, entities, transforms, and anchor", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 80 40"><style>
     .label { fill: #4cc9ff; font-family: rounded; font-size: 10; font-weight: 700;
-      font-style: italic; letter-spacing: 0.5; text-decoration: underline; text-anchor: middle; }
+      font-style: italic; letter-spacing: 0.5; baseline-shift: 2;
+      text-decoration: underline; text-anchor: middle; }
   </style><g transform="translate(2 3)"><text class="label" x="20" y="25">MGFX &amp; Ω</text></g>
   </svg>`);
   assert.equal(document.layers.length, 1);
   assert.deepEqual(document.layers[0]?.text, {
-    value: "MGFX & Ω", x: 20, y: 25, fontSize: 10,
+    value: "MGFX & Ω", x: 20, y: 23, fontSize: 10,
     color: { red: 0.2980392156862745, green: 0.788235294117647, blue: 1, alpha: 1 },
     family: "rounded", weight: "bold", fontStyle: "italic", letterSpacing: 0.05,
     decoration: TextDecoration.Underline,
@@ -206,6 +207,9 @@ test("SVG text rejects unsupported positioned spans, strokes, and entities", () 
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text text-decoration="overline">bad</text></svg>`),
   /Unsupported SVG text-decoration/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 40 20"><text baseline-shift="calc(1px)">bad</text></svg>`),
+  /Unsupported SVG baseline-shift/);
 });
 
 test("SVG positioned tspans restart compact native run groups without glyph geometry", () => {
@@ -228,21 +232,22 @@ test("SVG positioned tspans restart compact native run groups without glyph geom
 test("SVG nested tspans inherit native styles and font-metric decorations", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 30"><style>
     .marked { fill: #ff8a1e; font-size: 15; text-decoration: underline; }
-    .removed { font-family: serif; font-size: 9; font-style: italic;
+    .removed { font-family: serif; font-size: 9; font-style: italic; baseline-shift: super;
       text-decoration: underline line-through; }
   </style><text x="8" y="20" font-size="12">outer <tspan class="marked">nested
     <tspan class="removed">deep</tspan></tspan> tail</text></svg>`);
   const runs = document.layers[0]?.richText?.runs;
   assert.deepEqual(runs?.map((run) => ({ text: run.text, family: run.family,
-    style: run.style, scale: run.fontScale ?? 1,
+    style: run.style, scale: run.fontScale ?? 1, shift: run.baselineShift ?? 0,
     decoration: run.decoration ?? TextDecoration.None })), [
-    { text: "outer ", family: "system", style: "regular", scale: 1,
+    { text: "outer ", family: "system", style: "regular", scale: 1, shift: 0,
       decoration: TextDecoration.None },
-    { text: "nested ", family: "system", style: "regular", scale: 1.25,
+    { text: "nested ", family: "system", style: "regular", scale: 1.25, shift: 0,
       decoration: TextDecoration.Underline },
     { text: "deep", family: "serif", style: "italic",
-      scale: 0.75, decoration: TextDecoration.Underline | TextDecoration.LineThrough },
-    { text: " tail", family: "system", style: "regular", scale: 1,
+      scale: 0.75, shift: 0.375,
+      decoration: TextDecoration.Underline | TextDecoration.LineThrough },
+    { text: " tail", family: "system", style: "regular", scale: 1, shift: 0,
       decoration: TextDecoration.None },
   ]);
 });

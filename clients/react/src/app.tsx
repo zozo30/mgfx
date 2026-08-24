@@ -163,7 +163,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       font-weight: 600; letter-spacing: 0.45; text-anchor: middle; }
     .native-accent { fill: #ff8a1e; font-family: serif; font-size: 9;
       font-style: italic; font-weight: 700; }
-    .native-decoration { text-decoration: underline; }
+    .native-decoration { font-size: 7; baseline-shift: super; text-decoration: underline; }
   </style>
   <defs>
     <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="5" y1="5" x2="80" y2="36"

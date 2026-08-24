@@ -353,6 +353,7 @@ struct RichTextRun {
     Color color;
     std::string text;
     float fontScale = 1.0F;
+    float baselineShift = 0.0F;
 };
 
 struct RichTextCommand {
