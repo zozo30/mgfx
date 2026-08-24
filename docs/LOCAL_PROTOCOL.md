@@ -125,6 +125,7 @@ Native anchored text and rich-text placement are advertised by `1 << 52` and
 `1 << 53`; per-run font scaling and baseline shift use `1 << 54` and `1 << 55`.
 One-command tiled image surfaces are advertised by `1 << 56`.
 One-command nine-slice images are advertised by `1 << 57`.
+Server-shaped text with a solid native outline is advertised by `1 << 58`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -362,3 +363,9 @@ sampling, destination, UV rectangle, tint, four normalized source insets, four
 logical destination insets, corner radius, and one reserved zero `f32`. The
 backend preserves corners, stretches edges and center, and proportionally
 collapses borders when the destination is too small. Capability bit 57 is required.
+
+MGFX opcode `41` (`DrawStyledText`) has a 64-byte fixed header followed by UTF-8.
+It carries the complete family/weight/style/decoration, placement, fill color,
+tracking, font resource, anchor/baseline, then outline RGBA and an em-relative
+stroke width in `(0, 4]`. The backend shapes and strokes glyph contours; capability
+bit 58 is required.

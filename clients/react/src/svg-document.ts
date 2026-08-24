@@ -15,6 +15,7 @@ export interface SvgVectorLayer {
     readonly weight?: "regular" | "medium" | "semibold" | "bold";
     readonly fontStyle?: "regular" | "italic";
     readonly letterSpacing?: number; readonly decoration?: TextDecoration;
+    readonly strokeColor?: Color; readonly strokeWidth?: number;
     readonly anchor?: "start" | "middle" | "end";
     readonly sourceTransform?: Matrix };
   readonly richText?: { readonly runs: readonly RichTextRun[]; readonly x: number;
@@ -387,7 +388,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       for (const piece of drawablePieces) {
         if (piece.state.fillGradientId)
           throw new Error(`SVG ${hasSpans ? "tspan" : "text"} gradient fill is not supported natively`);
-        if (piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0)
+        if (hasSpans && piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0)
           throw new Error(`SVG ${hasSpans ? "tspan" : "text"} stroke is not supported natively`);
       }
       const visiblePieces = drawablePieces.filter((piece) => piece.state.fill && piece.state.fill.alpha > 0);
@@ -408,7 +409,10 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
           ...(state.textDecoration !== TextDecoration.None
             ? { decoration: state.textDecoration } : {}),
           ...(state.letterSpacing !== 0
-            ? { letterSpacing: state.letterSpacing / state.fontSize } : {}) } });
+            ? { letterSpacing: state.letterSpacing / state.fontSize } : {}),
+          ...(state.stroke && state.stroke.alpha > 0 && state.strokeWidth > 0
+            ? { strokeColor: multiplyAlpha(state.stroke, state.opacity * state.strokeOpacity),
+              strokeWidth: state.strokeWidth } : {}) } });
         continue;
       }
       const groups: { x: number; y: number; runs: RichTextRun[] }[] =

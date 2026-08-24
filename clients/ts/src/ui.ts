@@ -287,6 +287,7 @@ export interface VectorTextData {
   readonly family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">;
   readonly weight?: TextStyle["fontWeight"]; readonly fontStyle?: TextStyle["fontStyle"];
   readonly letterSpacing?: number; readonly decoration?: TextDecoration;
+  readonly strokeColor?: Color; readonly strokeWidth?: number;
   readonly anchor?: "start" | "middle" | "end";
   readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
     readonly d: number; readonly e: number; readonly f: number };
@@ -964,10 +965,18 @@ function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextDa
   const x = destination.x + (text.x - text.viewBox.x) / text.viewBox.width * destination.width;
   const y = destination.y + (text.y - text.viewBox.y) / text.viewBox.height * destination.height;
   const fontSize = text.fontSize / text.viewBox.height * destination.height;
-  encoder.systemText(text.value, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
-    fontSize / viewport.height * 2, text.color, text.family, text.weight, text.fontStyle,
-    text.letterSpacing ?? 0, text.decoration ?? TextDecoration.None, 0,
-    text.anchor ?? "start", "alphabetic");
+  const args = [text.value, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
+    fontSize / viewport.height * 2] as const;
+  if (text.strokeColor && (text.strokeWidth ?? 0) > 0) {
+    encoder.styledSystemText(...args, text.color, text.strokeColor,
+      text.strokeWidth! / text.fontSize, text.family, text.weight, text.fontStyle,
+      text.letterSpacing ?? 0, text.decoration ?? TextDecoration.None, 0,
+      text.anchor ?? "start", "alphabetic");
+  } else {
+    encoder.systemText(...args, text.color, text.family, text.weight, text.fontStyle,
+      text.letterSpacing ?? 0, text.decoration ?? TextDecoration.None, 0,
+      text.anchor ?? "start", "alphabetic");
+  }
   if (text.sourceTransform) encoder.popTransform();
   if (text.sourceClip) encoder.popClip();
 }

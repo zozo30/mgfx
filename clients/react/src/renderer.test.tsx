@@ -223,6 +223,18 @@ test("React Svg emits server-shaped text with SVG anchor and alphabetic baseline
   assert.equal(frame.readUInt8(textOffset + 45), 1);
 });
 
+test("React Svg emits outlined text as one native styled-text command", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Svg source={`<svg viewBox="0 0 100 40"><text x="50" y="28"
+    text-anchor="middle" font-size="20" fill="#d8fff0" stroke="#ff8a1e"
+    stroke-width="2">OUTLINE</text></svg>`} style={{ preferredSize: { width: 200, height: 80 } }} />);
+  surface.resize({ width: 200, height: 80 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 41);
+  assert.ok(Math.abs(frame.readFloatLE(40 + 8 + 60) - 0.1) < 0.00001);
+});
+
 test("React Svg uploads embedded images once and frames reference the native texture", () => {
   let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   const uploads: { id: number; width: number; height: number; bytes: number }[] = [];

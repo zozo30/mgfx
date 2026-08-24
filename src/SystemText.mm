@@ -131,7 +131,7 @@ CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style,
 
 ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
                             FontStyle style, float letterSpacing,
-                            std::uint32_t fontResourceId) {
+                            std::uint32_t fontResourceId, float strokeWidth) {
     ShapedText shaped;
     NSString* string = [[NSString alloc] initWithBytes:utf8.data()
                                               length:utf8.size()
@@ -184,11 +184,17 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
             CGPathApply(path, &builder, appendPathElement);
             CFRelease(path);
             if (builder.segments.empty()) continue;
-            PathTriangles glyph = tessellatePath(builder.segments, true, false,
-                FillRule::nonzero, LineCap::butt, LineJoin::bevel, 0.0F, 0.5F);
+            PathTriangles glyph = tessellatePath(builder.segments, true, strokeWidth > 0.0F,
+                FillRule::nonzero, LineCap::butt, LineJoin::round,
+                strokeWidth * designSize, 0.5F);
             const CGPoint position = positions[static_cast<std::size_t>(index)];
             for (const PathPoint& point : glyph.fill) {
                 shaped.triangles.push_back({
+                    static_cast<float>(position.x + point[0]) / designSize,
+                    static_cast<float>(ascent - position.y - point[1]) / designSize});
+            }
+            for (const PathPoint& point : glyph.stroke) {
+                shaped.strokeTriangles.push_back({
                     static_cast<float>(position.x + point[0]) / designSize,
                     static_cast<float>(ascent - position.y - point[1]) / designSize});
             }

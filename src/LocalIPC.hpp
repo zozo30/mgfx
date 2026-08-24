@@ -116,6 +116,7 @@ enum ServerCapability : std::uint64_t {
     richTextBaselineShift = 1ULL << 55U,
     tiledImageSurfaces = 1ULL << 56U,
     nineSliceImages = 1ULL << 57U,
+    styledNativeText = 1ULL << 58U,
 };
 
 enum class ResourceKind : std::uint8_t {

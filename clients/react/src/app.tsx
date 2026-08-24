@@ -174,6 +174,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     .native-accent { fill: #ff8a1e; font-family: serif; font-size: 9;
       font-style: italic; font-weight: 700; }
     .native-decoration { font-size: 7; baseline-shift: super; text-decoration: underline; }
+    .outline-label { fill: #d8fff0; stroke: #ff8a1e; stroke-width: 0.8;
+      font-family: rounded; font-size: 8; font-weight: 700; }
   </style>
   <defs>
     <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="5" y1="5" x2="80" y2="36"
@@ -205,6 +207,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       stroke-dasharray="5 3" stroke-dashoffset="1"/>
     <image href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDMyIDI0Ij48cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMjQiIHJ4PSI0IiBmaWxsPSIjMDgxMzFjIi8+PHBhdGggZD0iTTQgMThMMTAgN0wxNSAxNUwyMSA1TDI4IDE4WiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNThlNmI1IiBzdHJva2Utd2lkdGg9IjIiLz48Y2lyY2xlIGN4PSIyNSIgY3k9IjciIHI9IjMiIGZpbGw9IiNmZjhhMWUiLz48L3N2Zz4="
       x="47" y="7" width="16" height="12" preserveAspectRatio="xMidYMid meet"/>
+    <text class="outline-label" x="68" y="14">CORETEXT</text>
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
     <use class="signal" href="#signalGlyph" x="78" y="24" width="53" height="18"
       preserveAspectRatio="xMidYMid slice"/>

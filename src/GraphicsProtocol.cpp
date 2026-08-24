@@ -645,6 +645,27 @@ void CommandEncoder::drawText(const TextCommand& text) {
     bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
 }
 
+void CommandEncoder::drawStyledText(const TextCommand& text) {
+    constexpr std::size_t headerSize = 64;
+    if (text.text.size() > std::numeric_limits<std::uint32_t>::max() - headerSize)
+        throw std::length_error("Styled text command exceeds 4 GiB");
+    beginCommand(Opcode::drawStyledText,
+                 static_cast<std::uint32_t>(headerSize + text.text.size()));
+    bytes_.push_back(static_cast<std::uint8_t>(text.family));
+    bytes_.push_back(static_cast<std::uint8_t>(text.weight));
+    bytes_.push_back(static_cast<std::uint8_t>(text.style));
+    bytes_.push_back(text.decoration);
+    for (float value : {text.left, text.top, text.fontSize, text.color.red, text.color.green,
+                        text.color.blue, text.color.alpha, text.letterSpacing}) appendFloat(bytes_, value);
+    appendU32(bytes_, text.fontResourceId);
+    bytes_.push_back(static_cast<std::uint8_t>(text.anchor));
+    bytes_.push_back(static_cast<std::uint8_t>(text.baseline));
+    appendU16(bytes_, 0);
+    for (float value : {text.strokeColor.red, text.strokeColor.green, text.strokeColor.blue,
+                        text.strokeColor.alpha, text.strokeWidth}) appendFloat(bytes_, value);
+    bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
+}
+
 void CommandEncoder::drawRichText(const RichTextCommand& text) {
     const bool placed = text.anchor != TextAnchor::start || text.baseline != TextBaseline::top;
     const bool scaledRuns = std::any_of(text.runs.begin(), text.runs.end(), [](const RichTextRun& run) {
@@ -1452,6 +1473,39 @@ bool decodeText(const CommandView& command, TextCommand& text) {
     return (extension < 3 || extension == 4 || text.fontResourceId != 0) &&
            std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10.0F &&
            text.text.find('\0') == std::string::npos;
+}
+
+bool decodeStyledText(const CommandView& command, TextCommand& text) {
+    constexpr std::size_t headerSize = 64;
+    if (command.opcode != Opcode::drawStyledText || command.payloadSize <= headerSize ||
+        command.payloadSize > headerSize + 65536 ||
+        command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemRounded) ||
+        command.payload[1] > static_cast<std::uint8_t>(FontWeight::semibold) ||
+        command.payload[2] > static_cast<std::uint8_t>(FontStyle::italic) ||
+        command.payload[3] > (underlineText | strikeThroughText) ||
+        command.payload[40] > static_cast<std::uint8_t>(TextAnchor::end) ||
+        command.payload[41] > static_cast<std::uint8_t>(TextBaseline::alphabetic) ||
+        command.payload[42] != 0 || command.payload[43] != 0) return false;
+    text.family = static_cast<FontFamily>(command.payload[0]);
+    text.weight = static_cast<FontWeight>(command.payload[1]);
+    text.style = static_cast<FontStyle>(command.payload[2]);
+    text.decoration = command.payload[3];
+    text.left = readFloat(command.payload + 4); text.top = readFloat(command.payload + 8);
+    text.fontSize = readFloat(command.payload + 12);
+    text.color = {readFloat(command.payload + 16), readFloat(command.payload + 20),
+        readFloat(command.payload + 24), readFloat(command.payload + 28)};
+    text.letterSpacing = readFloat(command.payload + 32);
+    text.fontResourceId = readU32(command.payload + 36);
+    text.anchor = static_cast<TextAnchor>(command.payload[40]);
+    text.baseline = static_cast<TextBaseline>(command.payload[41]);
+    text.strokeColor = {readFloat(command.payload + 44), readFloat(command.payload + 48),
+        readFloat(command.payload + 52), readFloat(command.payload + 56)};
+    text.strokeWidth = readFloat(command.payload + 60);
+    text.text.assign(reinterpret_cast<const char*>(command.payload + headerSize),
+                     command.payloadSize - headerSize);
+    return std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10.0F &&
+        std::isfinite(text.strokeWidth) && text.strokeWidth > 0.0F && text.strokeWidth <= 4.0F &&
+        text.text.find('\0') == std::string::npos;
 }
 
 bool decodeRichText(const CommandView& command, RichTextCommand& text) {

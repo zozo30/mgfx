@@ -55,7 +55,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.RichTextRunMetrics |
     ExtendedServerCapability.RichTextBaselineShift |
     ExtendedServerCapability.TiledImageSurfaces |
-    ExtendedServerCapability.NineSliceImages;
+    ExtendedServerCapability.NineSliceImages |
+    ExtendedServerCapability.StyledNativeText;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -725,6 +726,21 @@ test("native text placement carries server-shaped anchor and alphabetic baseline
   assert.equal(bytes.readUInt8(16 + 8 + 3), 4);
   assert.equal(bytes.readUInt8(16 + 8 + 44), 1);
   assert.equal(bytes.readUInt8(16 + 8 + 45), 1);
+});
+
+test("outlined native text carries server-owned stroke geometry", () => {
+  const frame = new FrameEncoder();
+  frame.styledSystemText("OUTLINE", 0, 0.2, 0.1,
+    { red: 0.9, green: 0.9, blue: 1, alpha: 1 },
+    { red: 1, green: 0.4, blue: 0.1, alpha: 1 }, 0.08,
+    "rounded", "bold", "regular", 0.02, TextDecoration.None, 0, "middle", "alphabetic");
+  frame.endFrame(); const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 41);
+  assert.equal(bytes.readUInt8(64), 1);
+  assert.equal(bytes.readUInt8(65), 1);
+  assert.equal(bytes.readFloatLE(68), 1);
+  assert.ok(Math.abs(bytes.readFloatLE(84) - 0.08) < 0.00001);
+  assert.equal(bytes.subarray(88, 95).toString(), "OUTLINE");
 });
 
 test("font files upload once as bounded persistent resources", () => {

@@ -1758,9 +1758,12 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 path.strokeRadialGradient ? &path.radialGradient : nullptr,
                 path.strokeConicGradient ? &path.conicGradient : nullptr,
                 path.strokeTexture ? &path.texturePaint : nullptr);
-        } else if (command.opcode == gfx::Opcode::drawText) {
+        } else if (command.opcode == gfx::Opcode::drawText ||
+                   command.opcode == gfx::Opcode::drawStyledText) {
             gfx::TextCommand text{};
-            if (!gfx::decodeText(command, text) || !std::isfinite(text.left) ||
+            const bool decoded = command.opcode == gfx::Opcode::drawText
+                ? gfx::decodeText(command, text) : gfx::decodeStyledText(command, text);
+            if (!decoded || !std::isfinite(text.left) ||
                 !std::isfinite(text.top) || !std::isfinite(text.fontSize) ||
                 text.fontSize <= 0.0F) {
                 throw std::runtime_error("Malformed text command");
@@ -1772,6 +1775,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             cacheKey.push_back(static_cast<char>(text.decoration));
             cacheKey.append(reinterpret_cast<const char*>(&text.fontResourceId),
                             sizeof(text.fontResourceId));
+            cacheKey.append(reinterpret_cast<const char*>(&text.strokeWidth),
+                            sizeof(text.strokeWidth));
             const std::uint64_t fontVersion = gfx::fontResourceVersion(text.fontResourceId);
             cacheKey.append(reinterpret_cast<const char*>(&fontVersion), sizeof(fontVersion));
             cacheKey += text.text;
@@ -1780,7 +1785,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             if (inserted) {
                 shaped = gfx::shapeSystemText(
                     text.text, text.family, text.weight, text.style, text.letterSpacing,
-                    text.fontResourceId);
+                    text.fontResourceId, text.strokeWidth);
                 const auto appendDecoration = [&](float position, float thickness) {
                     const float half = std::max(thickness, 0.04F) * 0.5F;
                     const float left = 0.0F, right = shaped.advance;
@@ -1797,8 +1802,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                      shaped.strikeThroughThickness);
                 }
             }
-            const std::vector<gfx::PathPoint>& points = shaped.triangles;
-            if (points.empty() || clipEmpty()) continue;
+            if ((shaped.triangles.empty() && shaped.strokeTriangles.empty()) || clipEmpty()) continue;
             if (encoder == nullptr) {
                 encoder = commandBuffer->renderCommandEncoder(renderPass);
                 applyClip();
@@ -1817,25 +1821,27 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
             const float textTop = text.baseline == gfx::TextBaseline::alphabetic
                 ? text.top + shaped.ascent * text.fontSize : text.top;
-            const std::array<float, 4> color = {
-                text.color.red, text.color.green, text.color.blue,
-                text.color.alpha * opacityStack.back()};
-            for (std::size_t first = 0; first < points.size();) {
-                const std::size_t count = std::min(maxVertices, points.size() - first);
-                std::vector<gfx::Vertex> vertices;
-                vertices.reserve(count);
-                for (std::size_t index = 0; index < count; ++index) {
-                    const gfx::PathPoint& point = points[first + index];
-                    vertices.push_back({transformPoint(currentTransform(),
-                        {textLeft + point[0] * text.fontSize * aspect,
-                         textTop - point[1] * text.fontSize}), color});
+            const auto drawTextTriangles = [&](const std::vector<gfx::PathPoint>& points,
+                                                const gfx::Color& paint) {
+                const std::array<float, 4> color = {paint.red, paint.green, paint.blue,
+                    paint.alpha * opacityStack.back()};
+                for (std::size_t first = 0; first < points.size();) {
+                    const std::size_t count = std::min(maxVertices, points.size() - first);
+                    std::vector<gfx::Vertex> vertices; vertices.reserve(count);
+                    for (std::size_t index = 0; index < count; ++index) {
+                        const gfx::PathPoint& point = points[first + index];
+                        vertices.push_back({transformPoint(currentTransform(),
+                            {textLeft + point[0] * text.fontSize * aspect,
+                             textTop - point[1] * text.fontSize}), color});
+                    }
+                    encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
+                    encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                        static_cast<NS::UInteger>(0), static_cast<NS::UInteger>(vertices.size()));
+                    first += count;
                 }
-                encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
-                encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
-                                        static_cast<NS::UInteger>(0),
-                                        static_cast<NS::UInteger>(vertices.size()));
-                first += count;
-            }
+            };
+            drawTextTriangles(shaped.triangles, text.color);
+            if (text.strokeWidth > 0.0F) drawTextTriangles(shaped.strokeTriangles, text.strokeColor);
         } else if (command.opcode == gfx::Opcode::drawRichText) {
             gfx::RichTextCommand rich{};
             if (!gfx::decodeRichText(command, rich)) {

@@ -153,6 +153,9 @@ The built-in 5×7 font remains a bootstrap and diagnostic path. The implemented
 `DrawText` command carries UTF-8, a portable system-family choice, position,
 regular/medium/semibold/bold weight, regular/italic style, size, and color. The
 macOS server shapes it with CoreText, converts glyph outlines through the shared
+path tessellator, and caches the result. `DrawStyledText` adds solid outline color
+and an em-relative width; the server strokes the same CoreText contours, so SVG
+clients never transmit glyph paths or triangles.
 path tessellator, and caches geometry by family, weight, style, spacing, and string.
 Metal therefore receives compact cached vector text instead of one
 rectangle pair per lit pixel. Other native hosts can execute the same command

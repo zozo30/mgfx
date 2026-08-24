@@ -11,6 +11,7 @@ namespace gfx {
 
 struct ShapedText {
     std::vector<PathPoint> triangles;
+    std::vector<PathPoint> strokeTriangles;
     float advance = 0.0F;
     float ascent = 0.0F;
     float underlinePosition = 0.0F;
@@ -25,7 +26,8 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family,
                             FontWeight weight = FontWeight::regular,
                             FontStyle style = FontStyle::regular,
                             float letterSpacing = 0.0F,
-                            std::uint32_t fontResourceId = 0);
+                            std::uint32_t fontResourceId = 0,
+                            float strokeWidth = 0.0F);
 float measureSystemText(const std::string& utf8, FontFamily family,
                         FontWeight weight = FontWeight::regular,
                         FontStyle style = FontStyle::regular,

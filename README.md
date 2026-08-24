@@ -92,9 +92,11 @@ into the normalized display-list transform stack around the text command. Direct
 lower to anchored `DrawRichText` run lists. A span with an explicit numeric `x`
 can restart the native pen and apply `y/dx/dy`, covering multiline SVG labels
 without client glyph metrics. Nested spans inherit styles normally, and underline
-or line-through decorations use native font positions and thicknesses. Numeric,
+or line-through decorations use native font positions and thicknesses. Plain text
+also supports a solid native outline: CoreText supplies the glyph contours and the
+server tessellates the SVG stroke width once, advertised as `styledNativeText`. Numeric,
 percentage, `super`, and `sub` baseline shifts remain semantic run metrics. Text
-strokes and gradients remain explicit fallbacks.
+gradients and independently stroked rich-text spans remain explicit fallbacks.
 Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
 data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
 decode and upload once as canonical persistent textures; frames retain only

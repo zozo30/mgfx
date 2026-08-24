@@ -105,6 +105,7 @@ export const ExtendedServerCapability = {
   RichTextBaselineShift: 1n << 55n,
   TiledImageSurfaces: 1n << 56n,
   NineSliceImages: 1n << 57n,
+  StyledNativeText: 1n << 58n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -1212,6 +1213,36 @@ export class FrameEncoder {
     }
     utf8.copy(payload, headerSize);
     this.command(8, payload);
+  }
+
+  styledSystemText(text: string, left: number, top: number, fontSize: number,
+    color: Color, strokeColor: Color, strokeWidth: number,
+    family: FontFamily = "system", weight: FontWeight = "regular",
+    style: FontStyle = "regular", letterSpacing = 0,
+    decoration: TextDecoration = TextDecoration.None, fontResourceId = 0,
+    anchor: "start" | "middle" | "end" = "start",
+    baseline: "top" | "alphabetic" = "top"): void {
+    const utf8 = Buffer.from(text, "utf8");
+    const values = [left, top, fontSize, color.red, color.green, color.blue, color.alpha,
+      letterSpacing, strokeColor.red, strokeColor.green, strokeColor.blue, strokeColor.alpha,
+      strokeWidth];
+    if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0) ||
+        values.some((value) => !Number.isFinite(value)) || fontSize <= 0 ||
+        Math.abs(letterSpacing) > 10 || strokeWidth <= 0 || strokeWidth > 4 ||
+        !Number.isInteger(decoration) || decoration < 0 || decoration > 3 ||
+        !Number.isInteger(fontResourceId) || fontResourceId < 0 || fontResourceId > 0xffff_ffff)
+      throw new RangeError("Styled system text values are outside supported bounds");
+    const payload = Buffer.alloc(64 + utf8.length);
+    payload.writeUInt8(fontFamilyCode(family), 0); payload.writeUInt8(fontWeightCode(weight), 1);
+    payload.writeUInt8(style === "italic" ? 1 : 0, 2); payload.writeUInt8(decoration, 3);
+    [left, top, fontSize, color.red, color.green, color.blue, color.alpha, letterSpacing]
+      .forEach((value, index) => payload.writeFloatLE(value, 4 + index * 4));
+    payload.writeUInt32LE(fontResourceId, 36);
+    payload.writeUInt8(anchor === "middle" ? 1 : anchor === "end" ? 2 : 0, 40);
+    payload.writeUInt8(baseline === "alphabetic" ? 1 : 0, 41);
+    [strokeColor.red, strokeColor.green, strokeColor.blue, strokeColor.alpha, strokeWidth]
+      .forEach((value, index) => payload.writeFloatLE(value, 44 + index * 4));
+    utf8.copy(payload, 64); this.command(41, payload);
   }
 
   endFrame(): void {
