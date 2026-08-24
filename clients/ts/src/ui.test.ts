@@ -201,6 +201,23 @@ test("scroll events target the clipped container under the pointer", () => {
   assert.equal(host.scroll({ x: 120, y: 20 }, 0, 12), false);
 });
 
+test("vertical scroll content stretches across the viewport cross axis", () => {
+  let clicked = false;
+  class WideScrollComponent extends Component {
+    build(): Element {
+      return scrollView(column([{ ...box({ preferredSize: { width: 30, height: 100 } }),
+        onClick: () => { clicked = true; } }], { crossAxisAlignment: "stretch" }), 0,
+      { preferredSize: { width: 120, height: 50 } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new WideScrollComponent());
+  host.layout({ width: 120, height: 50 });
+  assert.equal(host.pointerDown({ x: 110, y: 20 }), true);
+  host.pointerUp({ x: 110, y: 20 });
+  assert.equal(clicked, true);
+});
+
 test("UTF-8 text and editing keys route only to the focused node", () => {
   let value = "";
   class FieldComponent extends Component {

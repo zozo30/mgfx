@@ -22,6 +22,12 @@ export const Column = ({ children, style }: LayoutProps) =>
   <mgfx-column style={style ?? {}}>{children}</mgfx-column>;
 export const Stack = ({ children, style }: LayoutProps) =>
   <mgfx-stack style={style ?? {}}>{children}</mgfx-stack>;
+export function Scroll({ children, style }: LayoutProps) {
+  const [offsetY, setOffsetY] = useState(0);
+  return <mgfx-scroll offsetY={offsetY}
+    onScroll={(_deltaX, deltaY) => setOffsetY((current) => Math.max(0, current + deltaY))}
+    style={style ?? {}}>{children}</mgfx-scroll>;
+}
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
 export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Circle, Column, Image, Path, RichText, Row, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Circle, Column, Image, Path, RichText, Row, Scroll, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -278,10 +278,11 @@ function DrawerToggle({ expanded, showLabels, labelOpacity, onPress }: {
   const [pressed, setPressed] = useState(false);
   useNativeCursor("pointer", hovered);
   return <mgfx-row onClick={onPress} onHoverChange={setHovered} onPressChange={setPressed}
-    style={{ preferredSize: { height: 48 }, padding: all(9), gap: 14, cornerRadius: 10,
+    style={{ preferredSize: { height: 48 },
+      padding: { top: 9, right: 9, bottom: 9, left: 14 }, gap: 14, cornerRadius: 10,
       background: pressed ? rgba(0.07, 0.10, 0.18)
         : hovered ? rgba(0.15, 0.22, 0.36) : rgba(0.11, 0.16, 0.27),
-      crossAxisAlignment: "center", mainAxisAlignment: showLabels ? "start" : "center" }}>
+      crossAxisAlignment: "center", mainAxisAlignment: "start" }}>
     <Path data={expanded ? "M15 5L8 12L15 19" : "M9 5L16 12L9 19"}
       viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
       strokeColor={rgba(0.70, 0.88, 1)} strokeWidth={2.5}
@@ -309,8 +310,9 @@ function DrawerItem({ active, label, icon, fallback, showLabel, labelOpacity, on
       borderColor: active ? rgba(0.36, 0.76, 1) : rgba(0, 0, 0, 0),
       ...(active ? { shadow: { color: rgba(0.12, 0.48, 1, 0.24),
         blur: 9, spread: 0 } } : {}) }}>
-    <Row style={{ position: "absolute", inset: all(0), padding: all(12), gap: 16,
-      crossAxisAlignment: "center", mainAxisAlignment: showLabel ? "start" : "center" }}>
+    <Row style={{ position: "absolute", inset: all(0),
+      padding: { top: 12, right: 12, bottom: 12, left: 13 }, gap: 16,
+      crossAxisAlignment: "center", mainAxisAlignment: "start" }}>
       <DrawerIcon icon={icon} fallback={fallback}
         color={active ? rgba(0.78, 0.96, 1) : hovered
           ? rgba(0.72, 0.84, 0.98) : rgba(0.55, 0.66, 0.80)} />
@@ -434,9 +436,9 @@ function Dashboard({ headerImageSize, contentLeft, contentTop, mode, setMode }: 
   ] as const;
   return (
     <>
-    <Column style={{ position: "absolute", inset: all(0),
-      padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft }, gap: 16,
-      crossAxisAlignment: "stretch" }}>
+    <Scroll style={{ position: "absolute", inset: all(0) }}>
+    <Column style={{ padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft },
+      gap: 16, crossAxisAlignment: "stretch" }}>
       <Row style={{ gap: 16, crossAxisAlignment: "stretch" }}>
         {cards.map(([label, normal, active], index) => (
           <Button key={label} label={label} background={normal} activeBackground={active}
@@ -482,6 +484,7 @@ function Dashboard({ headerImageSize, contentLeft, contentTop, mode, setMode }: 
           style={{ preferredSize: { width: 190, height: 48 } }} />
       </Row>
     </Column>
+    </Scroll>
     <Dialog open={dialogOpen} title="MODAL LAYER 1000" onDismiss={() => setDialogOpen(false)}>
       <Text value="ROUTE INPUT IS ISOLATED BEHIND THIS LAYER"
         style={{ fontSize: 22, color: rgba(0.68, 0.74, 0.86) }} />
@@ -503,9 +506,9 @@ function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, content
   const router = useRouter();
   const animationTime = useAnimationTime();
   return (
-      <Column style={{ position: "absolute", inset: all(0),
-        padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft }, gap: 22,
-        crossAxisAlignment: "stretch" }}>
+      <Scroll style={{ position: "absolute", inset: all(0) }}>
+      <Column style={{ padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft },
+        gap: 22, crossAxisAlignment: "stretch" }}>
           <Row style={{ preferredSize: { height: 70 }, padding: all(16), cornerRadius: 14,
             backgroundGradient: { start: rgba(0.08, 0.46, 0.36),
               end: rgba(0.28, 0.12, 0.68), direction: "horizontal" },
@@ -548,5 +551,6 @@ function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, content
               style={{ fontSize: 22, color: rgba(0.42, 0.92, 0.68) }} />
           </Column>
       </Column>
+      </Scroll>
   );
 }

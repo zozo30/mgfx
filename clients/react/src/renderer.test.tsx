@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Button, Image, Mesh, Path, RichText, Svg, Text, TextField } from "./components.js";
+import { Box, Button, Column, Image, Mesh, Path, RichText, Scroll, Svg, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -28,6 +28,22 @@ test("React JSX commits an MGFX binary frame", () => {
   assert.ok(frame);
   assert.equal(frame.toString("ascii", 0, 4), "MGFX");
   assert.equal(frame.readUInt32LE(8), frame.length);
+});
+
+test("React Scroll retains wheel offset and commits a clipped scrolled frame", () => {
+  const frames: Buffer[] = [];
+  const surface = new ReactSurface((value) => { frames.push(Buffer.from(value)); });
+  surface.render(<Scroll style={{ preferredSize: { width: 100, height: 50 } }}>
+    <Column><Box style={{ preferredSize: { width: 100, height: 60 },
+      background: { red: 1, green: 0, blue: 0, alpha: 1 } }} />
+    <Box style={{ preferredSize: { width: 100, height: 60 },
+      background: { red: 0, green: 0, blue: 1, alpha: 1 } }} /></Column>
+  </Scroll>);
+  surface.resize({ width: 100, height: 50 });
+  const before = frames.at(-1)!;
+  surface.scroll({ x: 20, y: 20, deltaX: 0, deltaY: 24 });
+  const after = frames.at(-1)!;
+  assert.notDeepEqual(after, before);
 });
 
 test("React Text defaults to native server shaping", () => {

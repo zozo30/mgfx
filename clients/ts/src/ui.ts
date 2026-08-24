@@ -604,7 +604,7 @@ class Node {
       if (child) {
         const offset = Math.max(0, Math.min(this.scrollOffsetY, Math.max(0, child.measured.height - content.height)));
         child.layout({ x: content.x, y: content.y - offset,
-          width: Math.min(content.width, child.measured.width), height: child.measured.height });
+          width: content.width, height: child.measured.height });
       }
       return;
     }
