@@ -542,6 +542,7 @@ export function Disclosure({ title, open, onChange, children, contentHeight = 96
     <mgfx-row onClick={() => onChange(!open)} onHoverChange={setHovered}
       onPressChange={setPressed} onFocusChange={setFocused}
       style={{ preferredSize: { height: 52 }, padding: all(13),
+        cornerRadius: 12,
         mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center",
         background: pressed ? rgba(0.07, 0.12, 0.20)
           : hovered ? rgba(0.09, 0.15, 0.24) : rgba(0.055, 0.08, 0.13) }}>
