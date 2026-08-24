@@ -537,8 +537,7 @@ export function Disclosure({ title, open, onChange, children, contentHeight = 96
     transition.current.startedAt, time);
   useNativeCursor("pointer", hovered);
   return <Column style={{ preferredSize: { height: 52 + contentHeight * progress },
-    cornerRadius: 12, clip: true, background: rgba(0.035, 0.052, 0.085),
-    borderWidth: 1, borderColor: focused ? rgba(0.44, 0.80, 1) : rgba(0.20, 0.29, 0.44) }}>
+    cornerRadius: 12, clip: true, background: rgba(0.035, 0.052, 0.085) }}>
     <mgfx-row onClick={() => onChange(!open)} onHoverChange={setHovered}
       onPressChange={setPressed} onFocusChange={setFocused}
       style={{ preferredSize: { height: 52 }, padding: all(13),
@@ -558,6 +557,9 @@ export function Disclosure({ title, open, onChange, children, contentHeight = 96
       opacity: progress, transform: { translateY: (1 - progress) * -8 } }}>
       {children}
     </Column>
+    <Box style={{ position: "absolute", inset: all(0), zIndex: 10, cornerRadius: 12,
+      borderWidth: focused ? 2 : 1,
+      borderColor: focused ? rgba(0.44, 0.80, 1) : rgba(0.20, 0.29, 0.44) }} />
   </Column>;
 }
 
