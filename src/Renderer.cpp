@@ -1842,7 +1842,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             drawTextTriangles(shaped.triangles, text.color);
             if (text.strokeWidth > 0.0F) drawTextTriangles(shaped.strokeTriangles, text.strokeColor);
-        } else if (command.opcode == gfx::Opcode::drawRichText) {
+        } else if (command.opcode == gfx::Opcode::drawRichText ||
+                   command.opcode == gfx::Opcode::drawStyledRichText) {
             gfx::RichTextCommand rich{};
             if (!gfx::decodeRichText(command, rich)) {
                 throw std::runtime_error("Malformed rich text command");
@@ -1859,6 +1860,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 key.append(reinterpret_cast<const char*>(&run.letterSpacing), sizeof(run.letterSpacing));
                 key.push_back(static_cast<char>(run.decoration));
                 key.append(reinterpret_cast<const char*>(&run.fontResourceId), sizeof(run.fontResourceId));
+                key.append(reinterpret_cast<const char*>(&run.strokeWidth), sizeof(run.strokeWidth));
                 const std::uint64_t version = gfx::fontResourceVersion(run.fontResourceId);
                 key.append(reinterpret_cast<const char*>(&version), sizeof(version));
                 key += run.text;
@@ -1866,7 +1868,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 gfx::ShapedText& shaped = found->second;
                 if (inserted) {
                     shaped = gfx::shapeSystemText(run.text, run.family, run.weight, run.style,
-                                                  run.letterSpacing, run.fontResourceId);
+                                                  run.letterSpacing, run.fontResourceId,
+                                                  run.strokeWidth);
                     const auto decorate = [&](float position, float thickness) {
                         const float half = std::max(thickness, 0.04F) * 0.5F;
                         shaped.triangles.insert(shaped.triangles.end(), {
@@ -1896,14 +1899,20 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 const float richTop = (rich.baseline == gfx::TextBaseline::alphabetic
                     ? rich.top + shaped.ascent * runFontSize : rich.top) +
                     run.baselineShift * rich.fontSize;
-                const std::array<float, 4> color = {run.color.red, run.color.green, run.color.blue,
-                                                     run.color.alpha * opacityStack.back()};
-                vertices.reserve(vertices.size() + shaped.triangles.size());
-                for (const gfx::PathPoint& point : shaped.triangles) {
-                    vertices.push_back({transformPoint(currentTransform(),
-                        {richLeft + (cursor + point[0] * run.fontScale) * rich.fontSize * aspect,
-                         richTop - point[1] * runFontSize}), color});
-                }
+                const auto appendTriangles = [&](const std::vector<gfx::PathPoint>& triangles,
+                                                  const gfx::Color& sourceColor) {
+                    const std::array<float, 4> color = {sourceColor.red, sourceColor.green,
+                        sourceColor.blue, sourceColor.alpha * opacityStack.back()};
+                    vertices.reserve(vertices.size() + triangles.size());
+                    for (const gfx::PathPoint& point : triangles) {
+                        vertices.push_back({transformPoint(currentTransform(),
+                            {richLeft + (cursor + point[0] * run.fontScale) * rich.fontSize * aspect,
+                             richTop - point[1] * runFontSize}), color});
+                    }
+                };
+                appendTriangles(shaped.triangles, run.color);
+                if (run.strokeWidth > 0.0F)
+                    appendTriangles(shaped.strokeTriangles, run.strokeColor);
                 cursor += shaped.advance * run.fontScale;
             }
             if (vertices.empty()) continue;

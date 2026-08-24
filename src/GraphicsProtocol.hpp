@@ -52,6 +52,7 @@ enum class Opcode : std::uint16_t {
     drawTiledImageSurface = 39,
     drawNineSliceImage = 40,
     drawStyledText = 41,
+    drawStyledRichText = 42,
 };
 
 enum class Primitive : std::uint8_t {
@@ -373,6 +374,8 @@ struct RichTextRun {
     std::string text;
     float fontScale = 1.0F;
     float baselineShift = 0.0F;
+    Color strokeColor{0.0F, 0.0F, 0.0F, 0.0F};
+    float strokeWidth = 0.0F;
 };
 
 struct RichTextCommand {

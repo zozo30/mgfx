@@ -173,7 +173,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       font-weight: 600; letter-spacing: 0.45; text-anchor: middle; }
     .native-accent { fill: #ff8a1e; font-family: serif; font-size: 9;
       font-style: italic; font-weight: 700; }
-    .native-decoration { font-size: 7; baseline-shift: super; text-decoration: underline; }
+    .native-decoration { fill: #07111f; stroke: #58e6b5; stroke-width: 0.7;
+      font-size: 7; baseline-shift: super; text-decoration: underline; }
     .outline-label { fill: #d8fff0; stroke: #ff8a1e; stroke-width: 0.8;
       font-family: rounded; font-size: 8; font-weight: 700; }
   </style>

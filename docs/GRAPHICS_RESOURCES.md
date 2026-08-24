@@ -192,6 +192,10 @@ changes; Metal scales cached native outlines and advances, then baseline-aligns
 mixed sizes without any client-side glyph measurement.
 Per-run baseline shifts support SVG numeric/percentage shifts plus `super` and
 `sub`; the server offsets cached geometry while preserving shaped advances.
+Outlined run lists use `DrawStyledRichText`: each run adds a straight-alpha stroke
+color and an em-relative width while preserving its UTF-8 and font semantics.
+CoreText supplies glyph contours and the server tessellates both filled and
+stroke-only spans; the client never sends glyph meshes.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is

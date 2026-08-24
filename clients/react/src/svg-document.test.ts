@@ -261,13 +261,14 @@ test("SVG text lowers styled tspans to native rich-text runs", () => {
   });
 });
 
-test("SVG text rejects unsupported positioned or stroked spans and entities", () => {
+test("SVG text rejects unsupported positioned, gradient-stroked spans and entities", () => {
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text><tspan dx="2">nested</tspan></text></svg>`),
   /require an explicit x/);
   assert.throws(() => parseSvgVectorDocument(
-    `<svg viewBox="0 0 40 20"><text><tspan stroke="red">outlined</tspan></text></svg>`),
-  /stroke is not supported/);
+    `<svg viewBox="0 0 40 20"><defs><linearGradient id="g"/></defs>
+      <text><tspan stroke="url(#g)">outlined</tspan></text></svg>`),
+  /gradient stroke is not supported/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text>bad &unknown;</text></svg>`), /Unsupported SVG text entity/);
   assert.throws(() => parseSvgVectorDocument(
@@ -286,6 +287,21 @@ test("SVG plain text lowers solid outlines to native styled text", () => {
   assert.equal(document.layers[0]?.text?.value, "MGFX");
   assert.equal(document.layers[0]?.text?.strokeWidth, 1.5);
   assert.ok(Math.abs((document.layers[0]?.text?.strokeColor?.alpha ?? 0) - 0.8) < 0.00001);
+});
+
+test("SVG tspans lower independent solid outlines to styled rich-text runs", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 120 30">
+    <text x="60" y="22" text-anchor="middle" font-size="16" fill="#d8fff0">
+      MG<tspan fill="none" stroke="#ff8a1e" stroke-width="2">FX</tspan>
+    </text>
+  </svg>`);
+  const runs = document.layers[0]?.richText?.runs;
+  assert.equal(runs?.length, 2);
+  assert.equal(runs?.[0]?.text, "MG");
+  assert.equal(runs?.[1]?.text, "FX");
+  assert.equal(runs?.[1]?.color.alpha, 0);
+  assert.equal(runs?.[1]?.strokeColor?.red, 1);
+  assert.equal(runs?.[1]?.strokeWidth, 0.125);
 });
 
 test("SVG positioned tspans restart compact native run groups without glyph geometry", () => {

@@ -56,7 +56,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.RichTextBaselineShift |
     ExtendedServerCapability.TiledImageSurfaces |
     ExtendedServerCapability.NineSliceImages |
-    ExtendedServerCapability.StyledNativeText;
+    ExtendedServerCapability.StyledNativeText |
+    ExtendedServerCapability.StyledRichTextRuns;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -768,6 +769,21 @@ test("rich text packs styled UTF-8 runs into one display-list command", () => {
   assert.equal(bytes.readUInt8(second + 2), 1);
   assert.equal(bytes.readUInt8(second + 3), TextDecoration.Underline);
   assert.equal(bytes.readUInt32LE(second + 8), 42);
+});
+
+test("outlined rich-text runs carry server-owned stroke geometry", () => {
+  const frame = new FrameEncoder();
+  frame.richText([{ text: "tspan", color: { red: 0.8, green: 1, blue: 0.9, alpha: 1 },
+    strokeColor: { red: 1, green: 0.4, blue: 0.1, alpha: 0.75 }, strokeWidth: 0.12 }],
+  -0.4, 0.2, 0.1);
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 42);
+  assert.equal(bytes.readUInt32LE(36), 1);
+  assert.equal(bytes.readFloatLE(72), 1);
+  assert.ok(Math.abs(bytes.readFloatLE(84) - 0.75) < 0.00001);
+  assert.ok(Math.abs(bytes.readFloatLE(88) - 0.12) < 0.00001);
+  assert.equal(bytes.subarray(92, 97).toString(), "tspan");
 });
 
 test("native rich-text placement anchors one server-shaped run list", () => {

@@ -246,6 +246,12 @@ same baseline. Capability bit 54 advertises this run-metrics extension.
 Bit 29 adds another `f32` after the optional scale: a signed baseline shift in
 units of the command's base font size. Positive values move a run upward without
 changing its horizontal advance. Capability bit 55 advertises baseline shifts.
+MGFX opcode `42` (`DrawStyledRichText`) preserves the `DrawRichText` header and
+run flags, then extends every run after its optional font scale and baseline shift
+with straight-alpha stroke RGBA and an em-relative `f32` stroke width in `[0, 4]`.
+Runs with zero width may share the same styled command without an outline. The
+backend shapes and tessellates fill and stroke geometry from the semantic UTF-8
+runs. Capability bit 59 advertises styled rich-text runs.
 
 MGFX opcode `25` (`DrawLinearGradientCircle`) carries a destination rectangle,
 horizontal/vertical/diagonal direction, and two straight-alpha colors. Backends

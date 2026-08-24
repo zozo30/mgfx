@@ -94,9 +94,11 @@ can restart the native pen and apply `y/dx/dy`, covering multiline SVG labels
 without client glyph metrics. Nested spans inherit styles normally, and underline
 or line-through decorations use native font positions and thicknesses. Plain text
 also supports a solid native outline: CoreText supplies the glyph contours and the
-server tessellates the SVG stroke width once, advertised as `styledNativeText`. Numeric,
-percentage, `super`, and `sub` baseline shifts remain semantic run metrics. Text
-gradients and independently stroked rich-text spans remain explicit fallbacks.
+server tessellates the SVG stroke width once, advertised as `styledNativeText`.
+Individual `<tspan>` runs can independently select solid fill, outline color, and
+outline width through `styledRichTextRuns`; even stroke-only runs remain compact
+UTF-8 plus semantic font data. Numeric, percentage, `super`, and `sub` baseline shifts
+remain semantic run metrics. Text gradients remain explicit fallbacks.
 Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
 data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
 decode and upload once as canonical persistent textures; frames retain only

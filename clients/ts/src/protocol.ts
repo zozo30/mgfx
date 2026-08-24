@@ -106,6 +106,7 @@ export const ExtendedServerCapability = {
   TiledImageSurfaces: 1n << 56n,
   NineSliceImages: 1n << 57n,
   StyledNativeText: 1n << 58n,
+  StyledRichTextRuns: 1n << 59n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -322,6 +323,8 @@ export interface RichTextRun {
   readonly fontResourceId?: number;
   readonly fontScale?: number;
   readonly baselineShift?: number;
+  readonly strokeColor?: Color;
+  readonly strokeWidth?: number;
 }
 const fontWeightCode = (weight: FontWeight): number =>
   weight === "bold" ? 1 : weight === "medium" ? 2 : weight === "semibold" ? 3 : 0;
@@ -1126,8 +1129,10 @@ export class FrameEncoder {
     const placed = anchor !== "start" || baseline !== "top";
     const scaledRuns = runs.some((run) => (run.fontScale ?? 1) !== 1);
     const shiftedRuns = runs.some((run) => (run.baselineShift ?? 0) !== 0);
+    const styledRuns = runs.some((run) => (run.strokeWidth ?? 0) > 0);
     const headerSize = placed ? 20 : 16;
-    const runHeaderSize = 32 + (scaledRuns ? 4 : 0) + (shiftedRuns ? 4 : 0);
+    const runHeaderSize = 32 + (scaledRuns ? 4 : 0) + (shiftedRuns ? 4 : 0) +
+      (styledRuns ? 20 : 0);
     const payload = Buffer.alloc(headerSize + encoded.reduce(
       (size, text) => size + runHeaderSize + text.length, 0));
     [left, top, fontSize].forEach((value, index) => {
@@ -1151,12 +1156,17 @@ export class FrameEncoder {
       const fontId = run.fontResourceId ?? 0;
       const fontScale = run.fontScale ?? 1;
       const baselineShift = run.baselineShift ?? 0;
+      const strokeWidth = run.strokeWidth ?? 0;
+      const stroke = run.strokeColor ?? { red: 0, green: 0, blue: 0, alpha: 0 };
       const colors = [run.color.red, run.color.green, run.color.blue, run.color.alpha];
       if (!Number.isFinite(spacing) || Math.abs(spacing) > 10 || decoration < 0 || decoration > 3 ||
           !Number.isInteger(fontId) || fontId < 0 || fontId > 0xffff_ffff ||
           !Number.isFinite(fontScale) || fontScale <= 0 || fontScale > 16 ||
           !Number.isFinite(baselineShift) || Math.abs(baselineShift) > 16 ||
-          colors.some((value) => !Number.isFinite(value)))
+          !Number.isFinite(strokeWidth) || strokeWidth < 0 || strokeWidth > 4 ||
+          colors.some((value) => !Number.isFinite(value)) ||
+          [stroke.red, stroke.green, stroke.blue, stroke.alpha]
+            .some((value) => !Number.isFinite(value)))
         throw new RangeError("Invalid rich text run style");
       payload.writeUInt8(fontFamilyCode(run.family ?? "system"), offset);
       payload.writeUInt8(fontWeightCode(run.weight ?? "regular"), offset + 1);
@@ -1169,10 +1179,16 @@ export class FrameEncoder {
       payload.writeUInt32LE(text.length, offset + 28);
       if (scaledRuns) payload.writeFloatLE(fontScale, offset + 32);
       if (shiftedRuns) payload.writeFloatLE(baselineShift, offset + 32 + (scaledRuns ? 4 : 0));
+      if (styledRuns) {
+        const strokeOffset = offset + 32 + (scaledRuns ? 4 : 0) + (shiftedRuns ? 4 : 0);
+        [stroke.red, stroke.green, stroke.blue, stroke.alpha, strokeWidth]
+          .forEach((value, strokeIndex) => payload.writeFloatLE(value,
+            strokeOffset + strokeIndex * 4));
+      }
       text.copy(payload, offset + runHeaderSize);
       offset += runHeaderSize + text.length;
     });
-    this.command(24, payload);
+    this.command(styledRuns ? 42 : 24, payload);
   }
 
   systemText(text: string, left: number, top: number, fontSize: number,

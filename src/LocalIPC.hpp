@@ -117,6 +117,7 @@ enum ServerCapability : std::uint64_t {
     tiledImageSurfaces = 1ULL << 56U,
     nineSliceImages = 1ULL << 57U,
     styledNativeText = 1ULL << 58U,
+    styledRichTextRuns = 1ULL << 59U,
 };
 
 enum class ResourceKind : std::uint8_t {

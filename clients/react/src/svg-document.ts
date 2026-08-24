@@ -388,10 +388,14 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       for (const piece of drawablePieces) {
         if (piece.state.fillGradientId)
           throw new Error(`SVG ${hasSpans ? "tspan" : "text"} gradient fill is not supported natively`);
-        if (hasSpans && piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0)
-          throw new Error(`SVG ${hasSpans ? "tspan" : "text"} stroke is not supported natively`);
+        if (piece.state.strokeGradientId && piece.state.strokeWidth > 0)
+          throw new Error(`SVG ${hasSpans ? "tspan" : "text"} gradient stroke is not supported natively`);
+        if (piece.state.dash && piece.state.strokeWidth > 0)
+          throw new Error(`SVG ${hasSpans ? "tspan" : "text"} dashed stroke is not supported natively`);
       }
-      const visiblePieces = drawablePieces.filter((piece) => piece.state.fill && piece.state.fill.alpha > 0);
+      const visiblePieces = drawablePieces.filter((piece) =>
+        piece.state.fill && piece.state.fill.alpha > 0 ||
+        piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0);
       const value = visiblePieces.map((piece) => piece.value).join("");
       if (!value) continue;
       const placement = {
@@ -420,9 +424,13 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       for (const piece of normalized) {
         if (piece.x !== undefined) groups.push({ x: piece.x, y: piece.y!, runs: [] });
         if (!piece.value || !piece.state.displayed || !piece.state.visible ||
-            !piece.state.fill || piece.state.fill.alpha <= 0) continue;
+            !(piece.state.fill && piece.state.fill.alpha > 0) &&
+            !(piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0))
+          continue;
         groups[groups.length - 1]!.runs.push({ text: piece.value,
-          color: multiplyAlpha(piece.state.fill, piece.state.opacity * piece.state.fillOpacity),
+          color: piece.state.fill && piece.state.fill.alpha > 0
+            ? multiplyAlpha(piece.state.fill, piece.state.opacity * piece.state.fillOpacity)
+            : { red: 0, green: 0, blue: 0, alpha: 0 },
           family: piece.state.fontFamily, weight: piece.state.fontWeight, style: piece.state.fontStyle,
           ...(piece.state.textDecoration !== TextDecoration.None
             ? { decoration: piece.state.textDecoration } : {}),
@@ -431,7 +439,11 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
           ...(piece.state.baselineShift !== 0
             ? { baselineShift: piece.state.baselineShift / state.fontSize } : {}),
           ...(piece.state.letterSpacing !== 0
-            ? { letterSpacing: piece.state.letterSpacing / piece.state.fontSize } : {}) });
+            ? { letterSpacing: piece.state.letterSpacing / piece.state.fontSize } : {}),
+          ...(piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0
+            ? { strokeColor: multiplyAlpha(piece.state.stroke,
+                piece.state.opacity * piece.state.strokeOpacity),
+              strokeWidth: piece.state.strokeWidth / piece.state.fontSize } : {}) });
       }
       for (const group of groups) {
         if (group.runs.length === 0) continue;
