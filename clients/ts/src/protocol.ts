@@ -103,6 +103,7 @@ export const ExtendedServerCapability = {
   NativeRichTextPlacement: 1n << 53n,
   RichTextRunMetrics: 1n << 54n,
   RichTextBaselineShift: 1n << 55n,
+  TiledImageSurfaces: 1n << 56n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -791,6 +792,24 @@ export class FrameEncoder {
     payload.writeUInt32LE(sampling === "nearest" ? 1 : 0, 4);
     values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
     this.command(19, payload);
+  }
+
+  tiledImageSurface(textureId: number, destination: ClipRect, uv: ClipRect,
+    tint: Color = { red: 1, green: 1, blue: 1, alpha: 1 }, cornerRadius = 0,
+    sampling: "linear" | "nearest" = "linear", repeatX = true, repeatY = true): void {
+    const values = [destination.left, destination.top, destination.right, destination.bottom,
+      uv.left, uv.top, uv.right, uv.bottom, tint.red, tint.green, tint.blue, tint.alpha,
+      cornerRadius, 0];
+    if (!Number.isSafeInteger(textureId) || textureId <= 0 || textureId > 0xffff_ffff ||
+        values.some((value) => !Number.isFinite(value)) || cornerRadius < 0 || cornerRadius > 8192 ||
+        (!repeatX && !repeatY))
+      throw new RangeError("Tiled image surface values are outside supported bounds");
+    const payload = Buffer.alloc(64);
+    payload.writeUInt32LE(textureId, 0);
+    payload.writeUInt32LE((sampling === "nearest" ? 1 : 0) |
+      (repeatX ? 2 : 0) | (repeatY ? 4 : 0), 4);
+    values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
+    this.command(39, payload);
   }
 
   path(pathId: number, destination: ClipRect,

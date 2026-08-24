@@ -39,6 +39,10 @@ pixel-space corner radius and portable linear/nearest sampling choice; Metal mas
 the sampled texture with an antialiased rounded SDF, so cards and avatars need no
 client-generated clipping geometry.
 
+`DrawTiledImageSurface` repeats the same persistent texture independently on X
+and Y. Tile size and phase remain frontend layout values, while Metal samples the
+entire rounded area in one draw, making image and rasterized-SVG patterns cheap to animate.
+
 The React client includes bounded PNG, JPEG, and SVG decoders. Raster files are converted to
 premultiplied RGBA8, uploaded once, and displayed with `fill`, `contain`, or
 `cover` geometry computed by the backend-neutral UI runtime.

@@ -24,13 +24,17 @@ export const Stack = ({ children, style }: LayoutProps) =>
   <mgfx-stack style={style ?? {}}>{children}</mgfx-stack>;
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
-export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling }: {
+export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling,
+  tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY }: {
   readonly textureId: number; readonly style?: Style;
   readonly sourceWidth?: number; readonly sourceHeight?: number;
   readonly fit?: "fill" | "contain" | "cover";
   readonly alignX?: "start" | "center" | "end";
   readonly alignY?: "start" | "center" | "end";
   readonly sampling?: "linear" | "nearest";
+  readonly tileWidth?: number; readonly tileHeight?: number;
+  readonly tileOffsetX?: number; readonly tileOffsetY?: number;
+  readonly repeatX?: boolean; readonly repeatY?: boolean;
 }) => <mgfx-box style={{ ...style, backgroundImage: {
   textureId,
   ...(sourceWidth !== undefined && sourceHeight !== undefined
@@ -39,6 +43,12 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX
   ...(alignX ? { alignX } : {}),
   ...(alignY ? { alignY } : {}),
   ...(sampling ? { sampling } : {}),
+  ...(tileWidth !== undefined && tileHeight !== undefined
+    ? { tileSize: { width: tileWidth, height: tileHeight } } : {}),
+  ...(tileOffsetX !== undefined ? { tileOffsetX } : {}),
+  ...(tileOffsetY !== undefined ? { tileOffsetY } : {}),
+  ...(repeatX !== undefined ? { repeatX } : {}),
+  ...(repeatY !== undefined ? { repeatY } : {}),
 } }} />;
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;

@@ -53,7 +53,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.NativeTextPlacement |
     ExtendedServerCapability.NativeRichTextPlacement |
     ExtendedServerCapability.RichTextRunMetrics |
-    ExtendedServerCapability.RichTextBaselineShift;
+    ExtendedServerCapability.RichTextBaselineShift |
+    ExtendedServerCapability.TiledImageSurfaces;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -371,6 +372,24 @@ test("rounded image surfaces encode radius and sampling without client geometry"
   assert.equal(bytes.readFloatLE(80), 14);
   assert.throws(() => frame.imageSurface(0,
     { left: 0, top: 1, right: 1, bottom: 0 }, undefined, undefined, 0));
+});
+
+test("tiled image surfaces encode repeat axes and phase in one command", () => {
+  const frame = new FrameEncoder();
+  frame.tiledImageSurface(11, { left: -1, top: 0.5, right: 1, bottom: -0.5 },
+    { left: -0.25, top: 0, right: 4.75, bottom: 1 }, undefined, 9, "nearest", true, false);
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 39);
+  assert.equal(bytes.readUInt32LE(20), 64);
+  assert.equal(bytes.readUInt32LE(24), 11);
+  assert.equal(bytes.readUInt32LE(28), 3); // Nearest + repeat X.
+  assert.equal(bytes.readFloatLE(48), -0.25);
+  assert.equal(bytes.readFloatLE(56), 4.75);
+  assert.equal(bytes.readFloatLE(80), 9);
+  assert.throws(() => frame.tiledImageSurface(11,
+    { left: -1, top: 1, right: 1, bottom: -1 },
+    { left: 0, top: 0, right: 1, bottom: 1 }, undefined, 0, "linear", false, false));
 });
 
 test("dot grids encode all cells as one fixed pattern command", () => {

@@ -65,6 +65,10 @@ int main() {
                               {-0.6F, 0.6F, 0.6F, -0.6F},
                               {0.1F, 0.2F, 0.9F, 0.8F},
                               {0.8F, 1.0F, 0.7F, 0.9F}, 14.0F});
+    encoder.drawTiledImageSurface({10, gfx::ImageSampling::linear,
+                                   {-0.8F, 0.4F, 0.8F, -0.4F},
+                                   {-0.25F, 0.0F, 4.75F, 1.0F},
+                                   {1.0F, 0.9F, 0.8F, 1.0F}, 8.0F, true, false});
     encoder.drawDotGrid({{-0.3F, 0.3F, 0.3F, -0.3F}, 4, 4, 0xA142U, 7,
                          6.0F, 4.0F, 2.0F,
                          {0.4F, 0.9F, 0.6F, 1.0F}, {0.4F, 0.9F, 0.6F, 0.8F},
@@ -293,6 +297,13 @@ int main() {
         !nearlyEqual(imageSurface.uv.left, 0.1F) ||
         !nearlyEqual(imageSurface.cornerRadius, 14.0F) || !decoder.next(command)) {
         return fail("Image-surface decoding failed");
+    }
+    gfx::ImageSurfaceCommand tiledImage{};
+    if (!gfx::decodeTiledImageSurface(command, tiledImage) || tiledImage.textureId != 10 ||
+        tiledImage.sampling != gfx::ImageSampling::linear || !tiledImage.repeatX ||
+        tiledImage.repeatY || !nearlyEqual(tiledImage.uv.left, -0.25F) ||
+        !nearlyEqual(tiledImage.uv.right, 4.75F) || !decoder.next(command)) {
+        return fail("Tiled image-surface decoding failed");
     }
     gfx::DotGridCommand grid{};
     if (!gfx::decodeDotGrid(command, grid) || grid.rows != 4 || grid.columns != 4 ||

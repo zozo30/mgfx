@@ -78,18 +78,17 @@ export function DiagonalPattern({ time }: { readonly time: number }) {
   );
 }
 
-function ImagePreview({ sourceSize }: {
-  readonly sourceSize: { readonly width: number; readonly height: number };
-}) {
+function ImagePreview({ time }: { readonly time: number }) {
   return (
     <Row style={{ preferredSize: { height: 126 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
       <Stack style={{ preferredSize: { width: 220 }, padding: all(8) }}>
-        <Text value="PERSISTENT IMAGE / SVG" style={{ fontSize: 22, fontWeight: "bold",
+        <Text value="TILED IMAGE / SVG" style={{ fontSize: 22, fontWeight: "bold",
           color: rgba(0.82, 0.86, 0.94) }} />
       </Stack>
-      <Image textureId={1} sourceWidth={sourceSize.width} sourceHeight={sourceSize.height}
-        fit="contain" style={{ preferredSize: { height: 102 }, flexGrow: 1,
+      <Image textureId={1} tileWidth={120} tileHeight={68} tileOffsetX={time / 24}
+        repeatX repeatY
+        style={{ preferredSize: { height: 102 }, flexGrow: 1,
           background: rgba(0.015, 0.02, 0.03), cornerRadius: 16,
           borderWidth: 2, borderColor: rgba(0.2, 0.3, 0.45) }} />
       <Path data="M50 2L62 18L82 18L82 38L98 50L82 62L82 82L62 82L50 98L38 82L18 82L18 62L2 50L18 38L18 18L38 18Z M50 32A18 18 0 1 1 49.9 32Z"
@@ -298,7 +297,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
         textStyle={{ fontSize: 22 }} />
       <WavePattern time={animationTime} />
       <DiagonalPattern time={animationTime} />
-      <ImagePreview sourceSize={headerImageSize} />
+      <ImagePreview time={animationTime} />
       <ServerVectorPath time={animationTime} />
       <SvgDocumentPreview time={animationTime} />
       <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>

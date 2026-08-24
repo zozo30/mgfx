@@ -121,6 +121,9 @@ Radial gradient paint on path strokes is advertised by `1 << 48`.
 Styled and dashed radial path paint is advertised by `1 << 49`.
 Multi-stop conic paint on persistent paths is advertised by `1 << 50`.
 Texture paint on persistent path fills and strokes is advertised by `1 << 51`.
+Native anchored text and rich-text placement are advertised by `1 << 52` and
+`1 << 53`; per-run font scaling and baseline shift use `1 << 54` and `1 << 55`.
+One-command tiled image surfaces are advertised by `1 << 56`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -345,3 +348,10 @@ values (`x`, `y`, `width`, `height`), four normalized UV `f32` values, four tint
 `u16`, and reserved zero `u32` complete the 200-byte header. Even dash lengths
 follow. Payload size is `200 + dashCount * 4`; dash count is zero or an even
 2–32. Capability bit 51 is required.
+
+MGFX opcode `39` (`DrawTiledImageSurface`) has the same fixed 64-byte layout as
+`DrawImageSurface`. Its second `u32` is a flag word: bit 0 selects nearest
+sampling, bit 1 repeats X, and bit 2 repeats Y; all other bits are zero. UV
+coordinates may extend outside `[0, 1]` to encode tile count and phase. The
+backend repeats only selected axes, retains the rounded mask, and requires at
+least one repeat bit. Capability bit 56 is required.

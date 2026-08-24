@@ -46,6 +46,9 @@ export interface ImagePaint {
   readonly alignX?: "start" | "center" | "end";
   readonly alignY?: "start" | "center" | "end";
   readonly sampling?: "linear" | "nearest";
+  readonly tileSize?: Size;
+  readonly tileOffsetX?: number; readonly tileOffsetY?: number;
+  readonly repeatX?: boolean; readonly repeatY?: boolean;
 }
 export interface Transform {
   readonly translateX?: number; readonly translateY?: number;
@@ -1136,6 +1139,20 @@ function imageGeometry(bounds: Rect, image: ImagePaint): {
 function paintImage(encoder: FrameEncoder, bounds: Rect, image: ImagePaint | undefined,
   cornerRadius: number, viewport: Size): void {
   if (!image || bounds.width <= 0 || bounds.height <= 0) return;
+  if (image.tileSize) {
+    const tile = image.tileSize;
+    if (tile.width <= 0 || tile.height <= 0) return;
+    const repeatX = image.repeatX ?? true, repeatY = image.repeatY ?? true;
+    if (!repeatX && !repeatY) return;
+    const offsetX = image.tileOffsetX ?? 0, offsetY = image.tileOffsetY ?? 0;
+    const uv = { left: repeatX ? -offsetX / tile.width : 0,
+      top: repeatY ? -offsetY / tile.height : 0,
+      right: repeatX ? (bounds.width - offsetX) / tile.width : 1,
+      bottom: repeatY ? (bounds.height - offsetY) / tile.height : 1 };
+    encoder.tiledImageSurface(image.textureId, normalizedRect(bounds, viewport), uv,
+      image.tint, cornerRadius, image.sampling ?? "linear", repeatX, repeatY);
+    return;
+  }
   const geometry = imageGeometry(bounds, image);
   if (cornerRadius > 0 || image.sampling === "nearest") {
     encoder.imageSurface(image.textureId, normalizedRect(geometry.destination, viewport), geometry.uv,

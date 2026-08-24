@@ -32,13 +32,17 @@ are decoded in the client runtime, not by a graphics backend. The server uploads
 the validated pixels into a native texture resource.
 
 `DrawImage` references a texture ID and carries destination rectangle, normalized
-UV rectangle, and tint; inherited opacity applies on the server. Nine-slice and repeating image
-patterns can be tessellated by the frontend into several ordinary image quads.
+UV rectangle, and tint; inherited opacity applies on the server. Repeating image
+patterns do not require resending the underlying pixels.
 
 The implemented `DrawImageSurface` extension adds a rounded-corner radius and an
 explicit linear/nearest sampling flag while retaining the same texture, UV, tint,
 transform, opacity, and clip semantics. Metal applies the rounded mask per fragment;
 support is advertised by `imageSurfaces`.
+
+`DrawTiledImageSurface` uses the same rounded fragment mask and adds independent
+X/Y repeat flags. UV extents encode tile count and phase, so a large or animated
+area remains one fixed-size command. Support is advertised by `tiledImageSurfaces`.
 
 ## SVG and vector paths
 

@@ -585,9 +585,13 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
-        } else if (command.opcode == gfx::Opcode::drawImageSurface) {
+        } else if (command.opcode == gfx::Opcode::drawImageSurface ||
+                   command.opcode == gfx::Opcode::drawTiledImageSurface) {
             gfx::ImageSurfaceCommand image{};
-            if (!gfx::decodeImageSurface(command, image) ||
+            const bool decoded = command.opcode == gfx::Opcode::drawImageSurface
+                ? gfx::decodeImageSurface(command, image)
+                : gfx::decodeTiledImageSurface(command, image);
+            if (!decoded ||
                 !std::isfinite(image.cornerRadius) || image.cornerRadius < 0.0F ||
                 image.cornerRadius > 8192.0F) {
                 throw std::runtime_error("Malformed image-surface command");
@@ -607,6 +611,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 std::array<float, 2> size;
                 float cornerRadius;
                 float sampling;
+                float repeatX;
+                float repeatY;
                 std::array<float, 4> tint;
             };
             const std::array<float, 4> tint = {image.tint.red, image.tint.green,
@@ -615,7 +621,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             const auto vertex = [&](float x, float y, float u, float v,
                                     float localX, float localY) {
                 return ImageSurfaceVertex{transformPoint(currentTransform(), {x, y}), {u, v},
-                    {localX, localY}, size, image.cornerRadius, sampling, tint};
+                    {localX, localY}, size, image.cornerRadius, sampling,
+                    image.repeatX ? 1.0F : 0.0F, image.repeatY ? 1.0F : 0.0F, tint};
             };
             const ImageSurfaceVertex vertices[] = {
                 vertex(image.destination.left, image.destination.top,

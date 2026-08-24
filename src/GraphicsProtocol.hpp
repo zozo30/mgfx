@@ -49,6 +49,7 @@ enum class Opcode : std::uint16_t {
     drawStyledRadialPath = 36,
     drawConicPath = 37,
     drawTexturePath = 38,
+    drawTiledImageSurface = 39,
 };
 
 enum class Primitive : std::uint8_t {
@@ -110,6 +111,8 @@ struct ImageSurfaceCommand {
     ClipRect uv;
     Color tint;
     float cornerRadius;
+    bool repeatX = false;
+    bool repeatY = false;
 };
 
 struct ShadowCommand {
@@ -376,6 +379,7 @@ public:
     void popClip();
     void drawImage(const ImageCommand& image);
     void drawImageSurface(const ImageSurfaceCommand& image);
+    void drawTiledImageSurface(const ImageSurfaceCommand& image);
     void drawMesh(const MeshCommand& mesh);
     void drawPath(const PathCommand& path);
     void drawText(const TextCommand& text);
@@ -427,6 +431,7 @@ bool decodeDraw(const CommandView& command, DrawCommand& draw);
 bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
 bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image);
+bool decodeTiledImageSurface(const CommandView& command, ImageSurfaceCommand& image);
 bool decodeMesh(const CommandView& command, MeshCommand& mesh);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);

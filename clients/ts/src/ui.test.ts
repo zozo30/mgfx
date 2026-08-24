@@ -491,6 +491,27 @@ test("image fitting honors edge alignment for letterboxing and cropping", () => 
   assert.equal(covered.readFloatLE(56), 1);
 });
 
+test("image tiles lower size and animated phase to one server draw", () => {
+  class TiledImage extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 120, height: 60 }, cornerRadius: 10,
+        backgroundImage: { textureId: 5, tileSize: { width: 30, height: 20 },
+          tileOffsetX: 7.5, tileOffsetY: -5, repeatX: true, repeatY: true } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new TiledImage());
+  host.layout({ width: 120, height: 60 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 120, height: 60 });
+  encoder.endFrame(); const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 39);
+  assert.equal(frame.readUInt32LE(28), 6); // Repeat X and Y with linear sampling.
+  assert.equal(frame.readFloatLE(48), -0.25);
+  assert.equal(frame.readFloatLE(52), 0.25);
+  assert.equal(frame.readFloatLE(56), 3.75);
+  assert.equal(frame.readFloatLE(60), 3.25);
+  assert.equal(frame.readFloatLE(80), 10);
+});
+
 test("diagonal patterns lower to one constant-size server command", () => {
   class PatternComponent extends Component {
     build(): Element {

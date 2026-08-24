@@ -162,6 +162,8 @@ struct ImageSurfaceVertex {
     packed_float2 size;
     float cornerRadius;
     float sampling;
+    float repeatX;
+    float repeatY;
     packed_float4 tint;
 };
 
@@ -172,6 +174,7 @@ struct ImageSurfaceVertexOut {
     float2 size;
     float cornerRadius;
     float sampling;
+    float2 repeat;
     float4 tint;
 };
 
@@ -179,15 +182,25 @@ vertex ImageSurfaceVertexOut imageSurfaceVertexMain(
     const device ImageSurfaceVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
     const ImageSurfaceVertex value = vertices[vertexId];
     return {float4(value.position, 0.0, 1.0), value.uv, value.local, value.size,
-            value.cornerRadius, value.sampling, value.tint};
+            value.cornerRadius, value.sampling, float2(value.repeatX, value.repeatY), value.tint};
 }
 
 fragment float4 imageSurfaceFragmentMain(ImageSurfaceVertexOut in [[stage_in]],
                                          texture2d<float> image [[texture(0)]]) {
-    constexpr sampler linearSampler(coord::normalized, address::clamp_to_edge, filter::linear);
-    constexpr sampler nearestSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    constexpr sampler linearClamp(coord::normalized, address::clamp_to_edge, filter::linear);
+    constexpr sampler nearestClamp(coord::normalized, address::clamp_to_edge, filter::nearest);
+    constexpr sampler linearRepeat(coord::normalized, address::repeat, filter::linear);
+    constexpr sampler nearestRepeat(coord::normalized, address::repeat, filter::nearest);
+    float2 sampleUv = in.uv;
+    const bool repeats = in.repeat.x > 0.5 || in.repeat.y > 0.5;
+    const float2 halfTexel = 0.5 / float2(image.get_width(), image.get_height());
+    if (repeats && in.repeat.x < 0.5)
+        sampleUv.x = clamp(sampleUv.x, halfTexel.x, 1.0 - halfTexel.x);
+    if (repeats && in.repeat.y < 0.5)
+        sampleUv.y = clamp(sampleUv.y, halfTexel.y, 1.0 - halfTexel.y);
     const float4 sampled = in.sampling > 0.5
-        ? image.sample(nearestSampler, in.uv) : image.sample(linearSampler, in.uv);
+        ? (repeats ? image.sample(nearestRepeat, sampleUv) : image.sample(nearestClamp, sampleUv))
+        : (repeats ? image.sample(linearRepeat, sampleUv) : image.sample(linearClamp, sampleUv));
     const float2 halfSize = in.size * 0.5;
     const float radius = min(in.cornerRadius, min(halfSize.x, halfSize.y));
     const float2 q = abs(in.local - halfSize) - halfSize + radius;

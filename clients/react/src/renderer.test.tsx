@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Button, Mesh, Path, RichText, Svg, Text, TextField } from "./components.js";
+import { Button, Image, Mesh, Path, RichText, Svg, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -51,6 +51,20 @@ test("React RichText lowers styled spans to one native command", () => {
   assert.ok(frame);
   assert.equal(frame.readUInt16LE(40), 24);
   assert.equal(frame.readUInt32LE(60), 2);
+});
+
+test("React Image exposes one native tiled-surface draw", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Image textureId={7} tileWidth={32} tileHeight={24}
+    tileOffsetX={8} repeatX repeatY={false}
+    style={{ preferredSize: { width: 128, height: 48 }, cornerRadius: 6 }} />);
+  surface.resize({ width: 128, height: 48 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 39);
+  assert.equal(frame.readUInt32LE(52), 2); // Repeat X with linear sampling.
+  assert.equal(frame.readFloatLE(72), -0.25);
+  assert.equal(frame.readFloatLE(80), 3.75);
 });
 
 test("React Path uploads canonical curves once and emits DrawPath instead of triangles", () => {
