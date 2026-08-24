@@ -3,7 +3,7 @@ import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo
 import { Box, Button, Checkbox, Circle, Column, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
-import { Dialog, Router, useRouter } from "./navigation.js";
+import { Dialog, Router, Toast, useRouter } from "./navigation.js";
 import { AnimationProvider, useAnimationTime } from "./animation.js";
 
 export function DotGrid({ time }: { readonly time: number }) {
@@ -565,6 +565,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [quantity, setQuantity] = useState(4);
   const [theme, setTheme] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
   const time = useAnimationTime();
   const router = useRouter();
   const progress = (Math.sin(time / 900) + 1) / 2;
@@ -659,6 +660,8 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
           </Row>
         </Column>
         <Row style={{ gap: 12, mainAxisAlignment: "end" }}>
+          <Button label="SHOW TOAST" onPress={() => setToastOpen(true)}
+            background={rgba(0.16, 0.42, 0.68)} style={{ preferredSize: { width: 170 } }} />
           <Button label="SHOW DIALOG" onPress={() => setDialogOpen(true)}
             background={rgba(0.48, 0.24, 0.72)} style={{ preferredSize: { width: 180 } }} />
           <Button label="GRAPHICS ROUTE" onPress={() => router.push("graphics")}
@@ -672,6 +675,8 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
       <Button label="DONE" onPress={() => setDialogOpen(false)}
         background={rgba(0.14, 0.58, 0.46)} />
     </Dialog>
+    <Toast open={toastOpen} message="Native state committed over the MGFX socket."
+      variant="success" onDismiss={() => setToastOpen(false)} />
   </>;
 }
 
