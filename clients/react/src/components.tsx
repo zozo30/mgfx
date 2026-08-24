@@ -739,7 +739,11 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const animationTime = useAnimationTime(focused);
   useNativeCursor("text", hovered);
   const characters = [...value];
-  const { caret, anchor } = selection;
+  // The controlled value belongs to the parent while the selection belongs to
+  // this component. React may expose the shorter value one render before the
+  // matching selection update, so never edit with an index past that value.
+  const caret = Math.min(selection.caret, characters.length);
+  const anchor = Math.min(selection.anchor, characters.length);
   useEffect(() => {
     setSelection((current) => {
       const next = { caret: Math.min(current.caret, characters.length),
