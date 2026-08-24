@@ -1,4 +1,5 @@
 #include "SystemText.hpp"
+#include "ResourceBudget.hpp"
 
 #import <AppKit/AppKit.h>
 #import <CoreText/CoreText.h>
@@ -25,6 +26,7 @@ struct FontResource {
 };
 std::mutex fontResourceMutex;
 std::unordered_map<std::uint32_t, FontResource> fontResources;
+ResourceBudget fontBudget{32, 64U * 1024U * 1024U};
 std::uint64_t nextFontVersion = 1;
 
 struct PathBuilder {
@@ -240,9 +242,14 @@ bool createFontResource(std::uint32_t id, const std::vector<std::uint8_t>& bytes
     CGDataProviderRelease(provider);
     if (font == nullptr) return false;
     const std::lock_guard<std::mutex> lock(fontResourceMutex);
+    if (!fontBudget.wouldAccept(id, bytes.size())) {
+        CGFontRelease(font);
+        return false;
+    }
     auto found = fontResources.find(id);
     if (found != fontResources.end()) CGFontRelease(found->second.font);
     fontResources[id] = {font, nextFontVersion++};
+    fontBudget.commit(id, bytes.size());
     return true;
 }
 
@@ -252,6 +259,7 @@ void destroyFontResource(std::uint32_t id) {
     if (found == fontResources.end()) return;
     CGFontRelease(found->second.font);
     fontResources.erase(found);
+    fontBudget.remove(id);
     ++nextFontVersion;
 }
 
@@ -262,6 +270,7 @@ void clearFontResources() {
         CGFontRelease(resource.font);
     }
     fontResources.clear();
+    fontBudget.clear();
     ++nextFontVersion;
 }
 

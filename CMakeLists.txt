@@ -85,6 +85,7 @@ add_executable(MGFXServer MACOSX_BUNDLE
     src/LocalIPC.hpp
     src/Renderer.cpp
     src/Renderer.hpp
+    src/ResourceBudget.hpp
     src/SystemText.mm
     src/SystemText.hpp
     src/TextGeometryCache.hpp

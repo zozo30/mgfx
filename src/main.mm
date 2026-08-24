@@ -221,9 +221,15 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     for (PendingResourceUpload<mgfx::ipc::PathUpload>& pending :
          _graphicsServer->takePathUploads()) {
         mgfx::ipc::PathUpload& path = pending.resource;
-        _renderer->createPath(path.id, std::move(path.segments));
-        _graphicsServer->sendResourceStatus(pending.connectionGeneration,
-            {mgfx::ipc::ResourceKind::path, mgfx::ipc::ResourceState::ready, path.id});
+        try {
+            _renderer->createPath(path.id, std::move(path.segments));
+            _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+                {mgfx::ipc::ResourceKind::path, mgfx::ipc::ResourceState::ready, path.id});
+        } catch (const std::exception& error) {
+            NSLog(@"MGFX path %u rejected: %s", path.id, error.what());
+            _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+                {mgfx::ipc::ResourceKind::path, mgfx::ipc::ResourceState::rejected, path.id});
+        }
     }
     for (const std::uint32_t id : _graphicsServer->takePathDestroys()) {
         _renderer->destroyPath(id);
@@ -231,9 +237,15 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     for (PendingResourceUpload<mgfx::ipc::MeshUpload>& pending :
          _graphicsServer->takeMeshUploads()) {
         mgfx::ipc::MeshUpload& mesh = pending.resource;
-        _renderer->createMesh(mesh.id, mesh.vertices, mesh.indices);
-        _graphicsServer->sendResourceStatus(pending.connectionGeneration,
-            {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::ready, mesh.id});
+        try {
+            _renderer->createMesh(mesh.id, mesh.vertices, mesh.indices);
+            _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+                {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::ready, mesh.id});
+        } catch (const std::exception& error) {
+            NSLog(@"MGFX mesh %u rejected: %s", mesh.id, error.what());
+            _graphicsServer->sendResourceStatus(pending.connectionGeneration,
+                {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::rejected, mesh.id});
+        }
     }
     for (const std::uint32_t id : _graphicsServer->takeMeshDestroys()) {
         _renderer->destroyMesh(id);

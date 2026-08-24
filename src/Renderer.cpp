@@ -401,7 +401,10 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
 
 void Renderer::createTexture(std::uint32_t id, std::uint32_t width, std::uint32_t height,
                              const std::vector<std::uint8_t>& rgba) {
-    if (id == 0 || rgba.size() != static_cast<std::size_t>(width) * height * 4) return;
+    if (id == 0 || rgba.size() != static_cast<std::size_t>(width) * height * 4)
+        throw std::runtime_error("Invalid image texture resource");
+    if (!textureBudget_.wouldAccept(id, rgba.size()))
+        throw std::runtime_error("Texture resource budget exceeded");
     auto descriptor = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
     descriptor->setTextureType(MTL::TextureType2D);
     descriptor->setPixelFormat(MTL::PixelFormatRGBA8Unorm_sRGB);
@@ -413,34 +416,43 @@ void Renderer::createTexture(std::uint32_t id, std::uint32_t width, std::uint32_
     texture->replaceRegion(MTL::Region::Make2D(0, 0, width, height), 0,
                            rgba.data(), static_cast<NS::UInteger>(width) * 4);
     textures_[id] = std::move(texture);
+    textureBudget_.commit(id, rgba.size());
 }
 
-void Renderer::destroyTexture(std::uint32_t id) { textures_.erase(id); }
-void Renderer::clearTextures() { textures_.clear(); }
+void Renderer::destroyTexture(std::uint32_t id) { textures_.erase(id); textureBudget_.remove(id); }
+void Renderer::clearTextures() { textures_.clear(); textureBudget_.clear(); }
 
 void Renderer::createPath(std::uint32_t id, std::vector<mgfx::ipc::PathSegment> segments) {
-    if (id == 0 || segments.empty()) return;
+    if (id == 0 || segments.empty()) throw std::runtime_error("Invalid path resource");
+    if (!pathBudget_.wouldAccept(id, segments.size()))
+        throw std::runtime_error("Path resource budget exceeded");
+    const std::size_t cost = segments.size();
     paths_[id] = {std::move(segments), {}};
+    pathBudget_.commit(id, cost);
 }
 
-void Renderer::destroyPath(std::uint32_t id) { paths_.erase(id); }
-void Renderer::clearPaths() { paths_.clear(); }
+void Renderer::destroyPath(std::uint32_t id) { paths_.erase(id); pathBudget_.remove(id); }
+void Renderer::clearPaths() { paths_.clear(); pathBudget_.clear(); }
 
 void Renderer::createMesh(std::uint32_t id, const std::vector<mgfx::ipc::MeshVertex>& vertices,
                           const std::vector<std::uint32_t>& indices) {
-    if (id == 0 || vertices.empty() || indices.empty() || indices.size() % 3 != 0) return;
+    if (id == 0 || vertices.empty() || indices.empty() || indices.size() % 3 != 0)
+        throw std::runtime_error("Invalid mesh resource");
+    if (!meshBudget_.wouldAccept(id, indices.size()))
+        throw std::runtime_error("Mesh resource budget exceeded");
     std::vector<gfx::Vertex> triangles;
     triangles.reserve(indices.size());
     for (const std::uint32_t index : indices) {
-        if (index >= vertices.size()) return;
+        if (index >= vertices.size()) throw std::runtime_error("Mesh index is out of bounds");
         const auto& source = vertices[index];
         triangles.push_back({source.position, source.color});
     }
     meshes_[id] = std::move(triangles);
+    meshBudget_.commit(id, indices.size());
 }
 
-void Renderer::destroyMesh(std::uint32_t id) { meshes_.erase(id); }
-void Renderer::clearMeshes() { meshes_.clear(); }
+void Renderer::destroyMesh(std::uint32_t id) { meshes_.erase(id); meshBudget_.remove(id); }
+void Renderer::clearMeshes() { meshes_.clear(); meshBudget_.clear(); }
 
 MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStream,
                                      MTL::RenderPassDescriptor* renderPass,

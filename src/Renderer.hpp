@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GraphicsProtocol.hpp"
+#include "ResourceBudget.hpp"
 #include "SystemText.hpp"
 #include "TextGeometryCache.hpp"
 #include "VectorPath.hpp"
@@ -76,4 +77,7 @@ private:
     std::unordered_map<std::uint32_t, PathResource> paths_;
     std::unordered_map<std::uint32_t, std::vector<gfx::Vertex>> meshes_;
     gfx::TextGeometryCache textCache_;
+    gfx::ResourceBudget textureBudget_{256, 256U * 1024U * 1024U};
+    gfx::ResourceBudget pathBudget_{4096, 1'000'000};
+    gfx::ResourceBudget meshBudget_{1024, 4'000'000};
 };

@@ -1,4 +1,5 @@
 #include "SystemText.hpp"
+#include "ResourceBudget.hpp"
 #include "TextGeometryCache.hpp"
 
 #include <cmath>
@@ -7,6 +8,25 @@
 #include <iterator>
 
 int main() {
+    gfx::ResourceBudget resourceBudget(2, 10);
+    if (!resourceBudget.commit(1, 6) || !resourceBudget.commit(2, 4) ||
+        resourceBudget.wouldAccept(3, 1) || !resourceBudget.commit(1, 5) ||
+        resourceBudget.cost() != 9 || resourceBudget.wouldAccept(1, 7) ||
+        resourceBudget.cost() != 9) {
+        std::cerr << "Persistent resource budget replacement accounting failed\n";
+        return 1;
+    }
+    resourceBudget.remove(2);
+    if (!resourceBudget.commit(3, 5) || resourceBudget.resources() != 2 ||
+        resourceBudget.cost() != 10) {
+        std::cerr << "Persistent resource budget did not release destroyed capacity\n";
+        return 1;
+    }
+    resourceBudget.clear();
+    if (resourceBudget.resources() != 0 || resourceBudget.cost() != 0) {
+        std::cerr << "Persistent resource budget did not clear on disconnect\n";
+        return 1;
+    }
     gfx::TextGeometryCache cache(2, 9);
     int factories = 0;
     const auto cachedShape = [&](const char* key, std::size_t points) -> gfx::ShapedText& {
