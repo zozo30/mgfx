@@ -482,10 +482,13 @@ export class ComponentHost {
       }
       return true;
     }
+    if (key === Key.PageUp || key === Key.PageDown || key === Key.Home || key === Key.End)
+      return this.keyboardScroll(key);
     if (this.focused?.onKeyDown) {
       this.focused.onKeyDown(key, modifiers);
       return true;
     }
+    if (key === Key.ArrowUp || key === Key.ArrowDown) return this.keyboardScroll(key);
     return false;
   }
   keyUp(key: Key): boolean {
@@ -536,6 +539,10 @@ export class ComponentHost {
       ? (current <= 0 ? targets.length - 1 : current - 1)
       : (current + 1) % targets.length;
     this.setFocus(targets[next]);
+  }
+  private keyboardScroll(key: Key): boolean {
+    const target = this.focused?.scrollAncestor() ?? this.root?.firstScrollable();
+    return target?.keyboardScroll(key) ?? false;
   }
 }
 
@@ -870,6 +877,43 @@ class Node {
     const maximum = this.maximumScrollOffset();
     const current = Math.max(0, Math.min(this.scrollOffsetY, maximum));
     return Math.max(0, Math.min(current + deltaY, maximum)) - current;
+  }
+  scrollAncestor(): Node | undefined {
+    let candidate: Node | undefined = this;
+    while (candidate) {
+      if (candidate.type === "scroll" && candidate.onScroll && candidate.maximumScrollOffset() > 0.5)
+        return candidate;
+      candidate = candidate.parent;
+    }
+    return undefined;
+  }
+  firstScrollable(): Node | undefined {
+    if (this.type === "scroll" && this.onScroll && this.maximumScrollOffset() > 0.5) return this;
+    const modal = this.modalChild();
+    if (modal) return modal.firstScrollable();
+    for (const child of this.paintOrder()) {
+      const target = child.firstScrollable();
+      if (target) return target;
+    }
+    return undefined;
+  }
+  keyboardScroll(key: Key): boolean {
+    if (!this.onScroll) return false;
+    const padding = insets(this.style.padding);
+    const viewportHeight = extent(this.bounds.height, padding.top, padding.bottom);
+    const maximum = this.maximumScrollOffset();
+    const current = Math.max(0, Math.min(this.scrollOffsetY, maximum));
+    let delta = 0;
+    if (key === Key.ArrowUp) delta = -40;
+    if (key === Key.ArrowDown) delta = 40;
+    if (key === Key.PageUp) delta = -viewportHeight * 0.9;
+    if (key === Key.PageDown) delta = viewportHeight * 0.9;
+    if (key === Key.Home) delta = -current;
+    if (key === Key.End) delta = maximum - current;
+    const applied = this.clampScrollDelta(delta);
+    if (Math.abs(applied) <= 0.0001) return false;
+    this.onScroll(0, applied);
+    return true;
   }
   private canScroll(deltaY: number): boolean {
     if (deltaY === 0) return this.maximumScrollOffset() > 0;

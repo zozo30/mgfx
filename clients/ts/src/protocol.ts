@@ -150,6 +150,7 @@ export enum Key {
   Backspace = 9,
   Copy = 10, Cut = 11, Paste = 12,
   SelectAll = 13,
+  PageUp = 14, PageDown = 15, Home = 16, End = 17,
 }
 
 export enum KeyModifier {

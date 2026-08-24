@@ -300,6 +300,33 @@ test("retained scrollbar track and thumb support pointer dragging", () => {
   assert.equal(host.pointerUp({ x: 40, y: 84 }), true);
 });
 
+test("scroll views support arrow, page, home, and end keyboard navigation", () => {
+  class KeyboardScroll extends Component {
+    offset = 0;
+    build(): Element {
+      return scrollView(box({ preferredSize: { width: 100, height: 500 } }), this.offset,
+        { preferredSize: { width: 100, height: 100 } }, "scroll",
+        (_x, y) => { this.offset = Math.max(0, Math.min(400, this.offset + y)); this.invalidate(); });
+    }
+  }
+  const component = new KeyboardScroll();
+  const host = new ComponentHost(); host.rebuild(component);
+  host.layout({ width: 100, height: 100 });
+  assert.equal(host.keyDown(Key.ArrowDown, false, false), true);
+  assert.equal(component.offset, 40);
+  host.layout({ width: 100, height: 100 });
+  assert.equal(host.keyDown(Key.PageDown, false, false), true);
+  assert.equal(component.offset, 130);
+  host.layout({ width: 100, height: 100 });
+  assert.equal(host.keyDown(Key.End, false, false), true);
+  assert.equal(component.offset, 400);
+  host.layout({ width: 100, height: 100 });
+  assert.equal(host.keyDown(Key.Home, false, false), true);
+  assert.equal(component.offset, 0);
+  host.layout({ width: 100, height: 100 });
+  assert.equal(host.keyDown(Key.ArrowUp, false, false), false);
+});
+
 test("vertical scroll content stretches across the viewport cross axis", () => {
   let clicked = false;
   class WideScrollComponent extends Component {

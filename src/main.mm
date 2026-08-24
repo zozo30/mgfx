@@ -43,6 +43,10 @@ mgfx::ipc::Key semanticKey(NSEvent* event) {
     case NSRightArrowFunctionKey: return mgfx::ipc::Key::arrowRight;
     case NSUpArrowFunctionKey: return mgfx::ipc::Key::arrowUp;
     case NSDownArrowFunctionKey: return mgfx::ipc::Key::arrowDown;
+    case NSPageUpFunctionKey: return mgfx::ipc::Key::pageUp;
+    case NSPageDownFunctionKey: return mgfx::ipc::Key::pageDown;
+    case NSHomeFunctionKey: return mgfx::ipc::Key::home;
+    case NSEndFunctionKey: return mgfx::ipc::Key::end;
     default: return mgfx::ipc::Key::unknown;
     }
 }

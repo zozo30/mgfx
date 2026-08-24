@@ -275,6 +275,10 @@ enum class Key : std::uint16_t {
     cut = 11,
     paste = 12,
     selectAll = 13,
+    pageUp = 14,
+    pageDown = 15,
+    home = 16,
+    end = 17,
 };
 
 enum KeyModifier : std::uint16_t {
