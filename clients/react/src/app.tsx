@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Circle, Column, Image, Path, RichText, Row, Scroll, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Circle, Column, Image, Path, RichText, Row, Scroll, Slider, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -530,6 +530,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   readonly contentTop: number }) {
   const [enabled, setEnabled] = useState(true);
   const [density, setDensity] = useState(1);
+  const [level, setLevel] = useState(0.62);
   const [dialogOpen, setDialogOpen] = useState(false);
   const time = useAnimationTime();
   const router = useRouter();
@@ -587,6 +588,15 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
                 flexGrow: Math.max(0.001, 1 - progress) }} />
             </Row>
           </Column>
+          <Row style={{ gap: 18, mainAxisAlignment: "spaceBetween",
+            crossAxisAlignment: "center" }}>
+            <Column style={{ gap: 4 }}>
+              <Text value="CONTROLLED SLIDER" style={{ fontSize: 20, fontWeight: "semibold" }} />
+              <Text value={`VALUE ${Math.round(level * 100)}`} style={{ fontSize: 18,
+                color: rgba(0.48, 0.84, 1) }} />
+            </Column>
+            <Slider value={level} onChange={setLevel} width={360} step={0.05} />
+          </Row>
         </Column>
         <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
           {densities.map((label, index) => <Button key={label} label={label}

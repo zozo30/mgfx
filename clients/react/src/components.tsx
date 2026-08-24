@@ -221,6 +221,45 @@ export function Button({ label, onPress, style = {}, textStyle, background = rgb
   );
 }
 
+export function Slider({ value, onChange, width = 360, step = 0.05 }: {
+  readonly value: number; readonly onChange: (value: number) => void;
+  readonly width?: number; readonly step?: number;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useNativeCursor("pointer", hovered || dragging);
+  const clamped = Math.max(0, Math.min(1, value));
+  const trackLeft = 10;
+  const trackWidth = Math.max(1, width - trackLeft * 2);
+  const updateAt = (point: Point) => onChange(Math.max(0,
+    Math.min(1, (point.x - trackLeft) / trackWidth)));
+  return <mgfx-stack style={{ preferredSize: { width, height: 44 }, cornerRadius: 12,
+    background: hovered ? rgba(0.075, 0.105, 0.17) : rgba(0.05, 0.07, 0.12),
+    borderWidth: focused ? 2 : 1,
+    borderColor: focused ? rgba(0.38, 0.72, 1) : rgba(0.20, 0.28, 0.42) }}
+    onHoverChange={setHovered} onFocusChange={setFocused}
+    onPointerDown={(point) => { setDragging(true); updateAt(point); }}
+    onPointerMove={(point) => { if (dragging) updateAt(point); }}
+    onPointerUp={(point) => { updateAt(point); setDragging(false); }}
+    onKeyDown={(key) => {
+      if (key === Key.ArrowLeft || key === Key.ArrowDown) onChange(Math.max(0, clamped - step));
+      if (key === Key.ArrowRight || key === Key.ArrowUp) onChange(Math.min(1, clamped + step));
+    }}>
+    <Box style={{ position: "absolute", inset: { top: 17, right: trackLeft,
+      bottom: 17, left: trackLeft }, cornerRadius: 5, background: rgba(0.13, 0.17, 0.25) }} />
+    <Box style={{ position: "absolute", inset: { top: 17, bottom: 17, left: trackLeft },
+      preferredSize: { width: trackWidth * clamped }, cornerRadius: 5,
+      backgroundGradient: { start: rgba(0.20, 0.82, 1),
+        end: rgba(0.62, 0.28, 1), direction: "horizontal" } }} />
+    <Circle style={{ position: "absolute", inset: { top: 8,
+      left: trackLeft + trackWidth * clamped - 14 }, preferredSize: { width: 28, height: 28 },
+      background: dragging ? rgba(0.94, 1, 1) : rgba(0.76, 0.94, 1),
+      borderWidth: 2, borderColor: rgba(0.28, 0.66, 1),
+      shadow: { color: rgba(0.18, 0.56, 1, 0.42), blur: 9, spread: 1 } }} />
+  </mgfx-stack>;
+}
+
 export interface TextFieldProps {
   readonly value: string;
   readonly onChange: (value: string) => void;

@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Box, Button, Column, Image, Mesh, Path, RichText, Scroll, Svg, Text, TextField } from "./components.js";
+import { Box, Button, Column, Image, Mesh, Path, RichText, Scroll, Slider, Svg, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -44,6 +44,21 @@ test("React Scroll retains wheel offset and commits a clipped scrolled frame", (
   surface.scroll({ x: 20, y: 20, deltaX: 0, deltaY: 24 });
   const after = frames.at(-1)!;
   assert.notDeepEqual(after, before);
+});
+
+test("React Slider reports pointer dragging and keyboard steps", () => {
+  const values: number[] = [];
+  const surface = new ReactSurface(() => {});
+  surface.render(<Slider value={0.2} onChange={(value) => values.push(value)} width={360} />);
+  surface.resize({ width: 360, height: 44 });
+  surface.pointerDown({ x: 180, y: 22 });
+  surface.pointerMove({ x: 300, y: 22 });
+  surface.pointerUp({ x: 340, y: 22 });
+  assert.ok(Math.abs(values[0]! - 0.5) < 0.001);
+  assert.ok(values[1]! > 0.84);
+  assert.ok(values[2]! > 0.96);
+  surface.keyDown({ key: Key.ArrowRight, modifiers: 0, repeat: false });
+  assert.ok(Math.abs(values.at(-1)! - 0.25) < 0.001);
 });
 
 test("React Text defaults to native server shaping", () => {
