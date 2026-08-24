@@ -248,6 +248,7 @@ export function App(props: AppProps) {
   return <AnimationProvider clock={props.animationClock}><Router initialRoute="dashboard" routes={{
     dashboard: null,
     graphics: null,
+    components: null,
   }}><AppShell {...props} /></Router></AnimationProvider>;
 }
 
@@ -338,6 +339,9 @@ function NavigationDrawer({ width, expanded, onToggle, icons }: {
       fallback: "M4 4H10V10H4ZM14 4H20V10H14ZM4 14H10V20H4ZM14 14H20V20H14Z" },
     { route: "graphics", label: "GRAPHICS", icon: icons.find((item) => item.name === "activity") ?? icons[0],
       fallback: "M3 12H7L10 5L14 19L17 12H21" },
+    { route: "components", label: "COMPONENTS",
+      icon: icons.find((item) => item.name === "badge-check") ?? icons[1],
+      fallback: "M12 3L15 5L19 5L20 9L22 12L20 15L19 19L15 19L12 21L9 19L5 19L4 15L2 12L4 9L5 5L9 5ZM8 12L11 15L16 9" },
   ] as const;
   return <Column style={{ position: "absolute", inset: { top: 100, bottom: 20, left: 20 },
     preferredSize: { width }, zIndex: 30, padding: all(10), gap: 10, cornerRadius: 16,
@@ -375,7 +379,9 @@ function AppShell(props: AppProps) {
       startedAt: animationTime });
     setExpanded(nextExpanded);
   };
-  return <Window title={`MGFX ${router.route === "dashboard" ? "Home" : "Graphics"}`}
+  const routeTitle = router.route === "dashboard" ? "Home"
+    : router.route === "graphics" ? "Graphics" : "Components";
+  return <Window title={`MGFX ${routeTitle}`}
     width={1100} height={700} minimumWidth={720} minimumHeight={520} mode={mode}
     chrome="overlay" draggableHeight={Math.max(82, chromeMetrics.titleBarHeight + 26)}>
     <Stack>
@@ -394,7 +400,7 @@ function AppShell(props: AppProps) {
           end: rgba(0.12, 0.48 + Math.cos(animationTime / 1100) * 0.06, 0.96),
           direction: "horizontal" }, mainAxisAlignment: "spaceBetween",
         crossAxisAlignment: "center" }}>
-        <Text value={`MGFX React · ${router.route === "dashboard" ? "Home" : "Graphics"}`}
+        <Text value={`MGFX React · ${routeTitle}`}
           style={{ fontSize: 30, fontFamily: "system", fontWeight: "semibold",
             letterSpacing: 0.5,
             ...(customFontResourceId === undefined ? {} : { fontResourceId: customFontResourceId }),
@@ -409,10 +415,11 @@ function AppShell(props: AppProps) {
           <DotGrid time={animationTime} />
         </Row>
       </Row>
-      {router.route === "dashboard"
-        ? <Dashboard {...props} contentLeft={contentLeft} contentTop={contentTop}
-            mode={mode} setMode={setMode} />
-        : <GraphicsRoute {...props} contentLeft={contentLeft} contentTop={contentTop} />}
+      {router.route === "dashboard" ? <Dashboard {...props} contentLeft={contentLeft}
+        contentTop={contentTop} mode={mode} setMode={setMode} />
+        : router.route === "graphics"
+          ? <GraphicsRoute {...props} contentLeft={contentLeft} contentTop={contentTop} />
+          : <ComponentsRoute contentLeft={contentLeft} contentTop={contentTop} />}
       <NavigationDrawer width={drawerWidth} expanded={expanded} onToggle={toggleDrawer}
         icons={vectorIcons} />
     </Stack>
@@ -498,6 +505,110 @@ function Dashboard({ headerImageSize, contentLeft, contentTop, mode, setMode }: 
     </Dialog>
     </>
   );
+}
+
+function NativeSwitch({ enabled, onChange }: { readonly enabled: boolean;
+  readonly onChange: (enabled: boolean) => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  useNativeCursor("pointer", hovered);
+  return <mgfx-row onClick={() => onChange(!enabled)} onHoverChange={setHovered}
+    onPressChange={setPressed} style={{ preferredSize: { width: 86, height: 44 },
+      padding: all(5), cornerRadius: 22,
+      background: pressed ? rgba(0.10, 0.34, 0.28)
+        : enabled ? hovered ? rgba(0.18, 0.82, 0.58) : rgba(0.12, 0.68, 0.46)
+          : hovered ? rgba(0.20, 0.25, 0.36) : rgba(0.12, 0.15, 0.23),
+      mainAxisAlignment: enabled ? "end" : "start", crossAxisAlignment: "center",
+      borderWidth: 1.5, borderColor: enabled ? rgba(0.48, 1, 0.76) : rgba(0.32, 0.39, 0.54) }}>
+    <Circle style={{ preferredSize: { width: 34, height: 34 },
+      background: enabled ? rgba(0.90, 1, 0.96) : rgba(0.64, 0.70, 0.80),
+      shadow: { color: rgba(0, 0, 0, 0.42), blur: 7, spread: 0, offsetX: enabled ? -2 : 2 } }} />
+  </mgfx-row>;
+}
+
+function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: number;
+  readonly contentTop: number }) {
+  const [enabled, setEnabled] = useState(true);
+  const [density, setDensity] = useState(1);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const time = useAnimationTime();
+  const router = useRouter();
+  const progress = (Math.sin(time / 900) + 1) / 2;
+  const densities = ["COMPACT", "COMFORTABLE", "SPACIOUS"] as const;
+  return <>
+    <Scroll style={{ position: "absolute", inset: all(0) }}>
+      <Column style={{ padding: { top: contentTop, right: 20, bottom: 28, left: contentLeft },
+        gap: 18, crossAxisAlignment: "stretch" }}>
+        <Row style={{ preferredSize: { height: 70 }, padding: all(16), cornerRadius: 14,
+          backgroundGradient: { start: rgba(0.52, 0.18, 0.72),
+            end: rgba(0.08, 0.58, 0.52), direction: "horizontal" },
+          mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
+          <Text value="Native Component Laboratory" style={{ fontSize: 30,
+            fontWeight: "bold", color: rgba(0.94, 1, 0.98) }} />
+          <Text value="REACT STATE → MGFX COMMANDS" style={{ fontSize: 18,
+            fontWeight: "semibold", color: rgba(0.72, 1, 0.90) }} />
+        </Row>
+        <Row style={{ gap: 16, crossAxisAlignment: "stretch" }}>
+          {["LAYOUT", "INPUT", "ANIMATION"].map((label, index) => <Column key={label}
+            style={{ preferredSize: { height: 112 }, flexGrow: 1, padding: all(18), gap: 10,
+              cornerRadius: 14, background: rgba(0.05 + index * 0.025, 0.075, 0.13),
+              borderWidth: 1, borderColor: rgba(0.22 + index * 0.08, 0.42, 0.64) }}>
+            <Text value={label} style={{ fontSize: 24, fontWeight: "bold",
+              color: rgba(0.62 + index * 0.08, 0.88, 1) }} />
+            <Text value={index === 0 ? "FLEX + CONSTRAINTS" : index === 1
+              ? "POINTER + KEYBOARD" : "SERVER CLOCK"}
+              style={{ fontSize: 18, color: rgba(0.58, 0.66, 0.78) }} />
+          </Column>)}
+        </Row>
+        <Column style={{ padding: all(20), gap: 18, cornerRadius: 16,
+          background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
+          borderColor: rgba(0.20, 0.30, 0.48) }}>
+          <Row style={{ mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
+            <Column style={{ gap: 5 }}>
+              <Text value="NATIVE SWITCH" style={{ fontSize: 23, fontWeight: "bold" }} />
+              <Text value={enabled ? "FEATURE ENABLED" : "FEATURE DISABLED"}
+                style={{ fontSize: 17, color: enabled ? rgba(0.36, 0.94, 0.66)
+                  : rgba(0.58, 0.64, 0.74) }} />
+            </Column>
+            <NativeSwitch enabled={enabled} onChange={setEnabled} />
+          </Row>
+          <Column style={{ gap: 9 }}>
+            <Row style={{ mainAxisAlignment: "spaceBetween" }}>
+              <Text value="ANIMATED PROGRESS" style={{ fontSize: 20, fontWeight: "semibold" }} />
+              <Text value={`${Math.round(progress * 100)}%`} style={{ fontSize: 20,
+                color: rgba(0.42, 0.88, 1) }} />
+            </Row>
+            <Row style={{ preferredSize: { height: 22 }, cornerRadius: 11, clip: true,
+              background: rgba(0.10, 0.13, 0.20), gap: 0 }}>
+              <Box style={{ preferredSize: { height: 22 }, flexGrow: Math.max(0.001, progress),
+                backgroundGradient: { start: rgba(0.24, 0.82, 1),
+                  end: rgba(0.62, 0.28, 1), direction: "horizontal" } }} />
+              <Box style={{ preferredSize: { height: 22 },
+                flexGrow: Math.max(0.001, 1 - progress) }} />
+            </Row>
+          </Column>
+        </Column>
+        <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
+          {densities.map((label, index) => <Button key={label} label={label}
+            active={density === index} activeBackground={rgba(0.18, 0.62, 0.52)}
+            onPress={() => setDensity(index)} background={rgba(0.12, 0.18, 0.28)}
+            style={{ flexGrow: 1, preferredSize: { height: 52 } }} />)}
+        </Row>
+        <Row style={{ gap: 12, mainAxisAlignment: "end" }}>
+          <Button label="SHOW DIALOG" onPress={() => setDialogOpen(true)}
+            background={rgba(0.48, 0.24, 0.72)} style={{ preferredSize: { width: 180 } }} />
+          <Button label="GRAPHICS ROUTE" onPress={() => router.push("graphics")}
+            background={rgba(0.12, 0.52, 0.44)} style={{ preferredSize: { width: 210 } }} />
+        </Row>
+      </Column>
+    </Scroll>
+    <Dialog open={dialogOpen} title="COMPONENT DIALOG" onDismiss={() => setDialogOpen(false)}>
+      <Text value="THIS MODAL REMAINS ABOVE THE DRAWER AND EVERY ROUTE LAYER."
+        style={{ fontSize: 21, color: rgba(0.70, 0.78, 0.90), wrap: true }} />
+      <Button label="DONE" onPress={() => setDialogOpen(false)}
+        background={rgba(0.14, 0.58, 0.46)} />
+    </Dialog>
+  </>;
 }
 
 function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, contentTop }: AppProps & {
