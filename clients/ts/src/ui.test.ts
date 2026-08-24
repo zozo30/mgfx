@@ -38,6 +38,30 @@ test("retained component host performs flex layout and hit testing", () => {
   assert.equal(host.pointerDown({ x: 199, y: 99 }), false);
 });
 
+test("single-sided absolute insets position preferred sizes without stretching", () => {
+  const hits: string[] = [];
+  class AbsoluteComponent extends Component {
+    build(): Element {
+      return stack([
+        { ...box({ position: "absolute", inset: { top: 14, left: 20, right: 20 },
+          preferredSize: { height: 32 } }, "top"), onClick: () => hits.push("top") },
+        { ...box({ position: "absolute", inset: { right: 7, bottom: 9 },
+          preferredSize: { width: 24, height: 18 } }, "corner"),
+          onClick: () => hits.push("corner") },
+      ], {}, "root");
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new AbsoluteComponent());
+  host.layout({ width: 200, height: 100 });
+  assert.equal(host.pointerDown({ x: 30, y: 20 }), true);
+  host.pointerUp({ x: 30, y: 20 });
+  assert.equal(host.pointerDown({ x: 180, y: 80 }), true);
+  host.pointerUp({ x: 180, y: 80 });
+  assert.deepEqual(hits, ["top", "corner"]);
+  assert.equal(host.pointerDown({ x: 100, y: 70 }), false);
+});
+
 test("pointer capture reports element-local drag coordinates", () => {
   const points: string[] = [];
   class DragComponent extends Component {

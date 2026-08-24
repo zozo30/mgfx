@@ -646,11 +646,19 @@ class Node {
     for (const child of this.children) {
       if (child.style.position !== "absolute") continue;
       const inset = insets(child.style.inset);
-      const hasHorizontal = child.style.inset?.left !== undefined || child.style.inset?.right !== undefined;
-      const hasVertical = child.style.inset?.top !== undefined || child.style.inset?.bottom !== undefined;
-      child.layout({ x: content.x + inset.left, y: content.y + inset.top,
-        width: hasHorizontal ? extent(content.width, inset.left, inset.right) : child.measured.width,
-        height: hasVertical ? extent(content.height, inset.top, inset.bottom) : child.measured.height });
+      const hasLeft = child.style.inset?.left !== undefined;
+      const hasRight = child.style.inset?.right !== undefined;
+      const hasTop = child.style.inset?.top !== undefined;
+      const hasBottom = child.style.inset?.bottom !== undefined;
+      const width = hasLeft && hasRight
+        ? extent(content.width, inset.left, inset.right) : child.measured.width;
+      const height = hasTop && hasBottom
+        ? extent(content.height, inset.top, inset.bottom) : child.measured.height;
+      const childX = hasLeft ? content.x + inset.left
+        : hasRight ? content.x + content.width - inset.right - width : content.x;
+      const childY = hasTop ? content.y + inset.top
+        : hasBottom ? content.y + content.height - inset.bottom - height : content.y;
+      child.layout({ x: childX, y: childY, width, height });
     }
   }
   paint(encoder: FrameEncoder, viewport: Size): void {
