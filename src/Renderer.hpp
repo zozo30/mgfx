@@ -10,6 +10,7 @@
 #include <Metal/Metal.hpp>
 #include <QuartzCore/QuartzCore.hpp>
 #include <cstdint>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -19,6 +20,8 @@ public:
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
+    std::unique_ptr<Renderer> recreated(MTL::Device* device,
+                                        std::uint32_t sampleCount) const;
 
     MTL::CommandBuffer* encode(const std::vector<std::uint8_t>& commandStream,
                                MTL::RenderPassDescriptor* renderPass,
@@ -39,6 +42,9 @@ public:
     gfx::ResourceUsage meshUsage() const { return meshBudget_.usage(); }
 
 private:
+    void createTextureWithBacking(
+        std::uint32_t id, std::uint32_t width, std::uint32_t height,
+        std::shared_ptr<const std::vector<std::uint8_t>> rgba);
     NS::SharedPtr<MTL::Device> device_;
     NS::SharedPtr<MTL::CommandQueue> commandQueue_;
     NS::SharedPtr<MTL::RenderPipelineState> pipelineState_;
@@ -57,7 +63,13 @@ private:
     NS::SharedPtr<MTL::RenderPipelineState> dotGridPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> waveDotsPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> conicGradientPipelineState_;
-    std::unordered_map<std::uint32_t, NS::SharedPtr<MTL::Texture>> textures_;
+    struct TextureResource {
+        std::uint32_t width;
+        std::uint32_t height;
+        std::shared_ptr<const std::vector<std::uint8_t>> rgba;
+        NS::SharedPtr<MTL::Texture> texture;
+    };
+    std::unordered_map<std::uint32_t, TextureResource> textures_;
     struct CachedPath {
         bool fill;
         bool stroke;
@@ -74,11 +86,11 @@ private:
         gfx::PathTriangles triangles;
     };
     struct PathResource {
-        std::vector<mgfx::ipc::PathSegment> segments;
+        std::shared_ptr<const std::vector<mgfx::ipc::PathSegment>> segments;
         std::vector<CachedPath> cache;
     };
     std::unordered_map<std::uint32_t, PathResource> paths_;
-    std::unordered_map<std::uint32_t, std::vector<gfx::Vertex>> meshes_;
+    std::unordered_map<std::uint32_t, std::shared_ptr<const std::vector<gfx::Vertex>>> meshes_;
     gfx::TextGeometryCache textCache_;
     gfx::ResourceBudget textureBudget_{256, 256U * 1024U * 1024U};
     gfx::ResourceBudget pathBudget_{4096, 1'000'000};

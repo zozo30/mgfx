@@ -7,12 +7,19 @@
 #include "Renderer.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <csignal>
 #include <exception>
 #include <chrono>
 #include <memory>
 #include <utility>
 
 namespace {
+
+volatile std::sig_atomic_t rendererRecoverySignal = 0;
+std::atomic<bool> rendererErrorRecoveryRequested{false};
+
+void requestRendererRecovery(int) { rendererRecoverySignal = 1; }
 
 mgfx::ipc::Key semanticKey(NSEvent* event) {
     NSString* characters = event.charactersIgnoringModifiers;
@@ -82,6 +89,7 @@ mgfx::ipc::ResourceTrace resourceTrace(mgfx::ipc::ResourceKind kind,
 
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate, MTKViewDelegate>
 - (void)processServerCommands:(NSTimer*)timer;
+- (void)recoverRenderer;
 - (void)createWindowWithConfig:(mgfx::ipc::WindowConfig)config;
 - (void)applyWindowState:(mgfx::ipc::WindowState)state;
 - (void)sendWindowChromeMetrics;
@@ -172,6 +180,7 @@ mgfx::ipc::ResourceTrace resourceTrace(mgfx::ipc::ResourceKind kind,
                                                static_cast<std::uint32_t>(_sampleCount));
         _graphicsServer = std::make_unique<GraphicsServer>(mgfx::ipc::defaultSocketPath());
         _graphicsServer->start();
+        std::signal(SIGUSR1, requestRendererRecovery);
     } catch (const std::exception& exception) {
         NSString* message = [NSString stringWithUTF8String:exception.what()];
         [NSApp presentError:[NSError errorWithDomain:@"MetalTriangle"
@@ -193,6 +202,12 @@ mgfx::ipc::ResourceTrace resourceTrace(mgfx::ipc::ResourceKind kind,
 - (void)processServerCommands:(NSTimer*)timer {
     (void)timer;
     if (!_graphicsServer) return;
+
+    if (rendererRecoverySignal != 0 ||
+        rendererErrorRecoveryRequested.exchange(false, std::memory_order_relaxed)) {
+        rendererRecoverySignal = 0;
+        [self recoverRenderer];
+    }
 
     if (_graphicsServer->takeClientDisconnected()) {
         _renderer->clearTextures();
@@ -364,6 +379,40 @@ mgfx::ipc::ResourceTrace resourceTrace(mgfx::ipc::ResourceKind kind,
     }
 }
 
+- (void)recoverRenderer {
+    if (!_renderer || _device == nil) return;
+    id<MTLDevice> recoveredDevice = MTLCreateSystemDefaultDevice();
+    if (recoveredDevice == nil) {
+        NSLog(@"MGFX renderer recovery deferred: no Metal device is available");
+        return;
+    }
+    const NSUInteger recoveredSampleCount =
+        [recoveredDevice supportsTextureSampleCount:4] ? 4 : 1;
+    try {
+        std::unique_ptr<Renderer> recovered = _renderer->recreated(
+            (__bridge MTL::Device*)recoveredDevice,
+            static_cast<std::uint32_t>(recoveredSampleCount));
+        const gfx::ResourceUsage textures = recovered->textureUsage();
+        const gfx::ResourceUsage paths = recovered->pathUsage();
+        const gfx::ResourceUsage meshes = recovered->meshUsage();
+        _renderer = std::move(recovered);
+        _device = recoveredDevice;
+        _sampleCount = recoveredSampleCount;
+        if (_metalView != nil) {
+            const BOOL wasPaused = _metalView.paused;
+            _metalView.paused = YES;
+            _metalView.device = recoveredDevice;
+            _metalView.sampleCount = recoveredSampleCount;
+            _metalView.paused = wasPaused;
+        }
+        _lastSubmittedFrameRevision = 0;
+        NSLog(@"MGFX renderer recovered: %zu textures, %zu paths, %zu meshes",
+              textures.resources, paths.resources, meshes.resources);
+    } catch (const std::exception& error) {
+        NSLog(@"MGFX renderer recovery failed; retaining current renderer: %s", error.what());
+    }
+}
+
 - (void)createWindowWithConfig:(mgfx::ipc::WindowConfig)config {
     const NSRect frame = NSMakeRect(0.0, 0.0, config.width, config.height);
     _metalView = [[InteractiveMetalView alloc] initWithFrame:frame device:_device];
@@ -462,18 +511,23 @@ mgfx::ipc::ResourceTrace resourceTrace(mgfx::ipc::ResourceKind kind,
         (__bridge CA::MetalDrawable*)view.currentDrawable);
     if (commandBuffer == nullptr) return;
 
-    if (frame.commands && !frame.commands->empty() &&
-        frame.revision != _lastSubmittedFrameRevision) {
+    const bool acknowledge = frame.commands && !frame.commands->empty() &&
+        frame.revision != _lastSubmittedFrameRevision;
+    const std::uint64_t generation = frame.connectionGeneration;
+    const std::uint32_t sequence = frame.sequence;
+    if (acknowledge) {
         _lastSubmittedFrameRevision = frame.revision;
-        const std::uint64_t generation = frame.connectionGeneration;
-        const std::uint32_t sequence = frame.sequence;
-        GraphicsServer* server = _graphicsServer.get();
-        id<MTLCommandBuffer> nativeCommandBuffer = (__bridge id<MTLCommandBuffer>)commandBuffer;
-        [nativeCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> completed) {
-            (void)completed;
-            server->acknowledgeFramePresented(generation, sequence);
-        }];
     }
+    GraphicsServer* server = _graphicsServer.get();
+    id<MTLCommandBuffer> nativeCommandBuffer = (__bridge id<MTLCommandBuffer>)commandBuffer;
+    [nativeCommandBuffer addCompletedHandler:^(id<MTLCommandBuffer> completed) {
+        if (completed.status == MTLCommandBufferStatusError) {
+            NSLog(@"MGFX Metal command buffer failed: %@", completed.error);
+            rendererErrorRecoveryRequested.store(true, std::memory_order_relaxed);
+        } else if (acknowledge) {
+            server->acknowledgeFramePresented(generation, sequence);
+        }
+    }];
     commandBuffer->commit();
 }
 

@@ -439,6 +439,14 @@ Servers also emit compact resource-trace events for creates, rejects, and explic
 destroys. TypeScript clients can inspect live count/cost against each quota without
 polling or coupling application code to Metal.
 
+The Metal renderer keeps immutable CPU backing for persistent resources. A failed
+command buffer schedules a main-thread renderer rebuild: pipelines and native
+textures are recreated, derived path/text caches are discarded, canonical paths
+and meshes are retained, and the latest display list is submitted again. The client
+connection and native window remain alive and no upload replay is required. For a
+local recovery drill, send `SIGUSR1` to the server process; its log reports the
+number of textures, paths, and meshes restored.
+
 ## Requirements
 
 - macOS

@@ -401,11 +401,13 @@ color glyph atlases remain available for small text and emoji.
    shaping, persistent font uploads, cached glyph-outline geometry, exact
    asynchronous advance metrics, and frontend-owned multiline rich-text wrapping.
    Next add atlas caching.
-5. **Partially implemented:** bounded LRU text geometry plus transactional per-client
+5. **Implemented:** bounded LRU text geometry plus transactional per-client
    texture-byte, path-segment, mesh-vertex, and font-byte/count budgets. Rejection
    preserves replacements and uses `ResourceStatus`. Protocol-visible trace events
    expose accepted, rejected, and destroyed resources with current count/cost and
-   quota. Next add device-loss recreation.
+   quota. Persistent resources retain immutable CPU backing so a Metal command-buffer
+   failure can transactionally recreate the renderer and resume the current display
+   list without reconnecting or reuploading.
 
 None of these stages changes window, layout, event, or component ownership: the
 client remains the program and the endless native process remains a graphics,

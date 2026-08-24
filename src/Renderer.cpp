@@ -401,9 +401,17 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
 
 void Renderer::createTexture(std::uint32_t id, std::uint32_t width, std::uint32_t height,
                              const std::vector<std::uint8_t>& rgba) {
-    if (id == 0 || rgba.size() != static_cast<std::size_t>(width) * height * 4)
+    createTextureWithBacking(id, width, height,
+                             std::make_shared<const std::vector<std::uint8_t>>(rgba));
+}
+
+void Renderer::createTextureWithBacking(
+    std::uint32_t id, std::uint32_t width, std::uint32_t height,
+    std::shared_ptr<const std::vector<std::uint8_t>> rgba) {
+    if (id == 0 || !rgba ||
+        rgba->size() != static_cast<std::size_t>(width) * height * 4)
         throw std::runtime_error("Invalid image texture resource");
-    if (!textureBudget_.wouldAccept(id, rgba.size()))
+    if (!textureBudget_.wouldAccept(id, rgba->size()))
         throw std::runtime_error("Texture resource budget exceeded");
     auto descriptor = NS::TransferPtr(MTL::TextureDescriptor::alloc()->init());
     descriptor->setTextureType(MTL::TextureType2D);
@@ -414,9 +422,9 @@ void Renderer::createTexture(std::uint32_t id, std::uint32_t width, std::uint32_
     auto texture = NS::TransferPtr(device_->newTexture(descriptor.get()));
     if (!texture) throw std::runtime_error("Could not allocate an image texture");
     texture->replaceRegion(MTL::Region::Make2D(0, 0, width, height), 0,
-                           rgba.data(), static_cast<NS::UInteger>(width) * 4);
-    textures_[id] = std::move(texture);
-    textureBudget_.commit(id, rgba.size());
+                           rgba->data(), static_cast<NS::UInteger>(width) * 4);
+    textures_[id] = {width, height, std::move(rgba), std::move(texture)};
+    textureBudget_.commit(id, textures_.at(id).rgba->size());
 }
 
 void Renderer::destroyTexture(std::uint32_t id) { textures_.erase(id); textureBudget_.remove(id); }
@@ -427,7 +435,8 @@ void Renderer::createPath(std::uint32_t id, std::vector<mgfx::ipc::PathSegment> 
     if (!pathBudget_.wouldAccept(id, segments.size()))
         throw std::runtime_error("Path resource budget exceeded");
     const std::size_t cost = segments.size();
-    paths_[id] = {std::move(segments), {}};
+    paths_[id] = {std::make_shared<const std::vector<mgfx::ipc::PathSegment>>(
+                      std::move(segments)), {}};
     pathBudget_.commit(id, cost);
 }
 
@@ -447,12 +456,33 @@ void Renderer::createMesh(std::uint32_t id, const std::vector<mgfx::ipc::MeshVer
         const auto& source = vertices[index];
         triangles.push_back({source.position, source.color});
     }
-    meshes_[id] = std::move(triangles);
+    meshes_[id] = std::make_shared<const std::vector<gfx::Vertex>>(std::move(triangles));
     meshBudget_.commit(id, indices.size());
 }
 
 void Renderer::destroyMesh(std::uint32_t id) { meshes_.erase(id); meshBudget_.remove(id); }
 void Renderer::clearMeshes() { meshes_.clear(); meshBudget_.clear(); }
+
+std::unique_ptr<Renderer> Renderer::recreated(MTL::Device* device,
+                                              std::uint32_t sampleCount) const {
+    auto recovered = std::make_unique<Renderer>(device, sampleCount);
+    for (const auto& [id, texture] : textures_) {
+        recovered->createTextureWithBacking(id, texture.width, texture.height, texture.rgba);
+    }
+    for (const auto& [id, path] : paths_) {
+        recovered->paths_[id] = {path.segments, {}};
+        if (!recovered->pathBudget_.commit(id, path.segments->size())) {
+            throw std::runtime_error("Could not restore path resource budget");
+        }
+    }
+    for (const auto& [id, mesh] : meshes_) {
+        recovered->meshes_[id] = mesh;
+        if (!recovered->meshBudget_.commit(id, mesh->size())) {
+            throw std::runtime_error("Could not restore mesh resource budget");
+        }
+    }
+    return recovered;
+}
 
 MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStream,
                                      MTL::RenderPassDescriptor* renderPass,
@@ -592,7 +622,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->setRenderPipelineState(imagePipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
-            encoder->setFragmentTexture(found->second.get(), 0);
+            encoder->setFragmentTexture(found->second.texture.get(), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
@@ -653,7 +683,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->setRenderPipelineState(imageSurfacePipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
-            encoder->setFragmentTexture(found->second.get(), 0);
+            encoder->setFragmentTexture(found->second.texture.get(), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
@@ -729,7 +759,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->setRenderPipelineState(imageSurfacePipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(ImageSurfaceVertex), 0);
-            encoder->setFragmentTexture(found->second.get(), 0);
+            encoder->setFragmentTexture(found->second.texture.get(), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                 static_cast<NS::UInteger>(0),
                 static_cast<NS::UInteger>(vertices.size()));
@@ -1296,12 +1326,12 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             applyClip();
             constexpr std::size_t maxInlineBytes = 4096;
             constexpr std::size_t maxVertices = (maxInlineBytes / sizeof(gfx::Vertex) / 3) * 3;
-            for (std::size_t first = 0; first < found->second.size();) {
-                const std::size_t count = std::min(maxVertices, found->second.size() - first);
+            for (std::size_t first = 0; first < found->second->size();) {
+                const std::size_t count = std::min(maxVertices, found->second->size() - first);
                 std::vector<gfx::Vertex> vertices;
                 vertices.reserve(count);
                 for (std::size_t index = 0; index < count; ++index) {
-                    gfx::Vertex vertex = found->second[first + index];
+                    gfx::Vertex vertex = (*found->second)[first + index];
                     vertex.position = {
                         mesh.destination.left +
                             (vertex.position[0] - mesh.viewBox.x) / mesh.viewBox.width *
@@ -1450,7 +1480,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                     path.lineJoin, path.strokeWidth, path.tolerance,
                     path.dashLength, path.gapLength, path.dashOffset, path.miterLimit,
                     path.dashPattern,
-                    gfx::tessellatePath(resource.segments, path.fill, path.stroke,
+                    gfx::tessellatePath(*resource.segments, path.fill, path.stroke,
                         path.fillRule, path.lineCap, path.lineJoin,
                         path.strokeWidth, path.tolerance,
                         path.dashLength, path.gapLength, path.dashOffset,
@@ -1489,7 +1519,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                         texture->sampling == gfx::ImageSampling::nearest ? 1U : 0U,
                         texture->repeatX ? 1U : 0U, texture->repeatY ? 1U : 0U, 0U};
                     encoder->setFragmentBytes(&uniforms, sizeof(uniforms), 0);
-                    encoder->setFragmentTexture(foundTexture->second.get(), 0);
+                    encoder->setFragmentTexture(foundTexture->second.texture.get(), 0);
                     struct PathTextureVertex {
                         std::array<float, 2> position, source;
                     };
