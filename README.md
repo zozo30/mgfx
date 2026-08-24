@@ -47,8 +47,8 @@ entire rounded area in one draw, making image and rasterized-SVG patterns cheap 
 while stretching only the center regions. Scalable panels therefore remain one
 fixed display-list command and one Metal draw instead of nine client quads.
 
-`DrawFilteredImageSurface` adds saturation, contrast, brightness, and hue rotation
-to the same rounded/tiled image shader. Animated treatment changes four floats in
+`DrawFilteredImageSurface` adds saturation, contrast, brightness, hue rotation, and
+bounded native blur to the same rounded/tiled image shader. Animated treatment changes five floats in
 one fixed display-list command; the persistent source texture is never decoded or
 uploaded again.
 

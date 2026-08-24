@@ -188,8 +188,13 @@ vertex ImageSurfaceVertexOut imageSurfaceVertexMain(
             value.cornerRadius, value.sampling, float2(value.repeatX, value.repeatY), value.tint};
 }
 
+struct ImageEffectsUniforms {
+    packed_float4 color;
+    packed_float4 sampling;
+};
+
 fragment float4 imageSurfaceFragmentMain(ImageSurfaceVertexOut in [[stage_in]],
-                                         constant packed_float4& effects [[buffer(0)]],
+                                         constant ImageEffectsUniforms& effects [[buffer(0)]],
                                          texture2d<float> image [[texture(0)]]) {
     constexpr sampler linearClamp(coord::normalized, address::clamp_to_edge, filter::linear);
     constexpr sampler nearestClamp(coord::normalized, address::clamp_to_edge, filter::nearest);
@@ -202,9 +207,30 @@ fragment float4 imageSurfaceFragmentMain(ImageSurfaceVertexOut in [[stage_in]],
         sampleUv.x = clamp(sampleUv.x, halfTexel.x, 1.0 - halfTexel.x);
     if (repeats && in.repeat.y < 0.5)
         sampleUv.y = clamp(sampleUv.y, halfTexel.y, 1.0 - halfTexel.y);
-    const float4 sampled = in.sampling > 0.5
+    float4 sampled = in.sampling > 0.5
         ? (repeats ? image.sample(nearestRepeat, sampleUv) : image.sample(nearestClamp, sampleUv))
         : (repeats ? image.sample(linearRepeat, sampleUv) : image.sample(linearClamp, sampleUv));
+    if (effects.sampling.x > 0.001) {
+        sampled = float4(0.0);
+        const float weights[3] = {1.0, 2.0, 1.0};
+        const float2 step = effects.sampling.x /
+            float2(image.get_width(), image.get_height());
+        for (int y = -1; y <= 1; ++y) {
+            for (int x = -1; x <= 1; ++x) {
+                float2 tapUv = sampleUv + float2(x, y) * step;
+                if (in.repeat.x < 0.5)
+                    tapUv.x = clamp(tapUv.x, halfTexel.x, 1.0 - halfTexel.x);
+                if (in.repeat.y < 0.5)
+                    tapUv.y = clamp(tapUv.y, halfTexel.y, 1.0 - halfTexel.y);
+                const float4 tap = in.sampling > 0.5
+                    ? (repeats ? image.sample(nearestRepeat, tapUv)
+                               : image.sample(nearestClamp, tapUv))
+                    : (repeats ? image.sample(linearRepeat, tapUv)
+                               : image.sample(linearClamp, tapUv));
+                sampled += tap * (weights[x + 1] * weights[y + 1] / 16.0);
+            }
+        }
+    }
     const float2 halfSize = in.size * 0.5;
     const float radius = min(in.cornerRadius, min(halfSize.x, halfSize.y));
     const float2 q = abs(in.local - halfSize) - halfSize + radius;
@@ -212,9 +238,9 @@ fragment float4 imageSurfaceFragmentMain(ImageSurfaceVertexOut in [[stage_in]],
     const float coverage = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
     float3 rgb = sampled.rgb;
     const float luminance = dot(rgb, float3(0.2126, 0.7152, 0.0722));
-    rgb = mix(float3(luminance), rgb, effects.x);
-    rgb = (rgb - 0.5) * effects.y + 0.5 + effects.z;
-    const float hue = effects.w;
+    rgb = mix(float3(luminance), rgb, effects.color.x);
+    rgb = (rgb - 0.5) * effects.color.y + 0.5 + effects.color.z;
+    const float hue = effects.color.w;
     const float3 axis = normalize(float3(1.0));
     rgb = rgb * cos(hue) + cross(axis, rgb) * sin(hue) +
           axis * dot(axis, rgb) * (1.0 - cos(hue));

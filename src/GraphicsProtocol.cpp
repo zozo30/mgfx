@@ -349,7 +349,7 @@ void CommandEncoder::drawFilteredImageSurface(const ImageSurfaceCommand& image) 
                         image.uv.left, image.uv.top, image.uv.right, image.uv.bottom,
                         image.tint.red, image.tint.green, image.tint.blue, image.tint.alpha,
                         image.cornerRadius, image.saturation, image.contrast, image.brightness,
-                        image.hueRotation, 0.0F}) {
+                        image.hueRotation, image.blur}) {
         appendFloat(bytes_, value);
     }
 }
@@ -1152,7 +1152,7 @@ bool decodeFilteredImageSurface(const CommandView& command, ImageSurfaceCommand&
     if (command.opcode != Opcode::drawFilteredImageSurface || command.payloadSize != 80)
         return false;
     const std::uint32_t flags = readU32(command.payload + 4);
-    if (flags > 7U || readFloat(command.payload + 76) != 0.0F) return false;
+    if (flags > 7U) return false;
     image.textureId = readU32(command.payload);
     image.sampling = (flags & 1U) != 0U ? ImageSampling::nearest : ImageSampling::linear;
     image.repeatX = (flags & 2U) != 0U;
@@ -1168,6 +1168,7 @@ bool decodeFilteredImageSurface(const CommandView& command, ImageSurfaceCommand&
     image.contrast = readFloat(command.payload + 64);
     image.brightness = readFloat(command.payload + 68);
     image.hueRotation = readFloat(command.payload + 72);
+    image.blur = readFloat(command.payload + 76);
     return image.textureId != 0;
 }
 

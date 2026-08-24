@@ -132,7 +132,8 @@ Styled rich-text runs, linear-gradient text, shaped gradient bounds, and radial-
 gradient text are advertised by `1 << 59` through `1 << 62`. Protocol-visible
 persistent resource accounting is advertised by `1 << 63`.
 Additional capability words continue the feature space in indexed 64-bit pages.
-Word 1 bit 0 advertises filtered image surfaces (global capability bit 64).
+Word 1 bit 0 advertises filtered image surfaces (global capability bit 64), and
+word 1 bit 1 advertises their blur kernel (global capability bit 65).
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -399,10 +400,10 @@ collapses borders when the destination is too small. Capability bit 57 is requir
 MGFX opcode `45` (`DrawFilteredImageSurface`) extends the rounded/tiled image
 layout to a fixed 80-byte payload. After corner radius it carries saturation and
 contrast in `[0, 2]`, brightness in `[-1, 1]`, hue rotation in radians within
-`[-2π, 2π]`, then one reserved zero float. Sampling and repeat flags retain their
-opcode-39 meanings. The backend samples the persistent texture once and evaluates
-all color treatment per fragment; filter animation therefore sends neither pixels
-nor client-generated geometry.
+`[-2π, 2π]`, then blur radius in `[0, 32]` source pixels. Sampling and repeat
+flags retain their opcode-39 meanings. The backend samples the persistent texture
+and evaluates all color treatment plus a bounded 3×3 Gaussian-style kernel per
+fragment; filter animation therefore sends neither pixels nor client-generated geometry.
 
 MGFX opcode `41` (`DrawStyledText`) has a 64-byte fixed header followed by UTF-8.
 It carries the complete family/weight/style/decoration, placement, fill color,

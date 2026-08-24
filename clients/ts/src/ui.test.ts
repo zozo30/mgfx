@@ -472,7 +472,8 @@ test("image color effects lower to one filtered server draw", () => {
     build(): Element {
       return box({ preferredSize: { width: 100, height: 60 }, cornerRadius: 10,
         backgroundImage: { textureId: 3,
-          effects: { saturation: 1.5, contrast: 1.2, brightness: 0.1, hueRotation: 0.5 } } });
+          effects: { saturation: 1.5, contrast: 1.2, brightness: 0.1,
+            hueRotation: 0.5, blur: 2 } } });
     }
   }
   const host = new ComponentHost();
@@ -483,6 +484,7 @@ test("image color effects lower to one filtered server draw", () => {
   assert.equal(frame.readUInt16LE(16), 45);
   assert.ok(Math.abs(frame.readFloatLE(84) - 1.5) < 0.0001);
   assert.ok(Math.abs(frame.readFloatLE(96) - 0.5) < 0.0001);
+  assert.ok(Math.abs(frame.readFloatLE(100) - 2) < 0.0001);
 });
 
 test("image fitting honors edge alignment for letterboxing and cropping", () => {

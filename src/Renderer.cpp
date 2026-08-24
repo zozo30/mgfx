@@ -643,7 +643,8 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 image.contrast > 2.0F || !std::isfinite(image.brightness) ||
                 image.brightness < -1.0F || image.brightness > 1.0F ||
                 !std::isfinite(image.hueRotation) || image.hueRotation < -6.283186F ||
-                image.hueRotation > 6.283186F) {
+                image.hueRotation > 6.283186F || !std::isfinite(image.blur) ||
+                image.blur < 0.0F || image.blur > 32.0F) {
                 throw std::runtime_error("Malformed image-surface command");
             }
             const auto found = textures_.find(image.textureId);
@@ -692,8 +693,11 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->setRenderPipelineState(imageSurfacePipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
-            const std::array<float, 4> effects = {
-                image.saturation, image.contrast, image.brightness, image.hueRotation};
+            struct ImageEffectsUniforms {
+                std::array<float, 4> color;
+                std::array<float, 4> sampling;
+            } effects{{image.saturation, image.contrast, image.brightness, image.hueRotation},
+                      {image.blur, 0.0F, 0.0F, 0.0F}};
             encoder->setFragmentBytes(&effects, sizeof(effects), 0);
             encoder->setFragmentTexture(found->second.texture.get(), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

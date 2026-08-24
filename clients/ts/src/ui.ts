@@ -54,6 +54,7 @@ export interface ImagePaint {
   readonly effects?: {
     readonly saturation?: number; readonly contrast?: number;
     readonly brightness?: number; readonly hueRotation?: number;
+    readonly blur?: number;
   };
 }
 export interface Transform {

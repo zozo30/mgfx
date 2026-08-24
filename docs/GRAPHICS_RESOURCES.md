@@ -41,7 +41,7 @@ UV rectangle, and tint; inherited opacity applies on the server. Repeating image
 patterns do not require resending the underlying pixels.
 
 Filtered image surfaces additionally carry bounded saturation, contrast, brightness,
-and hue rotation. These remain fragment-stage parameters on the persistent texture,
+hue rotation, and blur. These remain fragment-stage parameters on the persistent texture,
 including for cropped or tiled sources, so animated image treatment is constant-size.
 
 The implemented `DrawImageSurface` extension adds a rounded-corner radius and an

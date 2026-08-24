@@ -73,7 +73,7 @@ int main() {
                                       {-0.5F, 0.5F, 0.5F, -0.5F},
                                       {0.0F, 0.0F, 1.0F, 1.0F},
                                       {1.0F, 1.0F, 1.0F, 0.9F}, 6.0F, false, false,
-                                      1.4F, 1.2F, 0.1F, 2.0F});
+                                      1.4F, 1.2F, 0.1F, 2.0F, 3.0F});
     encoder.drawNineSliceImage({11, gfx::ImageSampling::nearest,
                                 {-0.9F, 0.7F, 0.9F, -0.7F}, {0.0F, 0.0F, 1.0F, 1.0F},
                                 {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.2F, 0.1F, 0.2F},
@@ -347,7 +347,8 @@ int main() {
         filteredImage.textureId != 12 || !nearlyEqual(filteredImage.saturation, 1.4F) ||
         !nearlyEqual(filteredImage.contrast, 1.2F) ||
         !nearlyEqual(filteredImage.brightness, 0.1F) ||
-        !nearlyEqual(filteredImage.hueRotation, 2.0F) || !decoder.next(command)) {
+        !nearlyEqual(filteredImage.hueRotation, 2.0F) ||
+        !nearlyEqual(filteredImage.blur, 3.0F) || !decoder.next(command)) {
         return fail("Filtered image-surface decoding failed");
     }
     gfx::NineSliceImageCommand nineSlice{};

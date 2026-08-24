@@ -433,7 +433,7 @@ test("filtered image surfaces carry animated color treatment in one command", ()
   const frame = new FrameEncoder();
   frame.filteredImageSurface(9, { left: -1, top: 1, right: 1, bottom: -1 },
     { left: 0, top: 0, right: 1, bottom: 1 },
-    { saturation: 1.4, contrast: 1.2, brightness: 0.1, hueRotation: 2 },
+    { saturation: 1.4, contrast: 1.2, brightness: 0.1, hueRotation: 2, blur: 3 },
     { red: 1, green: 1, blue: 1, alpha: 0.9 }, 8);
   const encoded = frame.finish();
   assert.equal(encoded.readUInt16LE(16), 45);
@@ -441,6 +441,7 @@ test("filtered image surfaces carry animated color treatment in one command", ()
   assert.equal(encoded.readUInt32LE(24), 9);
   assert.ok(Math.abs(encoded.readFloatLE(84) - 1.4) < 0.0001);
   assert.ok(Math.abs(encoded.readFloatLE(96) - 2) < 0.0001);
+  assert.ok(Math.abs(encoded.readFloatLE(100) - 3) < 0.0001);
 });
 
 test("nine-slice images encode fixed source and destination borders", () => {

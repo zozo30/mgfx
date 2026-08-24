@@ -123,6 +123,7 @@ struct ImageSurfaceCommand {
     float contrast = 1.0F;
     float brightness = 0.0F;
     float hueRotation = 0.0F;
+    float blur = 0.0F;
 };
 
 struct SliceInsets { float left; float top; float right; float bottom; };

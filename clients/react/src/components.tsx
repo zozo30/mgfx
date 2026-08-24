@@ -39,7 +39,7 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX
   readonly repeatX?: boolean; readonly repeatY?: boolean;
   readonly nineSlice?: { readonly source: Insets; readonly destination?: Insets };
   readonly effects?: { readonly saturation?: number; readonly contrast?: number;
-    readonly brightness?: number; readonly hueRotation?: number };
+    readonly brightness?: number; readonly hueRotation?: number; readonly blur?: number };
 }) => <mgfx-box style={{ ...style, backgroundImage: {
   textureId,
   ...(sourceWidth !== undefined && sourceHeight !== undefined

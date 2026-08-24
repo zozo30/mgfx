@@ -114,7 +114,10 @@ export const ExtendedServerCapability = {
   RadialGradientNativeText: 1n << 62n,
   ResourceTracing: 1n << 63n,
 } as const;
-export const ServerCapabilityWord1 = { ImageColorEffects: 1n << 0n } as const;
+export const ServerCapabilityWord1 = {
+  ImageColorEffects: 1n << 0n,
+  ImageBlurEffects: 1n << 1n,
+} as const;
 export interface CapabilityWord { readonly index: number; readonly capabilities: bigint }
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -192,6 +195,7 @@ export interface ImageEffects {
   readonly contrast?: number;
   readonly brightness?: number;
   readonly hueRotation?: number;
+  readonly blur?: number;
 }
 
 export interface Vertex {
@@ -870,14 +874,15 @@ export class FrameEncoder {
     repeatX = false, repeatY = false): void {
     const saturation = effects.saturation ?? 1, contrast = effects.contrast ?? 1;
     const brightness = effects.brightness ?? 0, hueRotation = effects.hueRotation ?? 0;
+    const blur = effects.blur ?? 0;
     const values = [destination.left, destination.top, destination.right, destination.bottom,
       uv.left, uv.top, uv.right, uv.bottom, tint.red, tint.green, tint.blue, tint.alpha,
-      cornerRadius, saturation, contrast, brightness, hueRotation, 0];
+      cornerRadius, saturation, contrast, brightness, hueRotation, blur];
     if (!Number.isSafeInteger(textureId) || textureId <= 0 || textureId > 0xffff_ffff ||
         values.some((value) => !Number.isFinite(value)) || cornerRadius < 0 ||
         cornerRadius > 8192 || saturation < 0 || saturation > 2 || contrast < 0 ||
         contrast > 2 || brightness < -1 || brightness > 1 ||
-        hueRotation < -Math.PI * 2 || hueRotation > Math.PI * 2)
+        hueRotation < -Math.PI * 2 || hueRotation > Math.PI * 2 || blur < 0 || blur > 32)
       throw new RangeError("Filtered image values are outside supported bounds");
     const payload = Buffer.alloc(80);
     payload.writeUInt32LE(textureId, 0);

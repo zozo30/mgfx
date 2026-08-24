@@ -128,6 +128,7 @@ enum ServerCapability : std::uint64_t {
 
 enum ServerCapabilityWord1 : std::uint64_t {
     imageColorEffects = 1ULL << 0U,
+    imageBlurEffects = 1ULL << 1U,
 };
 
 struct CapabilityWord {
