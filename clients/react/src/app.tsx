@@ -567,10 +567,10 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
           background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
           borderColor: rgba(0.20, 0.30, 0.48) }}>
           <Row style={{ preferredSize: { height: 76 }, padding: all(14), cornerRadius: 12,
-            background: rgba(0.065, 0.085, 0.135), borderWidth: 1,
+            gap: 32, background: rgba(0.065, 0.085, 0.135), borderWidth: 1,
             borderColor: rgba(0.18, 0.27, 0.42),
             mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
-            <Column style={{ gap: 5 }}>
+            <Column style={{ gap: 5, flexGrow: 1 }}>
               <Text value="NATIVE SWITCH" style={{ fontSize: 23, fontWeight: "bold" }} />
               <Text value={enabled ? "FEATURE ENABLED" : "FEATURE DISABLED"}
                 style={{ fontSize: 17, color: enabled ? rgba(0.36, 0.94, 0.66)
