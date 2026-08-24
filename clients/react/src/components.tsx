@@ -214,10 +214,11 @@ export function Button({ label, onPress, style = {}, textStyle, background = rgb
     onFocusChange: setFocused,
   };
   return (
-    <mgfx-stack {...handlers} style={{ preferredSize: { height: 48 }, padding: all(12),
-      cornerRadius: 10, clip: true, ...style, background: color }}>
+    <mgfx-row {...handlers} style={{ preferredSize: { height: 48 }, padding: all(12),
+      cornerRadius: 10, clip: true, mainAxisAlignment: "center",
+      crossAxisAlignment: "center", ...style, background: color }}>
       <Text value={label} style={{ fontWeight: "bold", ...textStyle }} />
-    </mgfx-stack>
+    </mgfx-row>
   );
 }
 
@@ -300,12 +301,16 @@ function RadioOption({ selected, label, onSelect }: { readonly selected: boolean
       gap: 11, cornerRadius: 9, crossAxisAlignment: "center",
       background: pressed ? rgba(0.06, 0.09, 0.15)
         : hovered ? rgba(0.09, 0.13, 0.21) : rgba(0.04, 0.055, 0.09) }}>
-    <Stack style={{ preferredSize: { width: 28, height: 28 }, cornerRadius: 14,
-      borderWidth: focused ? 2.5 : 1.5,
+    <Stack style={{ preferredSize: { width: 30, height: 30 }, cornerRadius: 15,
+      background: rgba(0.035, 0.05, 0.08), borderWidth: focused ? 2.5 : 2,
       borderColor: focused ? rgba(0.48, 0.86, 1)
         : selected ? rgba(0.46, 0.96, 0.76) : rgba(0.30, 0.38, 0.52) }}>
-      {selected ? <Circle style={{ position: "absolute", inset: all(7),
-        background: rgba(0.30, 0.88, 0.64) }} /> : null}
+      {selected ? <Row style={{ position: "absolute", inset: all(0),
+        mainAxisAlignment: "center", crossAxisAlignment: "center" }}>
+        <Circle style={{ preferredSize: { width: 12, height: 12 },
+          background: rgba(0.32, 0.96, 0.70),
+          shadow: { color: rgba(0.18, 0.78, 0.54, 0.34), blur: 5, spread: 0 } }} />
+      </Row> : null}
     </Stack>
     <Text value={label} style={{ fontSize: 20, fontWeight: selected ? "semibold" : "regular",
       color: selected ? rgba(0.82, 1, 0.92) : rgba(0.70, 0.76, 0.86) }} />

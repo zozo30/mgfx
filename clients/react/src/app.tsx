@@ -512,18 +512,19 @@ function NativeSwitch({ enabled, onChange }: { readonly enabled: boolean;
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
   useNativeCursor("pointer", hovered);
-  return <mgfx-row onClick={() => onChange(!enabled)} onHoverChange={setHovered}
-    onPressChange={setPressed} style={{ preferredSize: { width: 86, height: 44 },
-      padding: all(5), cornerRadius: 22,
+  return <mgfx-stack onClick={() => onChange(!enabled)} onHoverChange={setHovered}
+    onPressChange={setPressed} style={{ preferredSize: { width: 90, height: 48 },
+      cornerRadius: 24, clip: true,
       background: pressed ? rgba(0.10, 0.34, 0.28)
         : enabled ? hovered ? rgba(0.18, 0.82, 0.58) : rgba(0.12, 0.68, 0.46)
           : hovered ? rgba(0.20, 0.25, 0.36) : rgba(0.12, 0.15, 0.23),
-      mainAxisAlignment: enabled ? "end" : "start", crossAxisAlignment: "center",
-      borderWidth: 1.5, borderColor: enabled ? rgba(0.48, 1, 0.76) : rgba(0.32, 0.39, 0.54) }}>
-    <Circle style={{ preferredSize: { width: 34, height: 34 },
+      borderWidth: 2, borderColor: enabled ? rgba(0.42, 0.96, 0.72) : rgba(0.32, 0.39, 0.54) }}>
+    <Circle style={{ position: "absolute", inset: { top: 7, left: enabled ? 49 : 7 },
+      preferredSize: { width: 34, height: 34 },
       background: enabled ? rgba(0.90, 1, 0.96) : rgba(0.64, 0.70, 0.80),
+      borderWidth: 1, borderColor: rgba(1, 1, 1, 0.72),
       shadow: { color: rgba(0, 0, 0, 0.42), blur: 7, spread: 0, offsetX: enabled ? -2 : 2 } }} />
-  </mgfx-row>;
+  </mgfx-stack>;
 }
 
 function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: number;
