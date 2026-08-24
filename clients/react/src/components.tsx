@@ -450,6 +450,54 @@ export function Select({ options, value, onChange, width = 300 }: {
   </mgfx-stack>;
 }
 
+function TabOption({ label, active, onSelect, onPrevious, onNext }: {
+  readonly label: string; readonly active: boolean; readonly onSelect: () => void;
+  readonly onPrevious: () => void; readonly onNext: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useNativeCursor("pointer", hovered);
+  return <mgfx-stack onClick={onSelect} onHoverChange={setHovered} onPressChange={setPressed}
+    onFocusChange={setFocused} onKeyDown={(key) => {
+      if (key === Key.ArrowLeft || key === Key.ArrowUp) onPrevious();
+      if (key === Key.ArrowRight || key === Key.ArrowDown) onNext();
+    }} style={{ preferredSize: { height: 48 }, flexGrow: 1, cornerRadius: 9,
+      background: pressed ? rgba(0.07, 0.12, 0.20)
+        : active ? rgba(0.12, 0.24, 0.38) : hovered ? rgba(0.085, 0.13, 0.21)
+          : rgba(0.045, 0.065, 0.105),
+      borderWidth: focused ? 2 : 0,
+      borderColor: focused ? rgba(0.46, 0.82, 1) : rgba(0, 0, 0, 0) }}>
+    <Row style={{ position: "absolute", inset: all(0), mainAxisAlignment: "center",
+      crossAxisAlignment: "center" }}>
+      <Text value={label} style={{ fontSize: 19, fontWeight: active ? "bold" : "medium",
+        color: active ? rgba(0.76, 0.94, 1) : rgba(0.58, 0.66, 0.78) }} />
+    </Row>
+    {active ? <Box style={{ position: "absolute", inset: { right: 14, bottom: 0, left: 14 },
+      preferredSize: { height: 3 }, cornerRadius: 1.5,
+      backgroundGradient: { start: rgba(0.24, 0.82, 1),
+        end: rgba(0.58, 0.30, 1), direction: "horizontal" } }} /> : null}
+  </mgfx-stack>;
+}
+
+export function Tabs({ options, value, onChange, width = 640 }: {
+  readonly options: readonly string[]; readonly value: number;
+  readonly onChange: (index: number) => void; readonly width?: number;
+}) {
+  const selected = Math.max(0, Math.min(options.length - 1, value));
+  const selectRelative = (delta: number) => {
+    if (options.length === 0) return;
+    onChange((selected + delta + options.length) % options.length);
+  };
+  return <Row style={{ preferredSize: { width, height: 56 }, padding: all(4), gap: 6,
+    cornerRadius: 12, crossAxisAlignment: "stretch",
+    background: rgba(0.025, 0.04, 0.07), borderWidth: 1,
+    borderColor: rgba(0.18, 0.27, 0.42) }}>{options.map((label, index) =>
+    <TabOption key={label} label={label} active={selected === index}
+      onSelect={() => onChange(index)} onPrevious={() => selectRelative(-1)}
+      onNext={() => selectRelative(1)} />)}</Row>;
+}
+
 export interface TextFieldProps {
   readonly value: string;
   readonly onChange: (value: string) => void;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Circle, Column, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Checkbox, Circle, Column, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, Toast, useRouter } from "./navigation.js";
@@ -564,6 +564,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [telemetry, setTelemetry] = useState(false);
   const [quantity, setQuantity] = useState(4);
   const [theme, setTheme] = useState(0);
+  const [section, setSection] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const time = useAnimationTime();
@@ -594,6 +595,17 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
               ? "POINTER + KEYBOARD" : "SERVER CLOCK"}
               style={{ fontSize: 18, color: rgba(0.58, 0.66, 0.78) }} />
           </Column>)}
+        </Row>
+        <Row style={{ gap: 18, crossAxisAlignment: "center" }}>
+          <Tabs options={["CONTROLS", "OVERLAYS", "STATE"]} value={section}
+            onChange={setSection} width={440} />
+          <Stack style={{ preferredSize: { height: 56 }, padding: all(15), flexGrow: 1,
+            cornerRadius: 12, background: rgba(0.045, 0.065, 0.105) }}>
+            <Text value={section === 0 ? "CONTROLLED INPUT COMPONENTS"
+              : section === 1 ? "Z-INDEXED NATIVE SURFACES" : "REACT HOOK STATE"}
+              style={{ fontSize: 19, fontWeight: "semibold",
+                color: rgba(0.62, 0.82, 0.96) }} />
+          </Stack>
         </Row>
         <Column style={{ padding: all(20), gap: 18, cornerRadius: 16,
           background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
