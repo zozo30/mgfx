@@ -555,10 +555,11 @@ export interface TextFieldProps {
   readonly maxLength?: number;
   readonly style?: Style;
   readonly textStyle?: TextStyle;
+  readonly onKeyDown?: (key: Key, modifiers: number) => void;
 }
 
 export function TextField({ value, onChange, placeholder = "", maxLength = 256,
-  style = {}, textStyle }: TextFieldProps) {
+  style = {}, textStyle, onKeyDown }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [caret, setCaret] = useState([...value].length);
@@ -635,6 +636,7 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
       onPointerUp={() => setDragging(false)}
       onTextInput={insert}
       onKeyDown={(key, modifiers) => {
+        onKeyDown?.(key, modifiers);
         const extending = (modifiers & KeyModifier.Shift) !== 0;
         wakeCaret();
         if (key === Key.Backspace && hasSelection) {

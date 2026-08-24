@@ -3,7 +3,8 @@ import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo
 import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
-import { Dialog, Menu, Router, Toast, useRouter, type MenuItem } from "./navigation.js";
+import { CommandPalette, Dialog, Menu, Router, Toast, useRouter,
+  type CommandItem, type MenuItem } from "./navigation.js";
 import { AnimationProvider, useAnimationTime } from "./animation.js";
 
 export function DotGrid({ time }: { readonly time: number }) {
@@ -570,6 +571,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [toastOpen, setToastOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const time = useAnimationTime();
   const router = useRouter();
   const progress = (Math.sin(time / 900) + 1) / 2;
@@ -578,6 +580,16 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
     { label: "SAVE SNAPSHOT", detail: "Commit the current component state" },
     { label: "EXPORT COMMANDS", detail: "Write the latest binary frame" },
     { label: "REMOTE TARGET", detail: "Unavailable for local Unix mode", disabled: true },
+  ];
+  const commands: readonly CommandItem[] = [
+    { id: "home", label: "GO TO HOME", detail: "Open the primary graphics dashboard",
+      keywords: ["route", "dashboard"] },
+    { id: "graphics", label: "OPEN GRAPHICS LAB", detail: "Inspect paths, SVG, and patterns",
+      keywords: ["route", "metal", "vector"] },
+    { id: "components", label: "OPEN COMPONENT LAB", detail: "Return to native controls",
+      keywords: ["route", "ui"] },
+    { id: "toast", label: "SHOW STATUS TOAST", detail: "Exercise the notification overlay",
+      keywords: ["overlay", "message"] },
   ];
   return <>
     <Scroll style={{ position: "absolute", inset: all(0) }}>
@@ -692,6 +704,8 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
           </Row>
         </Column>
         <Row style={{ gap: 12, mainAxisAlignment: "end" }}>
+          <Button label="COMMAND PALETTE" onPress={() => setPaletteOpen(true)}
+            background={rgba(0.10, 0.34, 0.54)} style={{ preferredSize: { width: 220 } }} />
           <Button label="SHOW TOAST" onPress={() => setToastOpen(true)}
             background={rgba(0.16, 0.42, 0.68)} style={{ preferredSize: { width: 170 } }} />
           <Button label="SHOW DIALOG" onPress={() => setDialogOpen(true)}
@@ -714,6 +728,11 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
         setMenuIndex(index);
         if (index < 2) setToastOpen(true);
       }} onDismiss={() => setMenuOpen(false)} top={contentTop + 66} right={32} />
+    <CommandPalette open={paletteOpen} commands={commands} onDismiss={() => setPaletteOpen(false)}
+      onSelect={(command) => {
+        if (command.id === "toast") setToastOpen(true);
+        else router.push(command.id);
+      }} />
   </>;
 }
 
