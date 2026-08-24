@@ -9,7 +9,7 @@ import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
   decodeResourceStatus, decodeServerCapabilities, decodeServerHello, decodeSize, decodeText,
   decodeTextMetrics, decodeWindowChromeMetrics,
-  encodeCursor, encodeFontCreate, encodeMeshCreate, encodePathCreate, encodeText,
+  encodeCursor, encodeFontCreate, encodeMeshCreate, encodePathCreate, encodeResourceId, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
   MessageType, ResourceKind, ResourceState, sendMessage,
   TextMetricsClient } from "@mgfx/demo-client/protocol";
@@ -65,10 +65,13 @@ const surface = new ReactSurface(
   {
     createPath: (id, segments) => sendMessage(socket, MessageType.PathCreate,
       encodePathCreate(id, segments)),
+    destroyPath: (id) => sendMessage(socket, MessageType.PathDestroy, encodeResourceId(id)),
     createMesh: (id, vertices, indices) => sendMessage(socket, MessageType.MeshCreate,
       encodeMeshCreate(id, vertices, indices)),
+    destroyMesh: (id) => sendMessage(socket, MessageType.MeshDestroy, encodeResourceId(id)),
     createTexture: (id, width, height, rgba) => sendMessage(socket, MessageType.TextureCreate,
       encodeTextureCreate(id, width, height, rgba)),
+    destroyTexture: (id) => sendMessage(socket, MessageType.TextureDestroy, encodeResourceId(id)),
     measureText: (family, text, weight, style, letterSpacing, fontResourceId) =>
       textMetrics.measure(family, text, weight, style, letterSpacing, fontResourceId),
   },

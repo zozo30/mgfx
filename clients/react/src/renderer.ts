@@ -205,10 +205,13 @@ export class ReactSurface {
               private readonly windowCommands?: NativeWindowCommands,
               private readonly resourceCommands?: {
                 readonly createPath: (id: number, segments: readonly PathSegment[]) => void;
+                readonly destroyPath?: (id: number) => void;
                 readonly createMesh?: (id: number, vertices: readonly MeshUploadVertex[],
                   indices: readonly number[]) => void;
+                readonly destroyMesh?: (id: number) => void;
                 readonly createTexture?: (id: number, width: number, height: number,
                   rgba: Uint8Array) => void;
+                readonly destroyTexture?: (id: number) => void;
                 readonly measureText?: (family: FontFamily, text: string,
                   weight?: FontWeight, style?: FontStyle, letterSpacing?: number,
                   fontResourceId?: number) => Promise<number>;
@@ -243,7 +246,8 @@ export class ReactSurface {
 
   commit(): void { this.submit(); }
   private submit(): void {
-    if (this.viewport.width <= 0 || this.viewport.height <= 0 || this.container.children.length === 0) return;
+    if (this.viewport.width <= 0 || this.viewport.height <= 0) return;
+    const active = this.activeResources(this.container.children);
     this.uploadPaths(this.container.children);
     this.uploadMeshes(this.container.children);
     this.uploadTextures(this.container.children);
@@ -255,10 +259,37 @@ export class ReactSurface {
     this.host.paint(encoder, this.viewport);
     encoder.endFrame();
     this.onFrame(encoder.finish());
+    this.releaseUnused(this.uploadedPaths, active.paths, this.resourceCommands?.destroyPath);
+    this.releaseUnused(this.uploadedMeshes, active.meshes, this.resourceCommands?.destroyMesh);
+    this.releaseUnused(this.uploadedTextures, active.textures, this.resourceCommands?.destroyTexture);
+  }
+  private activeResources(children: readonly HostChild[]): {
+    paths: Set<number>; meshes: Set<number>; textures: Set<number>;
+  } {
+    const result = { paths: new Set<number>(), meshes: new Set<number>(), textures: new Set<number>() };
+    const visit = (items: readonly HostChild[]) => {
+      for (const child of items) {
+        if (child.kind !== "host" || child.hidden) continue;
+        if (child.props.path) result.paths.add(child.props.path.resourceId);
+        if (child.props.mesh) result.meshes.add(child.props.mesh.resourceId);
+        if (child.props.textureResource) result.textures.add(child.props.textureResource.resourceId);
+        visit(child.children);
+      }
+    };
+    visit(children);
+    return result;
+  }
+  private releaseUnused(uploaded: Set<number>, active: Set<number>,
+    destroy: ((id: number) => void) | undefined): void {
+    for (const id of uploaded) {
+      if (active.has(id)) continue;
+      destroy?.(id);
+      uploaded.delete(id);
+    }
   }
   private uploadPaths(children: readonly HostChild[]): void {
     for (const child of children) {
-      if (child.kind !== "host") continue;
+      if (child.kind !== "host" || child.hidden) continue;
       const path = child.props.path;
       if (path && !this.uploadedPaths.has(path.resourceId)) {
         this.resourceCommands?.createPath(path.resourceId, path.segments);
@@ -269,7 +300,7 @@ export class ReactSurface {
   }
   private uploadMeshes(children: readonly HostChild[]): void {
     for (const child of children) {
-      if (child.kind !== "host") continue;
+      if (child.kind !== "host" || child.hidden) continue;
       const mesh = child.props.mesh;
       if (mesh && !this.uploadedMeshes.has(mesh.resourceId)) {
         const vertices = mesh.positions.map((position, index) => ({ position,
@@ -282,7 +313,7 @@ export class ReactSurface {
   }
   private uploadTextures(children: readonly HostChild[]): void {
     for (const child of children) {
-      if (child.kind !== "host") continue;
+      if (child.kind !== "host" || child.hidden) continue;
       const texture = child.props.textureResource;
       if (texture && !this.uploadedTextures.has(texture.resourceId)) {
         this.resourceCommands?.createTexture?.(

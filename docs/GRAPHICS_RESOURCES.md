@@ -15,6 +15,11 @@ Create messages are idempotent for the same ID and content generation; explicit
 destroy messages permit early release. Servers enforce per-resource and
 per-connection byte limits before allocation.
 
+The React surface performs commit-level reachability for paths, meshes, and
+embedded textures. Resources absent from the new visible tree are destroyed after
+its replacement frame is submitted and removed from the upload set, so a later
+remount safely recreates the same canonical ID.
+
 Resource uploads are separate from MGFX frames. A frame may reference only
 resources acknowledged as ready, keeping display lists small and allowing the
 server to retain GPU allocations between frames.

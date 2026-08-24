@@ -243,6 +243,31 @@ test("React Svg uploads embedded images once and frames reference the native tex
   assert.deepEqual(opcodes, [1, 6, 3]);
 });
 
+test("React retires unused resources and reuploads cached identities on remount", () => {
+  const created = { paths: [] as number[], meshes: [] as number[], textures: [] as number[] };
+  const destroyed = { paths: [] as number[], meshes: [] as number[], textures: [] as number[] };
+  const surface = new ReactSurface(() => {}, undefined, {
+    createPath: (id) => created.paths.push(id), destroyPath: (id) => destroyed.paths.push(id),
+    createMesh: (id) => created.meshes.push(id), destroyMesh: (id) => destroyed.meshes.push(id),
+    createTexture: (id) => created.textures.push(id),
+    destroyTexture: (id) => destroyed.textures.push(id),
+  });
+  const content = <mgfx-stack><Path data="M0 0H10V10Z"
+      color={{ red: 1, green: 1, blue: 1, alpha: 1 }} />
+    <Mesh data={{ resourceId: 77,
+      positions: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }], indices: [0, 1, 2],
+      color: { red: 1, green: 0, blue: 0, alpha: 1 } }} />
+    <Svg source={`<svg viewBox="0 0 1 1"><image href="${embeddedPng()}"
+      width="1" height="1"/></svg>`} />
+  </mgfx-stack>;
+  surface.render(content); surface.resize({ width: 100, height: 100 });
+  assert.deepEqual(Object.values(created).map((ids) => ids.length), [1, 1, 1]);
+  surface.render(null);
+  assert.deepEqual(destroyed, created);
+  surface.render(content);
+  assert.deepEqual(Object.values(created).map((ids) => ids.length), [2, 2, 2]);
+});
+
 test("React Mesh uploads indexed geometry once and draws its resource ID", () => {
   let uploads = 0;
   let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);

@@ -178,6 +178,11 @@ active graphics backend, and feature bits. Frontends can therefore target
 capabilities rather than Metal, Vulkan, or DirectX by name. The first positive
 `Resize` is also the acknowledgement that the requested drawable is ready.
 
+React tracks the persistent path, mesh, and embedded-texture identities reachable
+from each committed tree. When the last component disappears it sends the existing
+resource-destroy message; remounting the canonical identity uploads it again. Empty
+trees also submit a clear frame, preventing stale pixels and route-driven GPU leaks.
+
 The original 32-bit `ServerHello` remains byte-for-byte stable and is followed
 by an optional `ServerCapabilities` message carrying the complete 64-bit mask.
 Legacy clients safely ignore that companion; current clients gain bits 32–63
