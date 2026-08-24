@@ -472,8 +472,9 @@ function Dashboard({ headerImageSize, contentLeft, contentTop, mode, setMode }: 
   ] as const;
   return (
     <>
-    <Scroll style={{ position: "absolute", inset: all(0) }}>
-    <Column style={{ padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft },
+    <Scroll style={{ position: "absolute",
+      inset: { top: contentTop, right: 20, bottom: 20, left: contentLeft } }}>
+    <Column style={{
       gap: 16, crossAxisAlignment: "stretch" }}>
       <Row style={{ gap: 16, crossAxisAlignment: "stretch" }}>
         {cards.map(([label, normal, active], index) => (
@@ -607,8 +608,9 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
     ] },
   ];
   return <>
-    <Scroll style={{ position: "absolute", inset: all(0) }}>
-      <Column style={{ padding: { top: contentTop, right: 20, bottom: 28, left: contentLeft },
+    <Scroll style={{ position: "absolute",
+      inset: { top: contentTop, right: 20, bottom: 28, left: contentLeft } }}>
+      <Column style={{
         gap: 18, crossAxisAlignment: "stretch" }}>
         <Row style={{ preferredSize: { height: 70 }, padding: all(16), cornerRadius: 14,
           backgroundGradient: { start: rgba(0.52, 0.18, 0.72),
@@ -793,8 +795,9 @@ function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, content
   const router = useRouter();
   const animationTime = useAnimationTime();
   return (
-      <Scroll style={{ position: "absolute", inset: all(0) }}>
-      <Column style={{ padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft },
+      <Scroll style={{ position: "absolute",
+        inset: { top: contentTop, right: 20, bottom: 20, left: contentLeft } }}>
+      <Column style={{
         gap: 22, crossAxisAlignment: "stretch" }}>
           <Row style={{ preferredSize: { height: 70 }, padding: all(16), cornerRadius: 14,
             backgroundGradient: { start: rgba(0.08, 0.46, 0.36),
