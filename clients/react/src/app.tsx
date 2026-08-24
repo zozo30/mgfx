@@ -298,7 +298,7 @@ function DrawerToggle({ expanded, showLabels, labelOpacity, onPress }: {
         style={{ fontSize: 18, fontWeight: "semibold", color: rgba(0.70, 0.88, 1) }} />
       </Stack> : null}
     </Row>
-    {!showLabels && (hovered || focused) ? <Stack style={{ position: "absolute",
+    {!showLabels && hovered ? <Stack style={{ position: "absolute",
       inset: { top: 4, left: 64 }, preferredSize: { width: 160, height: 40 },
       zIndex: 120, padding: all(10), cornerRadius: 9,
       background: rgba(0.025, 0.045, 0.08, 0.98), borderWidth: 1,
@@ -343,7 +343,7 @@ function DrawerItem({ active, label, icon, fallback, showLabel, labelOpacity, on
     </Row>
     {active ? <Box style={{ position: "absolute", inset: { top: 12, bottom: 12, left: 0 },
       preferredSize: { width: 4 }, cornerRadius: 2, background: rgba(0.48, 0.88, 1) }} /> : null}
-    {!showLabel && (hovered || focused) ? <Stack style={{ position: "absolute",
+    {!showLabel && hovered ? <Stack style={{ position: "absolute",
       inset: { top: 9, left: 64 }, preferredSize: { width: 170, height: 40 },
       zIndex: 120, padding: all(10), cornerRadius: 9,
       background: rgba(0.025, 0.045, 0.08, 0.98), borderWidth: 1,
