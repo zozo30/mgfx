@@ -423,6 +423,22 @@ test("semantic arcs emit one server SDF command without client tessellation", ()
   assert.ok(Math.abs(frame.readFloatLE(40) + Math.PI / 2) < 0.00001);
 });
 
+test("animated semantic arcs accept rotations accumulated over long runtimes", () => {
+  class ArcComponent extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 80, height: 80 }, backgroundArc: {
+        startAngle: 86_400_145, sweepAngle: 82, thickness: 10,
+        color: { red: 0.5, green: 0.3, blue: 1, alpha: 1 },
+      } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new ArcComponent());
+  host.layout({ width: 80, height: 80 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 80, height: 80 });
+  encoder.endFrame();
+  assert.equal(encoder.finish().readUInt16LE(16), 46);
+});
+
 test("gradient circles emit one server SDF command instead of a triangle fan", () => {
   class GradientCircle extends Component {
     build(): Element {

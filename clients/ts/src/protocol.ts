@@ -1508,13 +1508,14 @@ export class FrameEncoder {
   }
 
   arc(value: ArcPaint): void {
+    const twoPi = Math.PI * 2;
+    const startAngle = ((value.startAngle + Math.PI) % twoPi + twoPi) % twoPi - Math.PI;
     const values = [value.destination.left, value.destination.top, value.destination.right,
-      value.destination.bottom, value.startAngle, value.sweepAngle, value.thickness,
+      value.destination.bottom, startAngle, value.sweepAngle, value.thickness,
       value.roundCaps ? 1 : 0, value.color.red, value.color.green, value.color.blue,
       value.color.alpha];
-    const twoPi = Math.PI * 2;
-    if (values.some((item) => !Number.isFinite(item)) || value.startAngle < -twoPi ||
-        value.startAngle > twoPi || value.sweepAngle <= 0 || value.sweepAngle > twoPi ||
+    if (!Number.isFinite(value.startAngle) || values.some((item) => !Number.isFinite(item)) ||
+        value.sweepAngle <= 0 || value.sweepAngle > twoPi ||
         value.thickness <= 0 || value.thickness > 8192)
       throw new RangeError("Arc values are outside supported bounds");
     const payload = Buffer.alloc(48);

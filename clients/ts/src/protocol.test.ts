@@ -344,6 +344,16 @@ test("MGFX arc carries semantic angles, thickness, and cap style", () => {
     color: { red: 1, green: 1, blue: 1, alpha: 1 } }));
 });
 
+test("MGFX arc canonicalizes unbounded animation rotations", () => {
+  const frame = new FrameEncoder();
+  frame.arc({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
+    startAngle: Math.PI * 2000.5, sweepAngle: Math.PI / 2, thickness: 8,
+    roundCaps: true, color: { red: 1, green: 0.5, blue: 0.1, alpha: 1 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.ok(Math.abs(bytes.readFloatLE(40) - Math.PI / 2) < 0.0001);
+});
+
 test("MGFX diagonal pattern is constant-size regardless of area", () => {
   const frame = new FrameEncoder();
   frame.diagonalPattern({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
