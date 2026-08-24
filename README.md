@@ -86,7 +86,8 @@ strokes and gradients remain explicit fallbacks.
 Embedded SVG `<image>` elements accept bounded base64 PNG/JPEG data URLs. Pixels
 decode and upload once as canonical persistent textures; frames retain only
 `DrawImage` references with SVG placement, transform, opacity, clipping,
-`preserveAspectRatio`, and `image-rendering` sampling.
+all nine `preserveAspectRatio` alignments for meet/slice (plus `none`), and
+`image-rendering` sampling.
 Frames then contain only resource references at the component's current layout
 size. Documents using more complex gradients or non-rectangular masks
 continue through the bounded raster fallback instead of partially misrendering.

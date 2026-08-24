@@ -46,7 +46,7 @@ test("SVG embedded images become canonical persistent native textures", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 50">
     <g opacity="0.75" transform="rotate(8 30 20)">
       <image href="${href}" x="10" y="5" width="40" height="30"
-        preserveAspectRatio="xMidYMid slice" image-rendering="pixelated"/>
+        preserveAspectRatio="xMaxYMin slice" image-rendering="pixelated"/>
       <image href="${href}" x="55" y="5" width="40" height="30" preserveAspectRatio="none"/>
     </g></svg>`);
   assert.equal(document.layers.length, 2);
@@ -58,11 +58,19 @@ test("SVG embedded images become canonical persistent native textures", () => {
     sourceWidth: document.layers[0].image.texture.width,
     sourceHeight: document.layers[0].image.texture.height,
     fit: document.layers[0].image.fit, sampling: document.layers[0].image.sampling,
+    alignX: document.layers[0].image.alignX, alignY: document.layers[0].image.alignY,
     opacity: document.layers[0].image.opacity,
   }, { x: 10, y: 5, width: 40, height: 30, sourceWidth: 2, sourceHeight: 1,
-    fit: "cover", sampling: "nearest", opacity: 0.75 });
+    fit: "cover", sampling: "nearest", alignX: "end", alignY: "start", opacity: 0.75 });
   assert.equal(document.layers[1]?.image?.fit, "fill");
+  assert.equal(document.layers[1]?.image?.alignX, "center");
   assert.ok(document.layers[0]?.image?.sourceTransform);
+});
+
+test("SVG embedded images reject invalid preserveAspectRatio values", () => {
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 10 10">
+    <image href="${tinyPngDataUrl()}" width="10" height="10"
+      preserveAspectRatio="xMiddleYMid meet"/></svg>`), /Unsupported SVG preserveAspectRatio/);
 });
 
 test("SVG local use instances expand symbols into independently transformed native paths", () => {

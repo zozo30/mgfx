@@ -22,6 +22,8 @@ export interface SvgVectorLayer {
     readonly anchor?: "start" | "middle" | "end"; readonly sourceTransform?: Matrix };
   readonly image?: { readonly texture: EmbeddedTexture; readonly x: number; readonly y: number;
     readonly width: number; readonly height: number; readonly fit: "fill" | "contain" | "cover";
+    readonly alignX: "start" | "center" | "end";
+    readonly alignY: "start" | "center" | "end";
     readonly sampling: "linear" | "nearest"; readonly opacity?: number;
     readonly sourceTransform?: Matrix };
   readonly clip?: Rect;
@@ -443,13 +445,12 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const width = Number(attributes.width), height = Number(attributes.height);
       if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
         throw new Error("SVG image requires positive numeric width and height");
-      const preserve = attributes.preserveAspectRatio?.trim().toLowerCase() ?? "xmidymid meet";
-      const fit = preserve === "none" ? "fill" : preserve.includes("slice") ? "cover" : "contain";
+      const { fit, alignX, alignY } = imageAspectRatio(attributes.preserveAspectRatio);
       const samplingValue = attributes["image-rendering"]?.trim().toLowerCase();
       const sampling = samplingValue === "pixelated" || samplingValue === "crisp-edges"
         ? "nearest" : "linear";
       layers.push({ ...(state.clip ? { clip: state.clip } : {}), image: {
-        texture, x, y, width, height, fit, sampling,
+        texture, x, y, width, height, fit, alignX, alignY, sampling,
         ...(state.opacity < 1 ? { opacity: state.opacity } : {}),
         ...(state.transform.a !== 1 || state.transform.b !== 0 || state.transform.c !== 0 ||
           state.transform.d !== 1 || state.transform.e !== 0 || state.transform.f !== 0
@@ -1073,6 +1074,21 @@ function applyMatrix(path: string, matrix: Matrix): string {
 
 function multiplyAlpha(color: Color, opacity: number): Color {
   return { ...color, alpha: clamp01(color.alpha * opacity) };
+}
+function imageAspectRatio(value: string | undefined): {
+  fit: "fill" | "contain" | "cover";
+  alignX: "start" | "center" | "end";
+  alignY: "start" | "center" | "end";
+} {
+  const aspect = (value ?? "xMidYMid meet").trim().toLowerCase()
+    .replace(/^defer\s+/, "");
+  if (aspect === "none") return { fit: "fill", alignX: "center", alignY: "center" };
+  const match = /^(xmin|xmid|xmax)(ymin|ymid|ymax)(?:\s+(meet|slice))?$/.exec(aspect);
+  if (!match) throw new Error(`Unsupported SVG preserveAspectRatio ${value ?? ""}`);
+  const axisAlignment = (axis: string): "start" | "center" | "end" =>
+    axis.endsWith("min") ? "start" : axis.endsWith("max") ? "end" : "center";
+  return { fit: match[3] === "slice" ? "cover" : "contain",
+    alignX: axisAlignment(match[1]!), alignY: axisAlignment(match[2]!) };
 }
 function numberAttribute(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;

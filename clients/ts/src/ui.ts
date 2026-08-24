@@ -43,6 +43,8 @@ export interface ImagePaint {
   readonly tint?: Color;
   readonly sourceSize?: Size;
   readonly fit?: "fill" | "contain" | "cover";
+  readonly alignX?: "start" | "center" | "end";
+  readonly alignY?: "start" | "center" | "end";
   readonly sampling?: "linear" | "nearest";
 }
 export interface Transform {
@@ -296,6 +298,8 @@ export interface VectorImageData {
   readonly x: number; readonly y: number; readonly width: number; readonly height: number;
   readonly viewBox: Rect; readonly sourceClip?: Rect;
   readonly fit?: "fill" | "contain" | "cover"; readonly sampling?: "linear" | "nearest";
+  readonly alignX?: "start" | "center" | "end";
+  readonly alignY?: "start" | "center" | "end";
   readonly opacity?: number;
   readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
     readonly d: number; readonly e: number; readonly f: number };
@@ -1064,7 +1068,8 @@ function paintVectorImage(encoder: FrameEncoder, bounds: Rect, image: VectorImag
     height: image.height / image.viewBox.height * documentBounds.height,
   };
   paintImage(encoder, destination, { textureId: image.textureId, sourceSize: image.sourceSize,
-    fit: image.fit ?? "fill", sampling: image.sampling ?? "linear" }, 0, viewport);
+    fit: image.fit ?? "fill", sampling: image.sampling ?? "linear",
+    alignX: image.alignX ?? "center", alignY: image.alignY ?? "center" }, 0, viewport);
   if (image.sourceTransform) encoder.popTransform();
   if (image.opacity !== undefined && image.opacity < 1) encoder.popOpacity();
   if (image.sourceClip) encoder.popClip();
@@ -1107,20 +1112,25 @@ function imageGeometry(bounds: Rect, image: ImagePaint): {
   }
   const sourceAspect = image.sourceSize.width / image.sourceSize.height;
   const destinationAspect = bounds.width / bounds.height;
+  const alignment = (value: "start" | "center" | "end" | undefined) =>
+    value === "start" ? 0 : value === "end" ? 1 : 0.5;
+  const alignX = alignment(image.alignX), alignY = alignment(image.alignY);
   if (image.fit === "contain") {
     if (sourceAspect > destinationAspect) {
       const height = bounds.width / sourceAspect;
-      return { destination: { ...bounds, y: bounds.y + (bounds.height - height) / 2, height }, uv };
+      return { destination: { ...bounds, y: bounds.y + (bounds.height - height) * alignY, height }, uv };
     }
     const width = bounds.height * sourceAspect;
-    return { destination: { ...bounds, x: bounds.x + (bounds.width - width) / 2, width }, uv };
+    return { destination: { ...bounds, x: bounds.x + (bounds.width - width) * alignX, width }, uv };
   }
   if (sourceAspect > destinationAspect) {
     const visible = destinationAspect / sourceAspect;
-    return { destination: bounds, uv: { ...uv, left: (1 - visible) / 2, right: (1 + visible) / 2 } };
+    const left = (1 - visible) * alignX;
+    return { destination: bounds, uv: { ...uv, left, right: left + visible } };
   }
   const visible = sourceAspect / destinationAspect;
-  return { destination: bounds, uv: { ...uv, top: (1 - visible) / 2, bottom: (1 + visible) / 2 } };
+  const top = (1 - visible) * alignY;
+  return { destination: bounds, uv: { ...uv, top, bottom: top + visible } };
 }
 
 function paintImage(encoder: FrameEncoder, bounds: Rect, image: ImagePaint | undefined,

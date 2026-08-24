@@ -24,16 +24,20 @@ export const Stack = ({ children, style }: LayoutProps) =>
   <mgfx-stack style={style ?? {}}>{children}</mgfx-stack>;
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
-export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, sampling }: {
+export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling }: {
   readonly textureId: number; readonly style?: Style;
   readonly sourceWidth?: number; readonly sourceHeight?: number;
   readonly fit?: "fill" | "contain" | "cover";
+  readonly alignX?: "start" | "center" | "end";
+  readonly alignY?: "start" | "center" | "end";
   readonly sampling?: "linear" | "nearest";
 }) => <mgfx-box style={{ ...style, backgroundImage: {
   textureId,
   ...(sourceWidth !== undefined && sourceHeight !== undefined
     ? { sourceSize: { width: sourceWidth, height: sourceHeight } } : {}),
   ...(fit ? { fit } : {}),
+  ...(alignX ? { alignX } : {}),
+  ...(alignY ? { alignY } : {}),
   ...(sampling ? { sampling } : {}),
 } }} />;
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
@@ -113,6 +117,7 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
         sourceSize: { width: layer.image.texture.width, height: layer.image.texture.height },
         x: layer.image.x, y: layer.image.y, width: layer.image.width, height: layer.image.height,
         viewBox: document.viewBox, fit: layer.image.fit, sampling: layer.image.sampling,
+        alignX: layer.image.alignX, alignY: layer.image.alignY,
         ...(layer.image.opacity !== undefined ? { opacity: layer.image.opacity } : {}),
         ...(layer.image.sourceTransform ? { sourceTransform: layer.image.sourceTransform } : {}),
         ...(layer.clip ? { sourceClip: layer.clip } : {}) }}

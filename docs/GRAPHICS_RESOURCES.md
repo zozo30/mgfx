@@ -69,7 +69,8 @@ Missing, cyclic, or external gradient references are rejected rather than partia
 Embedded PNG/JPEG data URLs in SVG `<image>` elements decode under the same
 dimension and byte bounds as direct images, deduplicate by content hash, and
 upload once as connection-scoped textures. Native image commands preserve
-`preserveAspectRatio` meet/slice/none, opacity, rectangular clips, affine
+all nine `preserveAspectRatio` alignments with meet/slice plus `none`, opacity,
+rectangular clips, affine
 transforms, and linear or nearest sampling. Network and filesystem URLs remain rejected.
 Local `<use>` references to primitive, group, or symbol definitions expand before
 canonicalization. Each instance retains its own paint and transform while the

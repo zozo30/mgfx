@@ -467,6 +467,30 @@ test("rounded images lower to the server image-surface shader", () => {
   assert.equal(frame.readFloatLE(80), 12);
 });
 
+test("image fitting honors edge alignment for letterboxing and cropping", () => {
+  const render = (fit: "contain" | "cover") => {
+    class AlignedImage extends Component {
+      build(): Element {
+        return box({ preferredSize: { width: 100, height: 100 }, backgroundImage: {
+          textureId: 3, sourceSize: { width: 200, height: 100 }, fit,
+          alignX: "end", alignY: "end" } });
+      }
+    }
+    const host = new ComponentHost();
+    host.rebuild(new AlignedImage()); host.layout({ width: 100, height: 100 });
+    const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 100 });
+    encoder.endFrame();
+    return encoder.finish();
+  };
+  const contained = render("contain");
+  assert.equal(contained.readUInt16LE(16), 6);
+  assert.equal(contained.readFloatLE(36), 0); // Aligned to the bottom: top is y=50.
+  assert.equal(contained.readFloatLE(44), -1);
+  const covered = render("cover");
+  assert.equal(covered.readFloatLE(48), 0.5); // Right half of the wide source remains visible.
+  assert.equal(covered.readFloatLE(56), 1);
+});
+
 test("diagonal patterns lower to one constant-size server command", () => {
   class PatternComponent extends Component {
     build(): Element {
