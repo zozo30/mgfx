@@ -6,7 +6,7 @@ import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-
 import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, Stepper, Svg, Tabs, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
-import { Router, useRouter } from "./navigation.js";
+import { Menu, Router, useRouter } from "./navigation.js";
 import { AnimationProvider } from "./animation.js";
 import { PNG } from "pngjs";
 
@@ -137,6 +137,24 @@ test("React Tabs select by pointer and wrap with arrow keys", () => {
   assert.equal(value, 2);
   surface.keyDown({ key: Key.ArrowRight, modifiers: 0, repeat: false });
   assert.equal(value, 0);
+});
+
+test("native menu selects an anchored option and dismisses its modal hit layer", () => {
+  let selected = -1;
+  let dismissals = 0;
+  const surface = new ReactSurface(() => {});
+  surface.render(<Menu open items={[{ label: "ONE" }, { label: "TWO" }]} activeIndex={0}
+    onActiveChange={() => {}} onSelect={(index) => { selected = index; }}
+    onDismiss={() => { dismissals += 1; }} top={40} right={10} width={200} />);
+  surface.resize({ width: 240, height: 220 });
+  surface.pointerDown({ x: 100, y: 68 }); surface.pointerUp({ x: 100, y: 68 });
+  assert.equal(selected, 0);
+  assert.equal(dismissals, 1);
+
+  selected = -1; dismissals = 0;
+  surface.pointerDown({ x: 12, y: 190 }); surface.pointerUp({ x: 12, y: 190 });
+  assert.equal(selected, -1);
+  assert.equal(dismissals, 1);
 });
 
 test("React Text defaults to native server shaping", () => {

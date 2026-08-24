@@ -3,7 +3,7 @@ import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo
 import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
-import { Dialog, Router, Toast, useRouter } from "./navigation.js";
+import { Dialog, Menu, Router, Toast, useRouter, type MenuItem } from "./navigation.js";
 import { AnimationProvider, useAnimationTime } from "./animation.js";
 
 export function DotGrid({ time }: { readonly time: number }) {
@@ -568,10 +568,17 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuIndex, setMenuIndex] = useState(0);
   const time = useAnimationTime();
   const router = useRouter();
   const progress = (Math.sin(time / 900) + 1) / 2;
   const densities = ["COMPACT", "COMFORTABLE", "SPACIOUS"] as const;
+  const menuItems: readonly MenuItem[] = [
+    { label: "SAVE SNAPSHOT", detail: "Commit the current component state" },
+    { label: "EXPORT COMMANDS", detail: "Write the latest binary frame" },
+    { label: "REMOTE TARGET", detail: "Unavailable for local Unix mode", disabled: true },
+  ];
   return <>
     <Scroll style={{ position: "absolute", inset: all(0) }}>
       <Column style={{ padding: { top: contentTop, right: 20, bottom: 28, left: contentLeft },
@@ -582,8 +589,12 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
           mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
           <Text value="Native Component Laboratory" style={{ fontSize: 30,
             fontWeight: "bold", color: rgba(0.94, 1, 0.98) }} />
-          <Text value="REACT STATE → MGFX COMMANDS" style={{ fontSize: 18,
-            fontWeight: "semibold", color: rgba(0.72, 1, 0.90) }} />
+          <Row style={{ gap: 14, crossAxisAlignment: "center" }}>
+            <Text value="REACT STATE → MGFX COMMANDS" style={{ fontSize: 18,
+              fontWeight: "semibold", color: rgba(0.72, 1, 0.90) }} />
+            <Button label="ACTIONS ···" onPress={() => setMenuOpen((current) => !current)}
+              background={rgba(0.10, 0.30, 0.38)} style={{ preferredSize: { width: 150 } }} />
+          </Row>
         </Row>
         <Row style={{ gap: 16, crossAxisAlignment: "stretch" }}>
           {["LAYOUT", "INPUT", "ANIMATION"].map((label, index) => <Column key={label}
@@ -698,6 +709,11 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
     </Dialog>
     <Toast open={toastOpen} message="Native state committed over the MGFX socket."
       variant="success" onDismiss={() => setToastOpen(false)} />
+    <Menu open={menuOpen} items={menuItems} activeIndex={menuIndex}
+      onActiveChange={setMenuIndex} onSelect={(index) => {
+        setMenuIndex(index);
+        if (index < 2) setToastOpen(true);
+      }} onDismiss={() => setMenuOpen(false)} top={contentTop + 66} right={32} />
   </>;
 }
 
