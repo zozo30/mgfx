@@ -321,6 +321,48 @@ export function RadioGroup({ options, value, onChange }: {
       onSelect={() => onChange(index)} />)}</Row>;
 }
 
+export function ProgressBar({ value, height = 22 }: { readonly value: number;
+  readonly height?: number }) {
+  const clamped = Math.max(0, Math.min(1, value));
+  return <Row style={{ preferredSize: { height }, cornerRadius: height / 2, clip: true,
+    background: rgba(0.10, 0.13, 0.20), gap: 0 }}>
+    <Box style={{ preferredSize: { height }, flexGrow: Math.max(0.001, clamped),
+      backgroundGradient: { start: rgba(0.20, 0.82, 1),
+        end: rgba(0.62, 0.28, 1), direction: "horizontal" } }} />
+    <Box style={{ preferredSize: { height }, flexGrow: Math.max(0.001, 1 - clamped) }} />
+  </Row>;
+}
+
+export function Stepper({ value, onChange, minimum = 0, maximum = 100, step = 1 }: {
+  readonly value: number; readonly onChange: (value: number) => void;
+  readonly minimum?: number; readonly maximum?: number; readonly step?: number;
+}) {
+  const [focused, setFocused] = useState(false);
+  const clamped = Math.max(minimum, Math.min(maximum, value));
+  const update = (next: number) => onChange(Math.max(minimum, Math.min(maximum, next)));
+  return <mgfx-row style={{ preferredSize: { width: 280, height: 52 }, padding: all(4), gap: 8,
+    cornerRadius: 12, background: rgba(0.045, 0.065, 0.105), borderWidth: focused ? 2 : 1,
+    borderColor: focused ? rgba(0.38, 0.72, 1) : rgba(0.20, 0.28, 0.42),
+    crossAxisAlignment: "stretch" }} onFocusChange={setFocused}
+    onKeyDown={(key) => {
+      if (key === Key.ArrowUp || key === Key.ArrowRight) update(clamped + step);
+      if (key === Key.ArrowDown || key === Key.ArrowLeft) update(clamped - step);
+    }}>
+    <Button label="−" disabled={clamped <= minimum} onPress={() => update(clamped - step)}
+      background={rgba(0.16, 0.24, 0.38)} style={{ preferredSize: { width: 48, height: 44 } }}
+      textStyle={{ fontSize: 26 }} />
+    <Stack style={{ preferredSize: { height: 44 }, flexGrow: 1, padding: all(10),
+      cornerRadius: 8, background: rgba(0.08, 0.105, 0.16) }}>
+      <Text value={Number.isInteger(clamped) ? `${clamped}` : clamped.toFixed(2)}
+        style={{ fontSize: 21, fontWeight: "bold", textAlign: "center",
+          color: rgba(0.82, 0.92, 1) }} />
+    </Stack>
+    <Button label="+" disabled={clamped >= maximum} onPress={() => update(clamped + step)}
+      background={rgba(0.14, 0.48, 0.40)} style={{ preferredSize: { width: 48, height: 44 } }}
+      textStyle={{ fontSize: 24 }} />
+  </mgfx-row>;
+}
+
 export interface TextFieldProps {
   readonly value: string;
   readonly onChange: (value: string) => void;

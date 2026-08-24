@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Slider, Svg, Text, TextField } from "./components.js";
+import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Slider, Stepper, Svg, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -82,6 +82,28 @@ test("React selection controls support controlled pointer and keyboard activatio
   assert.equal(checked, false);
   surface.pointerDown({ x: 120, y: 66 }); surface.pointerUp({ x: 120, y: 66 });
   assert.equal(radio, 1);
+});
+
+test("React Stepper clamps pointer changes and accepts focused arrow keys", () => {
+  let value = 2;
+  function Harness() {
+    const [local, setLocal] = useState(2);
+    return <Stepper value={local} minimum={0} maximum={3} onChange={(next) => {
+      value = next; setLocal(next);
+    }} />;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Harness />);
+  surface.resize({ width: 280, height: 52 });
+  surface.keyDown({ key: Key.Tab, modifiers: 0, repeat: false });
+  surface.keyDown({ key: Key.ArrowLeft, modifiers: 0, repeat: false });
+  assert.equal(value, 1);
+  surface.pointerDown({ x: 255, y: 25 }); surface.pointerUp({ x: 255, y: 25 });
+  assert.equal(value, 2);
+  surface.pointerDown({ x: 255, y: 25 }); surface.pointerUp({ x: 255, y: 25 });
+  assert.equal(value, 3);
+  surface.pointerDown({ x: 255, y: 25 }); surface.pointerUp({ x: 255, y: 25 });
+  assert.equal(value, 3);
 });
 
 test("React Text defaults to native server shaping", () => {

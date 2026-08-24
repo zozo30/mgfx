@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Circle, Column, Image, Path, RadioGroup, RichText, Row, Scroll, Slider, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Checkbox, Circle, Column, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Slider, Stack, Stepper, Svg, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -533,6 +533,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [level, setLevel] = useState(0.62);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [telemetry, setTelemetry] = useState(false);
+  const [quantity, setQuantity] = useState(4);
   const [dialogOpen, setDialogOpen] = useState(false);
   const time = useAnimationTime();
   const router = useRouter();
@@ -584,14 +585,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
               <Text value={`${Math.round(progress * 100)}%`} style={{ fontSize: 20,
                 color: rgba(0.42, 0.88, 1) }} />
             </Row>
-            <Row style={{ preferredSize: { height: 22 }, cornerRadius: 11, clip: true,
-              background: rgba(0.10, 0.13, 0.20), gap: 0 }}>
-              <Box style={{ preferredSize: { height: 22 }, flexGrow: Math.max(0.001, progress),
-                backgroundGradient: { start: rgba(0.24, 0.82, 1),
-                  end: rgba(0.62, 0.28, 1), direction: "horizontal" } }} />
-              <Box style={{ preferredSize: { height: 22 },
-                flexGrow: Math.max(0.001, 1 - progress) }} />
-            </Row>
+            <ProgressBar value={progress} />
           </Column>
           <Row style={{ gap: 18, mainAxisAlignment: "spaceBetween",
             crossAxisAlignment: "center" }}>
@@ -601,6 +595,15 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
                 color: rgba(0.48, 0.84, 1) }} />
             </Column>
             <Slider value={level} onChange={setLevel} width={360} step={0.05} />
+          </Row>
+          <Row style={{ gap: 18, mainAxisAlignment: "spaceBetween",
+            crossAxisAlignment: "center" }}>
+            <Column style={{ gap: 4, flexGrow: 1 }}>
+              <Text value="NUMERIC STEPPER" style={{ fontSize: 20, fontWeight: "semibold" }} />
+              <Text value="POINTER + ARROW KEYS" style={{ fontSize: 18,
+                color: rgba(0.56, 0.66, 0.80) }} />
+            </Column>
+            <Stepper value={quantity} onChange={setQuantity} minimum={0} maximum={12} />
           </Row>
         </Column>
         <Column style={{ padding: all(18), gap: 14, cornerRadius: 14,
