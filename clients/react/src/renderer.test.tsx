@@ -81,6 +81,19 @@ test("React Image exposes a native nine-slice draw", () => {
   assert.equal(frame.readFloatLE(120), 12);
 });
 
+test("React Image selects one sprite-sheet source region", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Image textureId={9} sourceWidth={256} sourceHeight={64}
+    sourceRect={{ x: 128, y: 0, width: 64, height: 64 }} fit="fill"
+    style={{ preferredSize: { width: 64, height: 64 } }} />);
+  surface.resize({ width: 64, height: 64 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 6);
+  assert.equal(frame.readFloatLE(72), 0.5);
+  assert.equal(frame.readFloatLE(80), 0.75);
+});
+
 test("React Path uploads canonical curves once and emits DrawPath instead of triangles", () => {
   let uploads = 0;
   let frame: Buffer | undefined;

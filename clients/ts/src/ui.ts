@@ -42,6 +42,7 @@ export interface ImagePaint {
   readonly textureId: number;
   readonly tint?: Color;
   readonly sourceSize?: Size;
+  readonly sourceRect?: Rect;
   readonly fit?: "fill" | "contain" | "cover";
   readonly alignX?: "start" | "center" | "end";
   readonly alignY?: "start" | "center" | "end";
@@ -1109,12 +1110,27 @@ function normalizedRect(r: Rect, viewport: Size): ClipRect {
 function imageGeometry(bounds: Rect, image: ImagePaint): {
   destination: Rect; uv: ClipRect;
 } {
-  const uv: ClipRect = { left: 0, top: 0, right: 1, bottom: 1 };
-  if (!image.sourceSize || !image.fit || image.fit === "fill" ||
-      image.sourceSize.width <= 0 || image.sourceSize.height <= 0) {
+  let uv: ClipRect = { left: 0, top: 0, right: 1, bottom: 1 };
+  let sourceSize = image.sourceSize;
+  if (image.sourceRect) {
+    if (!sourceSize || sourceSize.width <= 0 || sourceSize.height <= 0 ||
+        image.sourceRect.x < 0 || image.sourceRect.y < 0 ||
+        image.sourceRect.width <= 0 || image.sourceRect.height <= 0 ||
+        image.sourceRect.x + image.sourceRect.width > sourceSize.width ||
+        image.sourceRect.y + image.sourceRect.height > sourceSize.height) {
+      return { destination: { ...bounds, width: 0, height: 0 }, uv };
+    }
+    uv = { left: image.sourceRect.x / sourceSize.width,
+      top: image.sourceRect.y / sourceSize.height,
+      right: (image.sourceRect.x + image.sourceRect.width) / sourceSize.width,
+      bottom: (image.sourceRect.y + image.sourceRect.height) / sourceSize.height };
+    sourceSize = { width: image.sourceRect.width, height: image.sourceRect.height };
+  }
+  if (!sourceSize || !image.fit || image.fit === "fill" ||
+      !sourceSize || sourceSize.width <= 0 || sourceSize.height <= 0) {
     return { destination: bounds, uv };
   }
-  const sourceAspect = image.sourceSize.width / image.sourceSize.height;
+  const sourceAspect = sourceSize.width / sourceSize.height;
   const destinationAspect = bounds.width / bounds.height;
   const alignment = (value: "start" | "center" | "end" | undefined) =>
     value === "start" ? 0 : value === "end" ? 1 : 0.5;
@@ -1129,12 +1145,14 @@ function imageGeometry(bounds: Rect, image: ImagePaint): {
   }
   if (sourceAspect > destinationAspect) {
     const visible = destinationAspect / sourceAspect;
-    const left = (1 - visible) * alignX;
-    return { destination: bounds, uv: { ...uv, left, right: left + visible } };
+    const width = uv.right - uv.left;
+    const left = uv.left + width * (1 - visible) * alignX;
+    return { destination: bounds, uv: { ...uv, left, right: left + width * visible } };
   }
   const visible = sourceAspect / destinationAspect;
-  const top = (1 - visible) * alignY;
-  return { destination: bounds, uv: { ...uv, top, bottom: top + visible } };
+  const height = uv.bottom - uv.top;
+  const top = uv.top + height * (1 - visible) * alignY;
+  return { destination: bounds, uv: { ...uv, top, bottom: top + height * visible } };
 }
 
 function paintImage(encoder: FrameEncoder, bounds: Rect, image: ImagePaint | undefined,
@@ -1166,6 +1184,7 @@ function paintImage(encoder: FrameEncoder, bounds: Rect, image: ImagePaint | und
     return;
   }
   const geometry = imageGeometry(bounds, image);
+  if (geometry.destination.width <= 0 || geometry.destination.height <= 0) return;
   if (cornerRadius > 0 || image.sampling === "nearest") {
     encoder.imageSurface(image.textureId, normalizedRect(geometry.destination, viewport), geometry.uv,
       image.tint, cornerRadius, image.sampling ?? "linear");

@@ -49,6 +49,10 @@ destination border insets. The backend collapses opposing borders proportionally
 for undersized destinations and submits all nine patches in one draw. Support is
 advertised by `nineSliceImages`.
 
+The UI image layer also accepts a bounded pixel-space source rectangle. It
+normalizes the selected atlas frame into the existing `DrawImage` UV fields;
+frame changes therefore need neither a new resource nor a new protocol opcode.
+
 ## SVG and vector paths
 
 SVG remains a frontend document format. The TypeScript or VM runtime parses it

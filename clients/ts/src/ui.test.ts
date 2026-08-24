@@ -491,6 +491,22 @@ test("image fitting honors edge alignment for letterboxing and cropping", () => 
   assert.equal(covered.readFloatLE(56), 1);
 });
 
+test("source-region cover crops inside the selected atlas frame", () => {
+  class Sprite extends Component { build(): Element { return box({
+    preferredSize: { width: 100, height: 100 }, backgroundImage: {
+      textureId: 4, sourceSize: { width: 400, height: 200 },
+      sourceRect: { x: 100, y: 50, width: 100, height: 50 },
+      fit: "cover", alignX: "end" } }); } }
+  const host = new ComponentHost(); host.rebuild(new Sprite()); host.layout({ width: 100, height: 100 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 100 });
+  encoder.endFrame(); const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 6);
+  assert.equal(frame.readFloatLE(48), 0.375);
+  assert.equal(frame.readFloatLE(56), 0.5);
+  assert.equal(frame.readFloatLE(52), 0.25);
+  assert.equal(frame.readFloatLE(60), 0.5);
+});
+
 test("image tiles lower size and animated phase to one server draw", () => {
   class TiledImage extends Component {
     build(): Element {

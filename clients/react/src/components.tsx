@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Key, KeyModifier, type Color,
   type PathConicGradientPaint, type PathRadialGradientPaint,
   type PathTexturePaint } from "@mgfx/demo-client/protocol";
-import { nativeTextAdvance, type Insets, type MeshData, type PathData, type Point, type Style,
+import { nativeTextAdvance, type Insets, type MeshData, type PathData, type Point, type Rect, type Style,
   type RichTextSpan, type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
 import { canonicalPath } from "./vector-path.js";
@@ -25,10 +25,11 @@ export const Stack = ({ children, style }: LayoutProps) =>
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
 export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling,
-  tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY, nineSlice }: {
+  sourceRect, tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY, nineSlice }: {
   readonly textureId: number; readonly style?: Style;
   readonly sourceWidth?: number; readonly sourceHeight?: number;
   readonly fit?: "fill" | "contain" | "cover";
+  readonly sourceRect?: Rect;
   readonly alignX?: "start" | "center" | "end";
   readonly alignY?: "start" | "center" | "end";
   readonly sampling?: "linear" | "nearest";
@@ -41,6 +42,7 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX
   ...(sourceWidth !== undefined && sourceHeight !== undefined
     ? { sourceSize: { width: sourceWidth, height: sourceHeight } } : {}),
   ...(fit ? { fit } : {}),
+  ...(sourceRect ? { sourceRect } : {}),
   ...(alignX ? { alignX } : {}),
   ...(alignY ? { alignY } : {}),
   ...(sampling ? { sampling } : {}),
