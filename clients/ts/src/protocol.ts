@@ -109,6 +109,7 @@ export const ExtendedServerCapability = {
   StyledRichTextRuns: 1n << 59n,
   GradientNativeText: 1n << 60n,
   ShapedTextGradientBounds: 1n << 61n,
+  RadialGradientNativeText: 1n << 62n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -271,6 +272,7 @@ export interface PathRadialGradientPaint {
   readonly spread?: "pad" | "repeat" | "reflect";
   readonly focal?: { readonly x: number; readonly y: number };
   readonly focalRadius?: number;
+  readonly coordinateSpace?: "objectBoundingBox";
 }
 
 export interface PathConicGradientPaint {
@@ -1301,6 +1303,47 @@ export class FrameEncoder {
       stop.color.blue, stop.color.alpha].forEach((value, component) =>
         payload.writeFloatLE(value, 48 + index * 20 + component * 4)));
     utf8.copy(payload, 48 + stops.length * 20); this.command(43, payload);
+  }
+
+  radialGradientSystemText(text: string, left: number, top: number, fontSize: number,
+    gradient: PathRadialGradientPaint, family: FontFamily = "system",
+    weight: FontWeight = "regular", style: FontStyle = "regular", letterSpacing = 0,
+    decoration: TextDecoration = TextDecoration.None, fontResourceId = 0,
+    anchor: "start" | "middle" | "end" = "start",
+    baseline: "top" | "alphabetic" = "top"): void {
+    const utf8 = Buffer.from(text, "utf8");
+    const stops = gradient.stops ?? [{ offset: 0, color: gradient.innerColor },
+      { offset: 1, color: gradient.outerColor }];
+    const focal = gradient.focal ?? gradient.center;
+    const values = [left, top, fontSize, letterSpacing, gradient.center.x, gradient.center.y,
+      gradient.axisX.x, gradient.axisX.y, gradient.axisY.x, gradient.axisY.y, focal.x, focal.y,
+      gradient.focalRadius ?? 0, ...stops.flatMap((stop) => [stop.offset, stop.color.red,
+        stop.color.green, stop.color.blue, stop.color.alpha])];
+    const determinant = gradient.axisX.x * gradient.axisY.y - gradient.axisX.y * gradient.axisY.x;
+    if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0) ||
+        values.some((value) => !Number.isFinite(value)) || fontSize <= 0 || Math.abs(letterSpacing) > 10 ||
+        Math.abs(determinant) <= 0.000001 || stops.length < 2 || stops.length > 8 ||
+        stops.some((stop, index) => stop.offset < 0 || stop.offset > 1 ||
+          index > 0 && stop.offset < stops[index - 1]!.offset) ||
+        (gradient.focalRadius ?? 0) < 0 || (gradient.focalRadius ?? 0) >= 1)
+      throw new RangeError("Radial-gradient system text values are outside supported bounds");
+    const payload = Buffer.alloc(68 + stops.length * 20 + utf8.length);
+    payload.writeUInt8(fontFamilyCode(family), 0); payload.writeUInt8(fontWeightCode(weight), 1);
+    payload.writeUInt8(style === "italic" ? 1 : 0, 2); payload.writeUInt8(decoration, 3);
+    [left, top, fontSize, letterSpacing].forEach((value, index) => payload.writeFloatLE(value, 4 + index * 4));
+    payload.writeUInt32LE(fontResourceId, 20);
+    payload.writeUInt8(anchor === "middle" ? 1 : anchor === "end" ? 2 : 0, 24);
+    payload.writeUInt8(baseline === "alphabetic" ? 1 : 0, 25);
+    [gradient.center.x, gradient.center.y, gradient.axisX.x, gradient.axisX.y,
+      gradient.axisY.x, gradient.axisY.y, focal.x, focal.y, gradient.focalRadius ?? 0]
+      .forEach((value, index) => payload.writeFloatLE(value, 28 + index * 4));
+    payload.writeUInt8(stops.length, 64);
+    payload.writeUInt8(gradient.spread === "repeat" ? 1 : gradient.spread === "reflect" ? 2 : 0, 65);
+    payload.writeUInt8(gradient.coordinateSpace === "objectBoundingBox" ? 1 : 0, 66);
+    stops.forEach((stop, index) => [stop.offset, stop.color.red, stop.color.green,
+      stop.color.blue, stop.color.alpha].forEach((value, component) =>
+        payload.writeFloatLE(value, 68 + index * 20 + component * 4)));
+    utf8.copy(payload, 68 + stops.length * 20); this.command(44, payload);
   }
 
   endFrame(): void {

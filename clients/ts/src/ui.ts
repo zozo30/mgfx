@@ -288,6 +288,7 @@ export interface VectorTextData {
   readonly weight?: TextStyle["fontWeight"]; readonly fontStyle?: TextStyle["fontStyle"];
   readonly letterSpacing?: number; readonly decoration?: TextDecoration;
   readonly fillGradient?: PathGradientPaint;
+  readonly fillRadialGradient?: PathRadialGradientPaint;
   readonly strokeColor?: Color; readonly strokeWidth?: number;
   readonly anchor?: "start" | "middle" | "end";
   readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
@@ -924,7 +925,7 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
 function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextData | undefined,
   viewport: Size): void {
   if (!text || !text.value || text.fontSize <= 0 ||
-      (!text.fillGradient && text.color.alpha <= 0 &&
+      (!text.fillGradient && !text.fillRadialGradient && text.color.alpha <= 0 &&
         !(text.strokeColor && (text.strokeWidth ?? 0) > 0)) ||
       text.viewBox.width <= 0 || text.viewBox.height <= 0) return;
   const sourceAspect = text.viewBox.width / text.viewBox.height;
@@ -970,13 +971,26 @@ function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextDa
   const fontSize = text.fontSize / text.viewBox.height * destination.height;
   const args = [text.value, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
     fontSize / viewport.height * 2] as const;
-  if (text.fillGradient) {
-    const mapPoint = (point: Point) => ({
+  const mapPoint = (point: Point) => ({
       x: (destination.x + (point.x - text.viewBox.x) / text.viewBox.width * destination.width) /
         viewport.width * 2 - 1,
       y: 1 - (destination.y + (point.y - text.viewBox.y) / text.viewBox.height *
         destination.height) / viewport.height * 2,
     });
+  if (text.fillRadialGradient) {
+    const gradient = text.fillRadialGradient;
+    const objectBoundingBox = gradient.coordinateSpace === "objectBoundingBox";
+    const center = objectBoundingBox ? gradient.center : mapPoint(gradient.center);
+    const mapVector = (vector: Point) => objectBoundingBox ? vector : (() => {
+      const edge = mapPoint({ x: gradient.center.x + vector.x, y: gradient.center.y + vector.y });
+      return { x: edge.x - center.x, y: edge.y - center.y };
+    })();
+    encoder.radialGradientSystemText(...args, { ...gradient, center,
+      axisX: mapVector(gradient.axisX), axisY: mapVector(gradient.axisY),
+      ...(gradient.focal ? { focal: objectBoundingBox ? gradient.focal : mapPoint(gradient.focal) } : {}) },
+      text.family, text.weight, text.fontStyle, text.letterSpacing ?? 0,
+      text.decoration ?? TextDecoration.None, 0, text.anchor ?? "start", "alphabetic");
+  } else if (text.fillGradient) {
     const objectBoundingBox = text.fillGradient.coordinateSpace === "objectBoundingBox";
     encoder.gradientSystemText(...args, { ...text.fillGradient,
       start: objectBoundingBox ? text.fillGradient.start : mapPoint(text.fillGradient.start),

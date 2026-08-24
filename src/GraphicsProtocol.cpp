@@ -699,6 +699,37 @@ void CommandEncoder::drawGradientText(const GradientTextCommand& value) {
     bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
 }
 
+void CommandEncoder::drawRadialGradientText(const RadialGradientTextCommand& value) {
+    const TextCommand& text = value.text;
+    std::vector<PathGradient::Stop> stops = value.gradient.stops;
+    if (stops.empty()) stops = {{0.0F, value.gradient.innerColor},
+                                {1.0F, value.gradient.outerColor}};
+    if (stops.size() < 2 || stops.size() > 8 || text.text.empty() || text.text.size() > 65536)
+        throw std::length_error("Radial-gradient text requires text and 2 through 8 stops");
+    const std::size_t headerSize = 68 + stops.size() * 20;
+    beginCommand(Opcode::drawRadialGradientText,
+                 static_cast<std::uint32_t>(headerSize + text.text.size()));
+    bytes_.push_back(static_cast<std::uint8_t>(text.family));
+    bytes_.push_back(static_cast<std::uint8_t>(text.weight));
+    bytes_.push_back(static_cast<std::uint8_t>(text.style)); bytes_.push_back(text.decoration);
+    for (float number : {text.left, text.top, text.fontSize, text.letterSpacing})
+        appendFloat(bytes_, number);
+    appendU32(bytes_, text.fontResourceId);
+    bytes_.push_back(static_cast<std::uint8_t>(text.anchor));
+    bytes_.push_back(static_cast<std::uint8_t>(text.baseline)); appendU16(bytes_, 0);
+    for (float number : {value.gradient.centerX, value.gradient.centerY,
+        value.gradient.axisXX, value.gradient.axisXY, value.gradient.axisYX,
+        value.gradient.axisYY, value.gradient.focalX, value.gradient.focalY,
+        value.gradient.focalRadius}) appendFloat(bytes_, number);
+    bytes_.push_back(static_cast<std::uint8_t>(stops.size()));
+    bytes_.push_back(static_cast<std::uint8_t>(value.gradient.spread));
+    bytes_.push_back(value.objectBoundingBox ? 1U : 0U); bytes_.push_back(0);
+    for (const PathGradient::Stop& stop : stops)
+        for (float number : {stop.offset, stop.color.red, stop.color.green,
+                             stop.color.blue, stop.color.alpha}) appendFloat(bytes_, number);
+    bytes_.insert(bytes_.end(), text.text.begin(), text.text.end());
+}
+
 void CommandEncoder::drawRichText(const RichTextCommand& text) {
     const bool placed = text.anchor != TextAnchor::start || text.baseline != TextBaseline::top;
     const bool scaledRuns = std::any_of(text.runs.begin(), text.runs.end(), [](const RichTextRun& run) {
@@ -1605,6 +1636,59 @@ bool decodeGradientText(const CommandView& command, GradientTextCommand& value) 
         std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10.0F &&
         std::isfinite(value.gradient.startX) && std::isfinite(value.gradient.startY) &&
         std::isfinite(value.gradient.endX) && std::isfinite(value.gradient.endY) &&
+        text.text.find('\0') == std::string::npos;
+}
+
+bool decodeRadialGradientText(const CommandView& command, RadialGradientTextCommand& value) {
+    constexpr std::size_t baseHeaderSize = 68;
+    if (command.opcode != Opcode::drawRadialGradientText || command.payloadSize <= baseHeaderSize ||
+        command.payload[0] > static_cast<std::uint8_t>(FontFamily::systemRounded) ||
+        command.payload[1] > static_cast<std::uint8_t>(FontWeight::semibold) ||
+        command.payload[2] > static_cast<std::uint8_t>(FontStyle::italic) ||
+        command.payload[3] > (underlineText | strikeThroughText) || command.payload[24] > 2 ||
+        command.payload[25] > 1 || command.payload[26] != 0 || command.payload[27] != 0 ||
+        command.payload[64] < 2 || command.payload[64] > 8 || command.payload[65] > 2 ||
+        command.payload[66] > 1 || command.payload[67] != 0) return false;
+    const std::size_t stopCount = command.payload[64];
+    const std::size_t headerSize = baseHeaderSize + stopCount * 20;
+    if (command.payloadSize <= headerSize || command.payloadSize > headerSize + 65536) return false;
+    TextCommand& text = value.text;
+    text.family = static_cast<FontFamily>(command.payload[0]);
+    text.weight = static_cast<FontWeight>(command.payload[1]);
+    text.style = static_cast<FontStyle>(command.payload[2]); text.decoration = command.payload[3];
+    text.left = readFloat(command.payload + 4); text.top = readFloat(command.payload + 8);
+    text.fontSize = readFloat(command.payload + 12); text.letterSpacing = readFloat(command.payload + 16);
+    text.fontResourceId = readU32(command.payload + 20);
+    text.anchor = static_cast<TextAnchor>(command.payload[24]);
+    text.baseline = static_cast<TextBaseline>(command.payload[25]);
+    auto& gradient = value.gradient;
+    gradient.centerX = readFloat(command.payload + 28); gradient.centerY = readFloat(command.payload + 32);
+    gradient.axisXX = readFloat(command.payload + 36); gradient.axisXY = readFloat(command.payload + 40);
+    gradient.axisYX = readFloat(command.payload + 44); gradient.axisYY = readFloat(command.payload + 48);
+    gradient.focalX = readFloat(command.payload + 52); gradient.focalY = readFloat(command.payload + 56);
+    gradient.focalRadius = readFloat(command.payload + 60); gradient.hasFocalPoint = true;
+    gradient.spread = static_cast<PathGradient::Spread>(command.payload[65]);
+    value.objectBoundingBox = command.payload[66] == 1;
+    gradient.stops.clear(); gradient.stops.reserve(stopCount);
+    float previous = -1.0F;
+    for (std::size_t index = 0; index < stopCount; ++index) {
+        const std::uint8_t* bytes = command.payload + baseHeaderSize + index * 20;
+        PathGradient::Stop stop{readFloat(bytes), {readFloat(bytes + 4), readFloat(bytes + 8),
+            readFloat(bytes + 12), readFloat(bytes + 16)}};
+        if (!std::isfinite(stop.offset) || stop.offset < previous || stop.offset < 0 || stop.offset > 1 ||
+            !std::isfinite(stop.color.red) || !std::isfinite(stop.color.green) ||
+            !std::isfinite(stop.color.blue) || !std::isfinite(stop.color.alpha)) return false;
+        previous = stop.offset; gradient.stops.push_back(stop);
+    }
+    gradient.innerColor = gradient.stops.front().color; gradient.outerColor = gradient.stops.back().color;
+    text.text.assign(reinterpret_cast<const char*>(command.payload + headerSize), command.payloadSize - headerSize);
+    const float determinant = gradient.axisXX * gradient.axisYY - gradient.axisXY * gradient.axisYX;
+    return std::isfinite(text.left) && std::isfinite(text.top) && std::isfinite(text.fontSize) && text.fontSize > 0 &&
+        std::isfinite(text.letterSpacing) && std::fabs(text.letterSpacing) <= 10 &&
+        std::isfinite(gradient.centerX) && std::isfinite(gradient.centerY) &&
+        std::isfinite(determinant) && std::fabs(determinant) > 0.000001F &&
+        std::isfinite(gradient.focalX) && std::isfinite(gradient.focalY) &&
+        std::isfinite(gradient.focalRadius) && gradient.focalRadius >= 0 && gradient.focalRadius < 1 &&
         text.text.find('\0') == std::string::npos;
 }
 

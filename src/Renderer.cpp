@@ -1759,15 +1759,20 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 path.strokeTexture ? &path.texturePaint : nullptr);
         } else if (command.opcode == gfx::Opcode::drawText ||
                    command.opcode == gfx::Opcode::drawStyledText ||
-                   command.opcode == gfx::Opcode::drawGradientText) {
+                   command.opcode == gfx::Opcode::drawGradientText ||
+                   command.opcode == gfx::Opcode::drawRadialGradientText) {
             gfx::TextCommand text{};
             gfx::GradientTextCommand gradientText{};
+            gfx::RadialGradientTextCommand radialText{};
             const bool gradientFill = command.opcode == gfx::Opcode::drawGradientText;
+            const bool radialFill = command.opcode == gfx::Opcode::drawRadialGradientText;
             const bool decoded = command.opcode == gfx::Opcode::drawText
                 ? gfx::decodeText(command, text) : command.opcode == gfx::Opcode::drawStyledText
                     ? gfx::decodeStyledText(command, text)
-                    : gfx::decodeGradientText(command, gradientText);
+                    : gradientFill ? gfx::decodeGradientText(command, gradientText)
+                    : gfx::decodeRadialGradientText(command, radialText);
             if (gradientFill) text = gradientText.text;
+            if (radialFill) text = radialText.text;
             if (!decoded || !std::isfinite(text.left) ||
                 !std::isfinite(text.top) || !std::isfinite(text.fontSize) ||
                 text.fontSize <= 0.0F) {
@@ -1849,22 +1854,57 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 resolvedGradient.startX = start[0]; resolvedGradient.startY = start[1];
                 resolvedGradient.endX = end[0]; resolvedGradient.endY = end[1];
             }
+            gfx::PathCommand::RadialGradient resolvedRadial = radialText.gradient;
+            if (radialFill && radialText.objectBoundingBox) {
+                float minX = std::numeric_limits<float>::infinity(), minY = minX;
+                float maxX = -minX, maxY = -minX;
+                for (const gfx::PathPoint& point : shaped.triangles) {
+                    const float x = textLeft + point[0] * text.fontSize * aspect;
+                    const float y = textTop - point[1] * text.fontSize;
+                    minX = std::min(minX, x); minY = std::min(minY, y);
+                    maxX = std::max(maxX, x); maxY = std::max(maxY, y);
+                }
+                const float width = maxX - minX, height = maxY - minY;
+                resolvedRadial.centerX = minX + resolvedRadial.centerX * width;
+                resolvedRadial.centerY = minY + resolvedRadial.centerY * height;
+                resolvedRadial.focalX = minX + resolvedRadial.focalX * width;
+                resolvedRadial.focalY = minY + resolvedRadial.focalY * height;
+                resolvedRadial.axisXX *= width; resolvedRadial.axisXY *= height;
+                resolvedRadial.axisYX *= width; resolvedRadial.axisYY *= height;
+            }
             struct GradientTextVertex { std::array<float, 2> position, source; };
-            if (gradientFill) {
+            if (gradientFill || radialFill) {
                 struct GradientTextUniforms {
                     std::array<float, 2> center, axisX, axisY, focal;
                     float radiusOrRotation = 0.0F;
-                    std::uint32_t stopCount = 0, spread = 0, mode = 2;
+                    std::uint32_t stopCount = 0, spread = 0, mode = 0;
                     std::array<std::array<float, 4>, 2> offsets{};
                     std::array<std::array<float, 4>, 8> colors{};
                 } uniforms{};
-                uniforms.center = {resolvedGradient.startX, resolvedGradient.startY};
-                uniforms.axisX = {resolvedGradient.endX - resolvedGradient.startX,
-                                  resolvedGradient.endY - resolvedGradient.startY};
-                uniforms.stopCount = static_cast<std::uint32_t>(resolvedGradient.stops.size());
-                uniforms.spread = static_cast<std::uint32_t>(resolvedGradient.spread);
-                for (std::size_t index = 0; index < resolvedGradient.stops.size(); ++index) {
-                    const gfx::PathGradient::Stop& stop = resolvedGradient.stops[index];
+                const auto& stops = gradientFill ? resolvedGradient.stops : resolvedRadial.stops;
+                if (gradientFill) {
+                    uniforms.center = {resolvedGradient.startX, resolvedGradient.startY};
+                    uniforms.axisX = {resolvedGradient.endX - resolvedGradient.startX,
+                                      resolvedGradient.endY - resolvedGradient.startY};
+                    uniforms.spread = static_cast<std::uint32_t>(resolvedGradient.spread);
+                    uniforms.mode = 2;
+                } else {
+                    uniforms.center = {resolvedRadial.centerX, resolvedRadial.centerY};
+                    uniforms.axisX = {resolvedRadial.axisXX, resolvedRadial.axisXY};
+                    uniforms.axisY = {resolvedRadial.axisYX, resolvedRadial.axisYY};
+                    const float determinant = resolvedRadial.axisXX * resolvedRadial.axisYY -
+                                              resolvedRadial.axisXY * resolvedRadial.axisYX;
+                    const float focalX = resolvedRadial.focalX - resolvedRadial.centerX;
+                    const float focalY = resolvedRadial.focalY - resolvedRadial.centerY;
+                    uniforms.focal = {
+                        (focalX * resolvedRadial.axisYY - focalY * resolvedRadial.axisYX) / determinant,
+                        (resolvedRadial.axisXX * focalY - resolvedRadial.axisXY * focalX) / determinant};
+                    uniforms.radiusOrRotation = resolvedRadial.focalRadius;
+                    uniforms.spread = static_cast<std::uint32_t>(resolvedRadial.spread);
+                }
+                uniforms.stopCount = static_cast<std::uint32_t>(stops.size());
+                for (std::size_t index = 0; index < stops.size(); ++index) {
+                    const gfx::PathGradient::Stop& stop = stops[index];
                     uniforms.offsets[index / 4U][index % 4U] = stop.offset;
                     uniforms.colors[index] = {stop.color.red, stop.color.green, stop.color.blue,
                                               stop.color.alpha * opacityStack.back()};
@@ -1878,7 +1918,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                                 const gfx::Color& paint) {
                 for (std::size_t first = 0; first < points.size();) {
                     const std::size_t count = std::min(maxVertices, points.size() - first);
-                    if (gradientFill) {
+                    if (gradientFill || radialFill) {
                         std::vector<GradientTextVertex> vertices; vertices.reserve(count);
                         for (std::size_t index = 0; index < count; ++index) {
                             const gfx::PathPoint& point = points[first + index];

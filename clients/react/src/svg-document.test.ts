@@ -309,6 +309,20 @@ test("SVG user-space linear-gradient text remains server-shaped", () => {
   assert.deepEqual(bounded.layers[0]?.text?.fillGradient?.end, { x: 1, y: 0 });
 });
 
+test("SVG radial-gradient text preserves native focal paint and shaped bounds", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 40"><defs>
+    <radialGradient id="r" fx="35%" fy="30%" fr="5%" spreadMethod="reflect">
+      <stop stop-color="#ffffff"/><stop offset="0.5" stop-color="#58e6b5"/>
+      <stop offset="1" stop-color="#1674ff"/></radialGradient></defs>
+    <text x="50" y="28" text-anchor="middle" font-size="20" fill="url(#r)">RADIAL</text></svg>`);
+  const gradient = document.layers[0]?.text?.fillRadialGradient;
+  assert.equal(gradient?.coordinateSpace, "objectBoundingBox");
+  assert.deepEqual(gradient?.center, { x: 0.5, y: 0.5 });
+  assert.deepEqual(gradient?.axisX, { x: 0.5, y: 0 });
+  assert.equal(gradient?.focalRadius, 0.1);
+  assert.equal(gradient?.stops?.length, 3);
+});
+
 test("SVG tspans lower independent solid outlines to styled rich-text runs", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 120 30">
     <text x="60" y="22" text-anchor="middle" font-size="16" fill="#d8fff0">

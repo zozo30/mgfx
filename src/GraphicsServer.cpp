@@ -391,7 +391,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::styledNativeText |
             mgfx::ipc::ServerCapability::styledRichTextRuns |
             mgfx::ipc::ServerCapability::gradientNativeText |
-            mgfx::ipc::ServerCapability::shapedTextGradientBounds;
+            mgfx::ipc::ServerCapability::shapedTextGradientBounds |
+            mgfx::ipc::ServerCapability::radialGradientNativeText;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

@@ -260,6 +260,9 @@ records begin at byte 48 and the UTF-8 follows.
 Capability bit 60 advertises native gradient text.
 Byte 46 may be `1` to interpret endpoints in the shaped contour's object-bounding-box
 space; byte 47 remains zero. Capability bit 61 advertises server-shaped gradient bounds.
+MGFX opcode `44` (`DrawRadialGradientText`) carries the same semantic text prefix,
+then center, two affine radius axes, focal point/radius, 2–8 stops, spread, and a
+user-space/object-bounds flag. Capability bit 62 advertises native radial text paint.
 
 MGFX opcode `25` (`DrawLinearGradientCircle`) carries a destination rectangle,
 horizontal/vertical/diagonal direction, and two straight-alpha colors. Backends

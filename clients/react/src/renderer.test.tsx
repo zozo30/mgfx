@@ -261,6 +261,19 @@ test("React Svg defers default text-gradient bounds to native shaping", () => {
   assert.equal(frame.readUInt8(40 + 8 + 46), 1);
 });
 
+test("React Svg emits radial-gradient text as one native semantic command", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Svg source={`<svg viewBox="0 0 100 40"><defs><radialGradient id="r">
+    <stop stop-color="#ffffff"/><stop offset="1" stop-color="#1674ff"/>
+    </radialGradient></defs><text x="50" y="28" font-size="20"
+    fill="url(#r)">RADIAL</text></svg>`} style={{ preferredSize: { width: 200, height: 80 } }} />);
+  surface.resize({ width: 200, height: 80 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 44);
+  assert.equal(frame.readUInt8(40 + 8 + 66), 1);
+});
+
 test("React Svg emits independently outlined tspans as styled rich text", () => {
   let frame: Buffer | undefined;
   const surface = new ReactSurface((value) => { frame = value; });

@@ -207,6 +207,14 @@ int main() {
          {1.0F, {0.1F, 0.8F, 1.0F, 1.0F}}}, gfx::PathGradient::Spread::reflect};
     gradientText.objectBoundingBox = true;
     encoder.drawGradientText(gradientText);
+    gfx::RadialGradientTextCommand radialText{};
+    radialText.text = gradientText.text; radialText.text.text = "RADIAL";
+    radialText.gradient = {0.5F, 0.5F, 0.5F, 0.0F, 0.0F, 0.5F,
+        {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.4F, 1.0F, 1.0F},
+        {{0.0F, {1.0F, 1.0F, 1.0F, 1.0F}}, {1.0F, {0.1F, 0.4F, 1.0F, 1.0F}}},
+        gfx::PathGradient::Spread::reflect, true, 0.4F, 0.35F, 0.1F};
+    radialText.objectBoundingBox = true;
+    encoder.drawRadialGradientText(radialText);
     gfx::RichTextCommand richSource{-0.7F, 0.5F, 0.07F, {
         {gfx::FontFamily::systemSans, gfx::FontWeight::bold, gfx::FontStyle::regular,
          0.0F, gfx::noTextDecoration, 0, {1.0F, 0.4F, 0.2F, 1.0F}, "Rich "},
@@ -484,6 +492,13 @@ int main() {
         !gradientDecoded.objectBoundingBox ||
         !nearlyEqual(gradientDecoded.gradient.stops[1].offset, 0.5F) || !decoder.next(command)) {
         return fail("Gradient text decoding failed");
+    }
+    gfx::RadialGradientTextCommand radialDecoded{};
+    if (!gfx::decodeRadialGradientText(command, radialDecoded) ||
+        radialDecoded.text.text != "RADIAL" || !radialDecoded.objectBoundingBox ||
+        radialDecoded.gradient.stops.size() != 2 ||
+        !nearlyEqual(radialDecoded.gradient.focalRadius, 0.1F) || !decoder.next(command)) {
+        return fail("Radial-gradient text decoding failed");
     }
     gfx::RichTextCommand rich{};
     if (!gfx::decodeRichText(command, rich) || rich.runs.size() != 2 ||

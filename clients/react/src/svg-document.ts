@@ -16,6 +16,7 @@ export interface SvgVectorLayer {
     readonly fontStyle?: "regular" | "italic";
     readonly letterSpacing?: number; readonly decoration?: TextDecoration;
     readonly fillGradient?: LinearGradientPaint;
+    readonly fillRadialGradient?: RadialGradientPaint;
     readonly strokeColor?: Color; readonly strokeWidth?: number;
     readonly anchor?: "start" | "middle" | "end";
     readonly sourceTransform?: Matrix };
@@ -63,6 +64,7 @@ export interface RadialGradientPaint {
   readonly spread?: "pad" | "repeat" | "reflect";
   readonly focal?: { readonly x: number; readonly y: number };
   readonly focalRadius?: number;
+  readonly coordinateSpace?: "objectBoundingBox";
 }
 
 export interface SvgVectorDocument {
@@ -410,13 +412,17 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const commonLayer = { ...(state.clip ? { clip: state.clip } : {}), strokeWidth: 0,
         fillRule: state.fillRule, lineCap: state.lineCap, lineJoin: state.lineJoin } as const;
       if (!hasSpans) {
-        const fillGradient = state.fillGradientId
+        const fillRadialGradient = state.fillGradientId && radialGradients.has(state.fillGradientId)
+          ? resolveTextRadialGradient(radialGradients, state.fillGradientId, state, viewBox,
+              state.fillOpacity) : undefined;
+        const fillGradient = state.fillGradientId && !fillRadialGradient
           ? resolveTextGradient(gradients, state.fillGradientId, state, viewBox, state.fillOpacity)
           : undefined;
         layers.push({ ...commonLayer, text: { ...placement, value,
           color: state.fill ? multiplyAlpha(state.fill, state.opacity * state.fillOpacity)
             : { red: 0, green: 0, blue: 0, alpha: 0 },
           ...(fillGradient ? { fillGradient } : {}),
+          ...(fillRadialGradient ? { fillRadialGradient } : {}),
           family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
           ...(state.textDecoration !== TextDecoration.None
             ? { decoration: state.textDecoration } : {}),
@@ -1013,6 +1019,52 @@ function resolveTextGradient(definitions: ReadonlyMap<string, GradientDefinition
   return { start, end, startColor: stops[0]!.color, endColor: stops[stops.length - 1]!.color,
     ...(stops.length > 2 ? { stops } : {}),
     ...(definition.spread !== "pad" ? { spread: definition.spread } : {}),
+    ...(objectBoundingBox ? { coordinateSpace: "objectBoundingBox" as const } : {}) };
+}
+
+function resolveTextRadialGradient(definitions: ReadonlyMap<string, RadialGradientDefinition>,
+  id: string, state: PaintState, viewBox: Rect, paintOpacity: number): RadialGradientPaint {
+  const definition = definitions.get(id);
+  if (!definition) throw new Error(`SVG radial gradient #${id} is unsupported`);
+  const objectBoundingBox = definition.units === "objectBoundingBox";
+  const cx = objectBoundingBox ? unitCoordinate(definition.cx)
+    : coordinate(definition.cx, viewBox.x, viewBox.width);
+  const cy = objectBoundingBox ? unitCoordinate(definition.cy)
+    : coordinate(definition.cy, viewBox.y, viewBox.height);
+  const radius = objectBoundingBox ? unitCoordinate(definition.radius)
+    : coordinate(definition.radius, 0, Math.min(viewBox.width, viewBox.height));
+  const focalRadius = (objectBoundingBox ? unitCoordinate(definition.focalRadius)
+    : coordinate(definition.focalRadius, 0, Math.min(viewBox.width, viewBox.height))) / radius;
+  const map = (point: { readonly x: number; readonly y: number }) =>
+    transformPoint(definition.transform, point);
+  const center = map({ x: cx, y: cy });
+  const edgeX = map({ x: cx + radius, y: cy });
+  const edgeY = map({ x: cx, y: cy + radius });
+  let focal = map({ x: objectBoundingBox ? unitCoordinate(definition.fx)
+      : coordinate(definition.fx, viewBox.x, viewBox.width),
+    y: objectBoundingBox ? unitCoordinate(definition.fy)
+      : coordinate(definition.fy, viewBox.y, viewBox.height) });
+  const axisX = { x: edgeX.x - center.x, y: edgeX.y - center.y };
+  const axisY = { x: edgeY.x - center.x, y: edgeY.y - center.y };
+  const determinant = axisX.x * axisY.y - axisX.y * axisY.x;
+  let focalX = ((focal.x - center.x) * axisY.y - (focal.y - center.y) * axisY.x) / determinant;
+  let focalY = (axisX.x * (focal.y - center.y) - axisX.y * (focal.x - center.x)) / determinant;
+  if (!Number.isFinite(focalRadius) || focalRadius < 0 || focalRadius >= 1 ||
+      !Number.isFinite(determinant) || Math.abs(determinant) <= 0.000001)
+    throw new Error(`SVG radial gradient #${id} has unsupported text geometry`);
+  const length = Math.hypot(focalX, focalY);
+  if (length + focalRadius >= 1) {
+    const scale = (0.999999 - focalRadius) / length; focalX *= scale; focalY *= scale;
+    focal = { x: center.x + axisX.x * focalX + axisY.x * focalY,
+      y: center.y + axisX.y * focalX + axisY.y * focalY };
+  }
+  const stops = definition.stops.map((stop) => ({ offset: stop.offset,
+    color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
+  return { center, axisX, axisY, innerColor: stops[0]!.color,
+    outerColor: stops[stops.length - 1]!.color,
+    ...(stops.length > 2 || stops[0]!.offset !== 0 || stops.at(-1)!.offset !== 1 ? { stops } : {}),
+    spread: definition.spread, ...(focalRadius > 0 ? { focalRadius } : {}),
+    ...(Math.hypot(focal.x - center.x, focal.y - center.y) > 0.000001 ? { focal } : {}),
     ...(objectBoundingBox ? { coordinateSpace: "objectBoundingBox" as const } : {}) };
 }
 

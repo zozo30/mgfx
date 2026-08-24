@@ -60,8 +60,10 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.StyledRichTextRuns |
     ExtendedServerCapability.GradientNativeText |
     ExtendedServerCapability.ShapedTextGradientBounds;
-  payload.writeBigUInt64LE(completeCapabilities);
-  assert.equal(decodeServerCapabilities(payload), completeCapabilities);
+  const finalCapabilities = completeCapabilities |
+    ExtendedServerCapability.RadialGradientNativeText;
+  payload.writeBigUInt64LE(finalCapabilities);
+  assert.equal(decodeServerCapabilities(payload), finalCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
 });
 
@@ -774,6 +776,23 @@ test("gradient text can defer object bounds to native shaping", () => {
   const bytes = frame.finish();
   assert.equal(bytes.readUInt16LE(16), 43);
   assert.equal(bytes.readUInt8(70), 1);
+});
+
+test("radial-gradient text carries focal paint without glyph geometry", () => {
+  const frame = new FrameEncoder();
+  frame.radialGradientSystemText("RADIAL", 0, 0, 0.1, {
+    center: { x: 0.5, y: 0.5 }, axisX: { x: 0.5, y: 0 }, axisY: { x: 0, y: 0.5 },
+    focal: { x: 0.4, y: 0.35 }, focalRadius: 0.05, coordinateSpace: "objectBoundingBox",
+    innerColor: { red: 1, green: 1, blue: 1, alpha: 1 },
+    outerColor: { red: 0, green: 0.6, blue: 1, alpha: 1 }, spread: "reflect",
+  });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 44);
+  assert.equal(bytes.readUInt8(88), 2);
+  assert.equal(bytes.readUInt8(89), 2);
+  assert.equal(bytes.readUInt8(90), 1);
+  assert.equal(bytes.subarray(132, 138).toString(), "RADIAL");
 });
 
 test("font files upload once as bounded persistent resources", () => {

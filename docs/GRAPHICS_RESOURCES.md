@@ -203,6 +203,8 @@ For SVG's default object-bounding-box units, normalized endpoints remain semanti
 until shaping completes; the server resolves them against the actual contour bounds.
 The shared native path-paint fragment shader evaluates linear projection, spread,
 and all stops per pixel; glyph tessellation density therefore does not affect paint.
+`DrawRadialGradientText` feeds the same cached contours through the native radial
+paint mode, including elliptical/affine axes, focal circles, spread, and shaped bounds.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is

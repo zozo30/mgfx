@@ -105,6 +105,8 @@ geometry. Default SVG object-bounding-box gradients are resolved against the act
 server-shaped contour bounds rather than guessed client text metrics.
 Metal evaluates stop selection and repeat/reflect mapping per fragment, so a glyph
 triangle crossing a stop boundary cannot smear colors across that boundary.
+Plain text also supports native radial SVG paint with affine axes, focal point and
+focal radius, multi-stop spread, and either user-space or server-shaped bounds.
 Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
 data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
 decode and upload once as canonical persistent textures; frames retain only
