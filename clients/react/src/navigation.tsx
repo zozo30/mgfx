@@ -11,9 +11,10 @@ export interface Navigator {
 
 const NavigationContext = createContext<Navigator | undefined>(undefined);
 
-export function Router({ initialRoute, routes }: {
+export function Router({ initialRoute, routes, children }: {
   readonly initialRoute: string;
   readonly routes: Readonly<Record<string, ReactNode>>;
+  readonly children?: ReactNode;
 }) {
   if (!(initialRoute in routes)) throw new Error(`Unknown initial route ${initialRoute}`);
   const [history, setHistory] = useState([initialRoute]);
@@ -30,7 +31,7 @@ export function Router({ initialRoute, routes }: {
     },
     back: () => setHistory((current) => current.length > 1 ? current.slice(0, -1) : current),
   }), [history.length, route, routes]);
-  return <NavigationContext value={navigator}>{routes[route]}</NavigationContext>;
+  return <NavigationContext value={navigator}>{children ?? routes[route]}</NavigationContext>;
 }
 
 export function useRouter(): Navigator {

@@ -246,15 +246,144 @@ interface AppProps {
 
 export function App(props: AppProps) {
   return <AnimationProvider clock={props.animationClock}><Router initialRoute="dashboard" routes={{
-    dashboard: <Dashboard {...props} />,
-    graphics: <GraphicsRoute {...props} />,
-  }} /></AnimationProvider>;
+    dashboard: null,
+    graphics: null,
+  }}><AppShell {...props} /></Router></AnimationProvider>;
 }
 
-function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontResourceId }: AppProps) {
+const collapsedDrawerWidth = 76;
+const expandedDrawerWidth = 248;
+const drawerAnimationDuration = 240;
+
+export function animatedDrawerWidth(from: number, to: number, startedAt: number,
+  now: number): number {
+  const progress = Math.max(0, Math.min(1, (now - startedAt) / drawerAnimationDuration));
+  const eased = 1 - Math.pow(1 - progress, 3);
+  return from + (to - from) * eased;
+}
+
+function DrawerIcon({ icon, fallback, color }: { readonly icon: VectorIcon | undefined;
+  readonly fallback: string; readonly color: ReturnType<typeof rgba> }) {
+  return <Path data={icon?.path ?? fallback}
+    viewBox={{ x: 0, y: 0, width: 24, height: 24 }} strokeColor={color}
+    strokeWidth={2.2} lineCap="round" lineJoin="round"
+    style={{ preferredSize: { width: 30, height: 30 } }} />;
+}
+
+function NavigationDrawer({ width, expanded, onToggle, icons }: {
+  readonly width: number; readonly expanded: boolean; readonly onToggle: () => void;
+  readonly icons: readonly VectorIcon[];
+}) {
+  const router = useRouter();
+  const showLabels = width >= 150;
+  const items = [
+    { route: "dashboard", label: "HOME", icon: icons.find((item) => item.name === "grid") ?? icons[3],
+      fallback: "M4 4H10V10H4ZM14 4H20V10H14ZM4 14H10V20H4ZM14 14H20V20H14Z" },
+    { route: "graphics", label: "GRAPHICS", icon: icons.find((item) => item.name === "activity") ?? icons[0],
+      fallback: "M3 12H7L10 5L14 19L17 12H21" },
+  ] as const;
+  return <Column style={{ position: "absolute", inset: { top: 100, bottom: 20, left: 20 },
+    preferredSize: { width }, zIndex: 30, padding: all(10), gap: 10, cornerRadius: 16,
+    background: rgba(0.035, 0.052, 0.085, 0.98), borderWidth: 1,
+    borderColor: rgba(0.22, 0.34, 0.56, 0.9),
+    shadow: { color: rgba(0, 0, 0, 0.42), blur: 18, spread: 1, offsetX: 4 } }}>
+    <mgfx-row onClick={onToggle} style={{ preferredSize: { height: 48 }, padding: all(9),
+      gap: 14, cornerRadius: 10, background: rgba(0.11, 0.16, 0.27),
+      crossAxisAlignment: "center", mainAxisAlignment: showLabels ? "start" : "center" }}>
+      <Path data={expanded ? "M15 5L8 12L15 19" : "M9 5L16 12L9 19"}
+        viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+        strokeColor={rgba(0.70, 0.88, 1)} strokeWidth={2.5}
+        style={{ preferredSize: { width: 28, height: 28 } }} />
+      {showLabels ? <Text value="COLLAPSE" style={{ fontSize: 18, fontWeight: "semibold",
+        color: rgba(0.70, 0.88, 1) }} /> : null}
+    </mgfx-row>
+    {items.map((item) => {
+      const active = router.route === item.route;
+      return <mgfx-row key={item.route} onClick={() => router.replace(item.route)} style={{
+        preferredSize: { height: 58 }, padding: all(12), gap: 16, cornerRadius: 12,
+        crossAxisAlignment: "center", mainAxisAlignment: showLabels ? "start" : "center",
+        background: active ? rgba(0.18, 0.34, 0.72) : rgba(0.055, 0.075, 0.12),
+        borderWidth: active ? 1.5 : 0,
+        borderColor: active ? rgba(0.36, 0.76, 1) : rgba(0, 0, 0, 0) }}>
+        <DrawerIcon icon={item.icon} fallback={item.fallback}
+          color={active ? rgba(0.78, 0.96, 1) : rgba(0.55, 0.66, 0.80)} />
+        {showLabels ? <Text value={item.label} style={{ fontSize: 21,
+          fontWeight: active ? "bold" : "medium",
+          color: active ? rgba(0.92, 0.98, 1) : rgba(0.66, 0.74, 0.86) }} /> : null}
+      </mgfx-row>;
+    })}
+  </Column>;
+}
+
+function AppShell(props: AppProps) {
+  const { chromeMetrics, headerImageSize, customFontResourceId, vectorIcons } = props;
+  const [mode, setMode] = useState<WindowMode>("normal");
+  const [expanded, setExpanded] = useState(false);
+  const [drawerTransition, setDrawerTransition] = useState({ from: collapsedDrawerWidth,
+    to: collapsedDrawerWidth, startedAt: 0 });
+  const animationTime = useAnimationTime();
+  const router = useRouter();
+  const drawerWidth = animatedDrawerWidth(drawerTransition.from, drawerTransition.to,
+    drawerTransition.startedAt, animationTime);
+  const contentLeft = 20 + drawerWidth + 16;
+  const contentTop = 100;
+  const toggleDrawer = () => {
+    const nextExpanded = !expanded;
+    setDrawerTransition({ from: drawerWidth,
+      to: nextExpanded ? expandedDrawerWidth : collapsedDrawerWidth,
+      startedAt: animationTime });
+    setExpanded(nextExpanded);
+  };
+  return <Window title={`MGFX ${router.route === "dashboard" ? "Home" : "Graphics"}`}
+    width={1100} height={700} minimumWidth={720} minimumHeight={520} mode={mode}
+    chrome="overlay" draggableHeight={Math.max(82, chromeMetrics.titleBarHeight + 26)}>
+    <Stack>
+      <Column style={{ position: "absolute", inset: all(0),
+        background: rgba(0.012, 0.018, 0.03),
+        backgroundGrid: { spacing: 28, minorWidth: 0.8, majorWidth: 1.4, majorEvery: 5,
+          offsetX: animationTime / 180, offsetY: animationTime / 260,
+          minorColor: rgba(0.16, 0.28, 0.48, 0.14),
+          majorColor: rgba(0.18, 0.48, 0.72, 0.22) } }} />
+      <Row style={{ position: "absolute", inset: { top: 14, right: 20, left: 20 },
+        preferredSize: { height: 72 }, zIndex: 40,
+        padding: { top: 10, right: 14, bottom: 10,
+          left: Math.max(82, chromeMetrics.leadingInset - 20) }, cornerRadius: 14,
+        backgroundGradient: {
+          start: rgba(0.31 + Math.sin(animationTime / 900) * 0.05, 0.13, 0.86),
+          end: rgba(0.12, 0.48 + Math.cos(animationTime / 1100) * 0.06, 0.96),
+          direction: "horizontal" }, mainAxisAlignment: "spaceBetween",
+        crossAxisAlignment: "center" }}>
+        <Text value={`MGFX React · ${router.route === "dashboard" ? "Home" : "Graphics"}`}
+          style={{ fontSize: 30, fontFamily: "system", fontWeight: "semibold",
+            letterSpacing: 0.5,
+            ...(customFontResourceId === undefined ? {} : { fontResourceId: customFontResourceId }),
+            color: rgba(0.9, 0.96, 1) }} />
+        <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
+          <GradientCircleBadge time={animationTime} />
+          <ConicBadge time={animationTime} />
+          <Image textureId={1} sourceWidth={headerImageSize.width}
+            sourceHeight={headerImageSize.height} fit="cover"
+            style={{ preferredSize: { width: 52, height: 52 }, cornerRadius: 12,
+              borderWidth: 2, borderColor: rgba(0.75, 0.92, 1) }} />
+          <DotGrid time={animationTime} />
+        </Row>
+      </Row>
+      {router.route === "dashboard"
+        ? <Dashboard {...props} contentLeft={contentLeft} contentTop={contentTop}
+            mode={mode} setMode={setMode} />
+        : <GraphicsRoute {...props} contentLeft={contentLeft} contentTop={contentTop} />}
+      <NavigationDrawer width={drawerWidth} expanded={expanded} onToggle={toggleDrawer}
+        icons={vectorIcons} />
+    </Stack>
+  </Window>;
+}
+
+function Dashboard({ headerImageSize, contentLeft, contentTop, mode, setMode }: AppProps & {
+  readonly contentLeft: number; readonly contentTop: number; readonly mode: WindowMode;
+  readonly setMode: (update: WindowMode | ((value: WindowMode) => WindowMode)) => void;
+}) {
   const [selected, setSelected] = useState(0);
   const [value, setValue] = useState("");
-  const [mode, setMode] = useState<WindowMode>("normal");
   const [dialogOpen, setDialogOpen] = useState(false);
   const animationTime = useAnimationTime();
   const clipboard = useNativeClipboard();
@@ -265,41 +394,10 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
     ["MGFX", rgba(0.24, 0.48, 1), rgba(0.48, 0.72, 1)],
   ] as const;
   return (
-    <Window title="MGFX React Native Window" width={1100} height={700}
-      minimumWidth={720} minimumHeight={520} mode={mode}
-      chrome="overlay" draggableHeight={Math.max(82, chromeMetrics.titleBarHeight + 26)}>
     <Stack>
     <Column style={{ position: "absolute", inset: all(0),
-      padding: { top: 14, right: 20, bottom: 20, left: 20 }, gap: 16,
-      crossAxisAlignment: "stretch", background: rgba(0.012, 0.018, 0.03),
-      backgroundGrid: { spacing: 28, minorWidth: 0.8, majorWidth: 1.4, majorEvery: 5,
-        offsetX: animationTime / 180, offsetY: animationTime / 260,
-        minorColor: rgba(0.16, 0.28, 0.48, 0.14),
-        majorColor: rgba(0.18, 0.48, 0.72, 0.22) } }}>
-      <Row style={{ preferredSize: { height: 72 },
-        padding: { top: 14, right: 14, bottom: 14,
-          left: Math.max(82, chromeMetrics.leadingInset - 20) }, cornerRadius: 14,
-        backgroundGradient: {
-          start: rgba(0.31 + Math.sin(animationTime / 900) * 0.05, 0.13, 0.86),
-          end: rgba(0.12, 0.48 + Math.cos(animationTime / 1100) * 0.06, 0.96),
-          direction: "horizontal",
-        },
-        mainAxisAlignment: "spaceBetween",
-        crossAxisAlignment: "center" }}>
-        <Text value="MGFX React" style={{ fontSize: 32, fontFamily: "system", fontWeight: "semibold",
-          letterSpacing: 0.5,
-          ...(customFontResourceId === undefined ? {} : { fontResourceId: customFontResourceId }),
-          color: rgba(0.9, 0.96, 1) }} />
-        <Row style={{ gap: 10, crossAxisAlignment: "center" }}>
-          <GradientCircleBadge time={animationTime} />
-          <ConicBadge time={animationTime} />
-          <Image textureId={1} sourceWidth={headerImageSize.width}
-            sourceHeight={headerImageSize.height} fit="cover"
-            style={{ preferredSize: { width: 52, height: 52 },
-            cornerRadius: 12, borderWidth: 2, borderColor: rgba(0.75, 0.92, 1) }} />
-          <DotGrid time={animationTime} />
-        </Row>
-      </Row>
+      padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft }, gap: 16,
+      crossAxisAlignment: "stretch" }}>
       <Row style={{ gap: 16, crossAxisAlignment: "stretch" }}>
         {cards.map(([label, normal, active], index) => (
           <Button key={label} label={label} background={normal} activeBackground={active}
@@ -357,21 +455,18 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
       </Row>
     </Dialog>
     </Stack>
-    </Window>
   );
 }
 
-function GraphicsRoute({ chromeMetrics, vectorIcons, customFontResourceId }: AppProps) {
+function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, contentTop }: AppProps & {
+  readonly contentLeft: number; readonly contentTop: number;
+}) {
   const router = useRouter();
   const animationTime = useAnimationTime();
-  const draggableHeight = Math.max(82, chromeMetrics.titleBarHeight + 26);
   return (
-    <Window title="MGFX Graphics Route" width={1100} height={700}
-      minimumWidth={720} minimumHeight={520} chrome="overlay"
-      draggableHeight={draggableHeight}>
       <Stack>
         <Column style={{ position: "absolute", inset: all(0),
-          padding: { top: draggableHeight + 14, right: 28, bottom: 28, left: 28 }, gap: 22,
+          padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft }, gap: 22,
           crossAxisAlignment: "stretch" }}>
           <Row style={{ preferredSize: { height: 70 }, padding: all(16), cornerRadius: 14,
             backgroundGradient: { start: rgba(0.08, 0.46, 0.36),
@@ -416,6 +511,5 @@ function GraphicsRoute({ chromeMetrics, vectorIcons, customFontResourceId }: App
           </Column>
         </Column>
       </Stack>
-    </Window>
   );
 }
