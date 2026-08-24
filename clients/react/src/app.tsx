@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, SplitPane, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, SplitPane, Stack, Stepper, Svg, Tabs, Text, TextField, TreeView, all, rgba, type TreeItem } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { CommandPalette, Dialog, Menu, Router, Toast, useRouter,
@@ -568,6 +568,9 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [section, setSection] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [splitRatio, setSplitRatio] = useState(0.44);
+  const [selectedNode, setSelectedNode] = useState("header");
+  const [expandedNodes, setExpandedNodes] = useState<ReadonlySet<string>>(
+    () => new Set(["window", "content"]));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -591,6 +594,17 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
       keywords: ["route", "ui"] },
     { id: "toast", label: "SHOW STATUS TOAST", detail: "Exercise the notification overlay",
       keywords: ["overlay", "message"] },
+  ];
+  const sceneTree: readonly TreeItem[] = [
+    { id: "window", label: "WINDOW", detail: "ROOT", children: [
+      { id: "header", label: "TITLE BAR", detail: "Z 40" },
+      { id: "drawer", label: "NAVIGATION DRAWER", detail: "Z 30" },
+      { id: "content", label: "ROUTE CONTENT", children: [
+        { id: "split", label: "SPLIT PANE", detail: `${Math.round(splitRatio * 100)}%` },
+        { id: "controls", label: "CONTROL GROUP" },
+        { id: "overlays", label: "OVERLAY HOST", detail: "Z 1000+" },
+      ] },
+    ] },
   ];
   return <>
     <Scroll style={{ position: "absolute", inset: all(0) }}>
@@ -657,6 +671,25 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
             <Text value="DRAG DIVIDER OR USE LEFT / RIGHT ARROWS" style={{ fontSize: 16,
               color: rgba(0.48, 0.58, 0.72) }} />
           </>} />
+        <Row style={{ gap: 18, crossAxisAlignment: "stretch" }}>
+          <TreeView items={sceneTree} expandedIds={expandedNodes} selectedId={selectedNode}
+            onSelect={setSelectedNode} width={620} height={270}
+            onToggle={(id) => setExpandedNodes((current) => {
+              const next = new Set(current);
+              if (next.has(id)) next.delete(id); else next.add(id);
+              return next;
+            })} />
+          <Column style={{ flexGrow: 1, padding: all(20), gap: 12, cornerRadius: 14,
+            background: rgba(0.035, 0.052, 0.09), borderWidth: 1,
+            borderColor: rgba(0.18, 0.29, 0.45) }}>
+            <Text value="TREE SELECTION" style={{ fontSize: 20, fontWeight: "bold",
+              color: rgba(0.46, 0.88, 0.72) }} />
+            <Text value={selectedNode.toLocaleUpperCase()} style={{ fontSize: 30,
+              fontWeight: "bold", color: rgba(0.80, 0.92, 1) }} />
+            <Text value="UP / DOWN SELECT · LEFT / RIGHT COLLAPSE" style={{ fontSize: 17,
+              color: rgba(0.52, 0.64, 0.78) }} />
+          </Column>
+        </Row>
         <Column style={{ padding: all(20), gap: 18, cornerRadius: 16,
           background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
           borderColor: rgba(0.20, 0.30, 0.48) }}>

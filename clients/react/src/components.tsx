@@ -606,6 +606,101 @@ export function SplitPane({ ratio, onChange, primary, secondary, width = 900, he
   </mgfx-stack>;
 }
 
+export interface TreeItem {
+  readonly id: string;
+  readonly label: string;
+  readonly detail?: string;
+  readonly children?: readonly TreeItem[];
+}
+
+export interface VisibleTreeItem {
+  readonly item: TreeItem;
+  readonly depth: number;
+  readonly parentId?: string;
+}
+
+export function flattenTree(items: readonly TreeItem[], expandedIds: ReadonlySet<string>,
+  depth = 0, parentId?: string): readonly VisibleTreeItem[] {
+  return items.flatMap((item) => {
+    const current: VisibleTreeItem = { item, depth, ...(parentId ? { parentId } : {}) };
+    return item.children?.length && expandedIds.has(item.id)
+      ? [current, ...flattenTree(item.children, expandedIds, depth + 1, item.id)] : [current];
+  });
+}
+
+function TreeRow({ entry, selected, expanded, onSelect, onToggle, onNavigate }: {
+  readonly entry: VisibleTreeItem; readonly selected: boolean; readonly expanded: boolean;
+  readonly onSelect: () => void; readonly onToggle: () => void;
+  readonly onNavigate: (key: Key) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const branch = Boolean(entry.item.children?.length);
+  useNativeCursor("pointer", hovered);
+  return <mgfx-row onClick={onSelect} onHoverChange={setHovered} onPressChange={setPressed}
+    onFocusChange={setFocused} onKeyDown={onNavigate}
+    style={{ preferredSize: { height: 44 }, padding: { top: 6, right: 10, bottom: 6,
+      left: 10 + entry.depth * 24 }, gap: 8, cornerRadius: 8, crossAxisAlignment: "center",
+      background: pressed ? rgba(0.08, 0.20, 0.31)
+        : selected ? rgba(0.12, 0.30, 0.46) : hovered ? rgba(0.075, 0.12, 0.19)
+          : rgba(0.03, 0.045, 0.075),
+      borderWidth: focused ? 1.5 : 0,
+      borderColor: focused ? rgba(0.42, 0.80, 1) : rgba(0, 0, 0, 0) }}>
+    {entry.depth > 0 ? <Box style={{ position: "absolute", inset: {
+      top: 0, bottom: 0, left: 18 + (entry.depth - 1) * 24 }, preferredSize: { width: 1 },
+      background: rgba(0.18, 0.28, 0.42) }} /> : null}
+    <mgfx-stack onClick={() => { if (branch) onToggle(); }}
+      style={{ preferredSize: { width: 24, height: 24 }, cornerRadius: 5,
+        background: branch && hovered ? rgba(0.12, 0.22, 0.34) : rgba(0, 0, 0, 0) }}>
+      {branch ? <Path data="M8 5L15 12L8 19" viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+        strokeColor={selected ? rgba(0.52, 0.90, 1) : rgba(0.48, 0.60, 0.74)} strokeWidth={2.2}
+        style={{ position: "absolute", inset: all(0),
+          transform: { rotation: expanded ? 90 : 0 } }} />
+        : <Circle style={{ position: "absolute", inset: { top: 9, left: 9 },
+          preferredSize: { width: 6, height: 6 }, background: rgba(0.32, 0.70, 0.82) }} />}
+    </mgfx-stack>
+    <Text value={entry.item.label} style={{ fontSize: 18,
+      fontWeight: selected ? "semibold" : "regular",
+      color: selected ? rgba(0.82, 0.96, 1) : rgba(0.72, 0.79, 0.88) }} />
+    <Box style={{ flexGrow: 1 }} />
+    {entry.item.detail ? <Text value={entry.item.detail} style={{ fontSize: 14,
+      color: rgba(0.42, 0.54, 0.68) }} /> : null}
+  </mgfx-row>;
+}
+
+export function TreeView({ items, expandedIds, selectedId, onToggle, onSelect,
+  width = 540, height = 260 }: {
+  readonly items: readonly TreeItem[]; readonly expandedIds: ReadonlySet<string>;
+  readonly selectedId?: string; readonly onToggle: (id: string) => void;
+  readonly onSelect: (id: string) => void; readonly width?: number; readonly height?: number;
+}) {
+  const visible = flattenTree(items, expandedIds);
+  const navigate = (key: Key) => {
+    if (visible.length === 0) return;
+    const index = Math.max(0, visible.findIndex((entry) => entry.item.id === selectedId));
+    const current = visible[index]!;
+    if (key === Key.ArrowUp) onSelect(visible[Math.max(0, index - 1)]!.item.id);
+    if (key === Key.ArrowDown) onSelect(visible[Math.min(visible.length - 1, index + 1)]!.item.id);
+    if (key === Key.ArrowRight) {
+      if (current.item.children?.length && !expandedIds.has(current.item.id)) onToggle(current.item.id);
+      else if (current.item.children?.length) onSelect(current.item.children[0]!.id);
+    }
+    if (key === Key.ArrowLeft) {
+      if (current.item.children?.length && expandedIds.has(current.item.id)) onToggle(current.item.id);
+      else if (current.parentId) onSelect(current.parentId);
+    }
+  };
+  return <Scroll style={{ preferredSize: { width, height }, padding: all(7), cornerRadius: 13,
+    background: rgba(0.022, 0.034, 0.058), borderWidth: 1,
+    borderColor: rgba(0.18, 0.29, 0.45) }}>
+    <Column style={{ gap: 3, crossAxisAlignment: "stretch" }}>{visible.map((entry) =>
+      <TreeRow key={entry.item.id} entry={entry} selected={entry.item.id === selectedId}
+        expanded={expandedIds.has(entry.item.id)} onSelect={() => onSelect(entry.item.id)}
+        onToggle={() => onToggle(entry.item.id)} onNavigate={navigate} />)}</Column>
+  </Scroll>;
+}
+
 export interface TextFieldProps {
   readonly value: string;
   readonly onChange: (value: string) => void;

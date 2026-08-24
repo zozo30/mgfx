@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, SplitPane, Stepper, Svg, Tabs, Text, TextField } from "./components.js";
+import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, SplitPane, Stepper, Svg, Tabs, Text, TextField, TreeView, type TreeItem } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Menu, Router, useRouter } from "./navigation.js";
@@ -154,6 +154,31 @@ test("React SplitPane drags within constraints and supports keyboard resizing", 
   assert.equal(value, 0.75);
   surface.keyDown({ key: Key.ArrowLeft, modifiers: 0, repeat: false });
   assert.equal(value, 0.71);
+});
+
+test("React TreeView selects visible rows and expands branches from keyboard focus", () => {
+  const items: readonly TreeItem[] = [{ id: "root", label: "ROOT", children: [
+    { id: "one", label: "ONE" }, { id: "two", label: "TWO" },
+  ] }];
+  let selected = "root";
+  let expanded = new Set<string>();
+  function Harness() {
+    const [localSelected, setLocalSelected] = useState("root");
+    const [localExpanded, setLocalExpanded] = useState<ReadonlySet<string>>(new Set());
+    return <TreeView items={items} selectedId={localSelected} expandedIds={localExpanded}
+      width={320} height={180} onSelect={(id) => { selected = id; setLocalSelected(id); }}
+      onToggle={(id) => { setLocalExpanded((current) => {
+        const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id);
+        expanded = next; return next;
+      }); }} />;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Harness />); surface.resize({ width: 320, height: 180 });
+  surface.pointerDown({ x: 90, y: 25 }); surface.pointerUp({ x: 90, y: 25 });
+  surface.keyDown({ key: Key.ArrowRight, modifiers: 0, repeat: false });
+  assert.equal(expanded.has("root"), true);
+  surface.keyDown({ key: Key.ArrowDown, modifiers: 0, repeat: false });
+  assert.equal(selected, "one");
 });
 
 test("native menu selects an anchored option and dismisses its modal hit layer", () => {
