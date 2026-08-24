@@ -567,7 +567,9 @@ class Node {
   }
   measure(constraints: Constraints): Size {
     const padding = insets(this.style.padding);
-    const inner = { minWidth: 0, maxWidth: extent(constraints.maxWidth, padding.left, padding.right),
+    const gutter = this.type === "scroll" ? scrollIndicatorGutter : 0;
+    const inner = { minWidth: 0,
+      maxWidth: extent(constraints.maxWidth, padding.left, padding.right + gutter),
       minHeight: 0, maxHeight: extent(constraints.maxHeight, padding.top, padding.bottom) };
     if (this.type === "scroll") inner.maxHeight = 1_000_000;
     let width = 0, height = 0;
@@ -600,7 +602,8 @@ class Node {
     const preferred = this.style.preferredSize ?? {};
     const desiredHeight = this.type === "scroll" && preferred.height !== undefined
       ? preferred.height : Math.max(preferred.height ?? 0, height + padding.top + padding.bottom);
-    this.measured = constrain({ width: Math.max(preferred.width ?? 0, width + padding.left + padding.right),
+    this.measured = constrain({ width: Math.max(preferred.width ?? 0,
+      width + padding.left + padding.right + gutter),
       height: desiredHeight }, constraints);
     return this.measured;
   }
@@ -614,7 +617,7 @@ class Node {
       if (child) {
         const offset = Math.max(0, Math.min(this.scrollOffsetY, Math.max(0, child.measured.height - content.height)));
         child.layout({ x: content.x, y: content.y - offset,
-          width: content.width, height: child.measured.height });
+          width: extent(content.width, 0, scrollIndicatorGutter), height: child.measured.height });
       }
       return;
     }
@@ -1370,6 +1373,7 @@ export function constrain(size: Size, c: Constraints): Size {
 }
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const extent = (value: number, before: number, after: number): number => Math.max(0, value - before - after);
+const scrollIndicatorGutter = 18;
 const insets = (p?: Partial<Insets>): Insets => ({ top: p?.top ?? 0, right: p?.right ?? 0, bottom: p?.bottom ?? 0, left: p?.left ?? 0 });
 const contains = (r: Rect, p: Point): boolean => p.x >= r.x && p.y >= r.y && p.x < r.x + r.width && p.y < r.y + r.height;
 function rectangleVertices(r: Rect, color: Color, v: Size): Vertex[] {
