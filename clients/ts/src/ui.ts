@@ -393,6 +393,13 @@ export abstract class Component {
   attach(callback: () => void): void { this.notify = callback; }
 }
 
+const scrollIndicatorWidth = 10;
+const scrollIndicatorRightInset = 8;
+const scrollContentGap = 10;
+const scrollIndicatorGutter = scrollContentGap + scrollIndicatorWidth +
+  scrollIndicatorRightInset;
+const scrollIndicatorVerticalInset = 10;
+
 export class ComponentHost {
   private component: Component | undefined;
   private root: Node | undefined;
@@ -401,6 +408,7 @@ export class ComponentHost {
   private pressed: Node | undefined;
   private focused: Node | undefined;
   private keyboardPressed: Node | undefined;
+  private scrollDrag: { target: Node; grabOffset: number } | undefined;
   rebuild(component: Component): void {
     this.component = component;
     component.attach(() => { this.dirty = true; });
@@ -415,6 +423,11 @@ export class ComponentHost {
   }
   paint(encoder: FrameEncoder, viewport: Size): void { this.root?.paint(encoder, viewport); }
   pointerMove(point: Point): boolean {
+    if (this.scrollDrag) {
+      const local = this.scrollDrag.target.localPoint(point);
+      this.scrollDrag.target.dragScrollbar(local.y, this.scrollDrag.grabOffset);
+      return true;
+    }
     if (this.pressed?.onPointerMove) {
       this.pressed.onPointerMove(this.pressed.localPoint(point));
       return true;
@@ -427,6 +440,12 @@ export class ComponentHost {
     return true;
   }
   pointerDown(point: Point): boolean {
+    const scrollbar = this.root?.scrollbarTarget(point);
+    if (scrollbar?.onScroll) {
+      this.scrollDrag = { target: scrollbar,
+        grabOffset: scrollbar.beginScrollbarDrag(scrollbar.localPoint(point).y) };
+      return true;
+    }
     const target = this.root?.hitTarget(point);
     if (!target) return false;
     this.setFocus(target);
@@ -437,6 +456,12 @@ export class ComponentHost {
     return true;
   }
   pointerUp(point: Point): boolean {
+    if (this.scrollDrag) {
+      const drag = this.scrollDrag;
+      this.scrollDrag = undefined;
+      drag.target.dragScrollbar(drag.target.localPoint(point).y, drag.grabOffset);
+      return true;
+    }
     const pressed = this.pressed;
     if (!pressed) return false;
     this.pressed = undefined;
@@ -806,6 +831,41 @@ class Node {
     }
     return this.onScroll && this.canScroll(deltaY) ? this : undefined;
   }
+  scrollbarTarget(point: Point): Node | undefined {
+    const transformedPoint = this.inverseTransform(point);
+    if (!contains(this.bounds, transformedPoint)) return undefined;
+    const modal = this.modalChild();
+    if (modal) return modal.scrollbarTarget(transformedPoint);
+    const geometry = this.scrollIndicatorGeometry();
+    if (geometry && contains(geometry.track, transformedPoint)) return this;
+    const ordered = this.paintOrder();
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const target = ordered[i]!.scrollbarTarget(transformedPoint);
+      if (target) return target;
+    }
+    return undefined;
+  }
+  beginScrollbarDrag(localY: number): number {
+    const geometry = this.scrollIndicatorGeometry();
+    if (!geometry) return 0;
+    const absoluteY = this.bounds.y + localY;
+    if (contains(geometry.thumb, { x: geometry.thumb.x, y: absoluteY }))
+      return absoluteY - geometry.thumb.y;
+    const grabOffset = geometry.thumb.height / 2;
+    this.dragScrollbar(localY, grabOffset);
+    return grabOffset;
+  }
+  dragScrollbar(localY: number, grabOffset: number): void {
+    const geometry = this.scrollIndicatorGeometry();
+    if (!geometry || !this.onScroll) return;
+    const travel = geometry.track.height - geometry.thumb.height;
+    if (travel <= 0) return;
+    const thumbY = Math.max(geometry.track.y, Math.min(
+      this.bounds.y + localY - grabOffset, geometry.track.y + travel));
+    const next = geometry.maximum * (thumbY - geometry.track.y) / travel;
+    const current = Math.max(0, Math.min(this.scrollOffsetY, geometry.maximum));
+    this.onScroll(0, next - current);
+  }
   clampScrollDelta(deltaY: number): number {
     const maximum = this.maximumScrollOffset();
     const current = Math.max(0, Math.min(this.scrollOffsetY, maximum));
@@ -824,26 +884,34 @@ class Node {
     return Math.max(0, child.measured.height - viewportHeight);
   }
   private paintScrollIndicator(encoder: FrameEncoder, viewport: Size): void {
+    const geometry = this.scrollIndicatorGeometry();
+    if (!geometry) return;
+    paintServerRoundedRect(encoder, geometry.track, scrollIndicatorWidth / 2,
+      { red: 0.10, green: 0.16, blue: 0.25, alpha: 0.48 }, 0, undefined, viewport);
+    paintServerRoundedRect(encoder, geometry.thumb, scrollIndicatorWidth / 2,
+      { red: 0.36, green: 0.70, blue: 0.92, alpha: 0.82 }, 0, undefined, viewport);
+  }
+  private scrollIndicatorGeometry(): { track: Rect; thumb: Rect; maximum: number } | undefined {
     const child = this.children[0];
     const maximum = this.maximumScrollOffset();
-    if (!child || maximum <= 0.5 || this.bounds.width < 12 || this.bounds.height < 32) return;
+    if (this.type !== "scroll" || !child || maximum <= 0.5 ||
+        this.bounds.width < scrollIndicatorGutter ||
+        this.bounds.height < scrollIndicatorVerticalInset * 2 + 12) return undefined;
     const padding = insets(this.style.padding);
     const visibleHeight = extent(this.bounds.height, padding.top, padding.bottom);
-    const verticalInset = 10;
-    const trackHeight = Math.max(1, this.bounds.height - verticalInset * 2);
+    const trackHeight = Math.max(1,
+      this.bounds.height - scrollIndicatorVerticalInset * 2);
     const thumbHeight = Math.min(trackHeight,
       Math.max(24, trackHeight * Math.min(1, visibleHeight / child.measured.height)));
     const current = Math.max(0, Math.min(this.scrollOffsetY, maximum));
     const travel = Math.max(0, trackHeight - thumbHeight);
-    const thumbY = this.bounds.y + verticalInset +
-      (maximum > 0 ? travel * current / maximum : 0);
-    const track = { x: this.bounds.x + this.bounds.width - 10,
-      y: this.bounds.y + verticalInset, width: 2, height: trackHeight };
-    const thumb = { ...track, y: thumbY, height: thumbHeight };
-    paintServerRoundedRect(encoder, track, 1,
-      { red: 0.10, green: 0.16, blue: 0.25, alpha: 0.48 }, 0, undefined, viewport);
-    paintServerRoundedRect(encoder, thumb, 1,
-      { red: 0.36, green: 0.70, blue: 0.92, alpha: 0.82 }, 0, undefined, viewport);
+    const track = {
+      x: this.bounds.x + this.bounds.width - scrollIndicatorRightInset - scrollIndicatorWidth,
+      y: this.bounds.y + scrollIndicatorVerticalInset,
+      width: scrollIndicatorWidth, height: trackHeight,
+    };
+    const thumb = { ...track, y: track.y + travel * current / maximum, height: thumbHeight };
+    return { track, thumb, maximum };
   }
   private isFocusable(): boolean {
     return this.onClick !== undefined || this.onKeyDown !== undefined || this.onTextInput !== undefined ||
@@ -1373,7 +1441,6 @@ export function constrain(size: Size, c: Constraints): Size {
 }
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const extent = (value: number, before: number, after: number): number => Math.max(0, value - before - after);
-const scrollIndicatorGutter = 18;
 const insets = (p?: Partial<Insets>): Insets => ({ top: p?.top ?? 0, right: p?.right ?? 0, bottom: p?.bottom ?? 0, left: p?.left ?? 0 });
 const contains = (r: Rect, p: Point): boolean => p.x >= r.x && p.y >= r.y && p.x < r.x + r.width && p.y < r.y + r.height;
 function rectangleVertices(r: Rect, color: Color, v: Size): Vertex[] {

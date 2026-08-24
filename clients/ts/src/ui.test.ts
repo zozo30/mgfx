@@ -278,6 +278,28 @@ test("overflowing scroll views paint a retained scrollbar above their content", 
   assert.equal(opcodes.at(-1), 3);
 });
 
+test("retained scrollbar track and thumb support pointer dragging", () => {
+  class DraggableScroll extends Component {
+    offset = 0;
+    build(): Element {
+      return scrollView(box({ preferredSize: { width: 100, height: 240 } }), this.offset,
+        { preferredSize: { width: 100, height: 100 } }, "scroll",
+        (_x, y) => { this.offset = Math.max(0, this.offset + y); this.invalidate(); });
+    }
+  }
+  const component = new DraggableScroll();
+  const host = new ComponentHost(); host.rebuild(component);
+  host.layout({ width: 100, height: 100 });
+  assert.equal(host.pointerDown({ x: 87, y: 70 }), true);
+  host.layout({ width: 100, height: 100 });
+  const trackJump = component.offset;
+  assert.ok(trackJump > 0);
+  assert.equal(host.pointerMove({ x: 87, y: 84 }), true);
+  host.layout({ width: 100, height: 100 });
+  assert.ok(component.offset > trackJump);
+  assert.equal(host.pointerUp({ x: 40, y: 84 }), true);
+});
+
 test("vertical scroll content stretches across the viewport cross axis", () => {
   let clicked = false;
   class WideScrollComponent extends Component {
