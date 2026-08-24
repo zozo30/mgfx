@@ -394,7 +394,7 @@ function Dashboard({ headerImageSize, contentLeft, contentTop, mode, setMode }: 
     ["MGFX", rgba(0.24, 0.48, 1), rgba(0.48, 0.72, 1)],
   ] as const;
   return (
-    <Stack>
+    <>
     <Column style={{ position: "absolute", inset: all(0),
       padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft }, gap: 16,
       crossAxisAlignment: "stretch" }}>
@@ -454,7 +454,7 @@ function Dashboard({ headerImageSize, contentLeft, contentTop, mode, setMode }: 
         }} background={rgba(0.16, 0.62, 0.48)} style={{ flexGrow: 1 }} />
       </Row>
     </Dialog>
-    </Stack>
+    </>
   );
 }
 
@@ -464,10 +464,9 @@ function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, content
   const router = useRouter();
   const animationTime = useAnimationTime();
   return (
-      <Stack>
-        <Column style={{ position: "absolute", inset: all(0),
-          padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft }, gap: 22,
-          crossAxisAlignment: "stretch" }}>
+      <Column style={{ position: "absolute", inset: all(0),
+        padding: { top: contentTop, right: 20, bottom: 20, left: contentLeft }, gap: 22,
+        crossAxisAlignment: "stretch" }}>
           <Row style={{ preferredSize: { height: 70 }, padding: all(16), cornerRadius: 14,
             backgroundGradient: { start: rgba(0.08, 0.46, 0.36),
               end: rgba(0.28, 0.12, 0.68), direction: "horizontal" },
@@ -509,7 +508,6 @@ function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, content
             <Text value={`ROUTE ${router.route}  BACK ${router.canGoBack ? "READY" : "EMPTY"}`}
               style={{ fontSize: 22, color: rgba(0.42, 0.92, 0.68) }} />
           </Column>
-        </Column>
-      </Stack>
+      </Column>
   );
 }
