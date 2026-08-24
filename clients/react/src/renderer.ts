@@ -1,6 +1,6 @@
 import { createContext, createElement, type ReactNode } from "react";
 import ReactReconciler from "react-reconciler";
-import { ConcurrentRoot, DefaultEventPriority } from "react-reconciler/constants.js";
+import { ConcurrentRoot, DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants.js";
 import { FrameEncoder, type FontFamily, type FontStyle, type FontWeight, type Key, type KeyEvent,
   type MeshUploadVertex, type PathSegment, type ScrollEvent } from "@mgfx/demo-client/protocol";
 import {
@@ -233,20 +233,32 @@ export class ReactSurface {
     reconciler.flushSyncWork();
   }
   resize(viewport: Size): void { this.viewport = viewport; this.submit(); }
-  pointerMove(point: Point): void { reconciler.flushSyncFromReconciler(() => this.host.pointerMove(point)); }
-  pointerDown(point: Point): void { reconciler.flushSyncFromReconciler(() => this.host.pointerDown(point)); }
-  pointerUp(point: Point): void { reconciler.flushSyncFromReconciler(() => this.host.pointerUp(point)); }
+  pointerMove(point: Point): void { this.dispatchDiscrete(() => this.host.pointerMove(point)); }
+  pointerDown(point: Point): void { this.dispatchDiscrete(() => this.host.pointerDown(point)); }
+  pointerUp(point: Point): void { this.dispatchDiscrete(() => this.host.pointerUp(point)); }
   keyDown(event: KeyEvent): void {
-    reconciler.flushSyncFromReconciler(() => this.host.keyDown(event.key,
+    this.dispatchDiscrete(() => this.host.keyDown(event.key,
       (event.modifiers & 1) !== 0, event.repeat, event.modifiers));
   }
-  keyUp(event: KeyEvent): void { reconciler.flushSyncFromReconciler(() => this.host.keyUp(event.key)); }
+  keyUp(event: KeyEvent): void { this.dispatchDiscrete(() => this.host.keyUp(event.key)); }
   scroll(event: ScrollEvent): void {
     reconciler.flushSyncFromReconciler(() => this.host.scroll({ x: event.x, y: event.y }, event.deltaX, event.deltaY));
   }
-  textInput(value: string): void { reconciler.flushSyncFromReconciler(() => this.host.textInput(value)); }
+  textInput(value: string): void {
+    this.dispatchDiscrete(() => this.host.textInput(value));
+  }
 
   commit(): void { this.submit(); }
+  private dispatchDiscrete(callback: () => unknown): void {
+    const previousPriority = currentPriority;
+    currentPriority = DiscreteEventPriority;
+    try {
+      reconciler.flushSyncFromReconciler(callback);
+      reconciler.flushSyncWork();
+    } finally {
+      currentPriority = previousPriority;
+    }
+  }
   private submit(): void {
     if (this.viewport.width <= 0 || this.viewport.height <= 0) return;
     const active = this.activeResources(this.container.children);

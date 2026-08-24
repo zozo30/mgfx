@@ -147,7 +147,14 @@ export function nativeTextAdvance(
 
 export function nativeTextMetricRuns(value: string, style: TextStyle): readonly string[] {
   if (!style.fontFamily || style.fontFamily === "pixel") return [];
-  if (!style.wrap) return value.split("\n").filter(Boolean);
+  if (!style.wrap) {
+    const runs = new Set<string>();
+    for (const line of value.split("\n")) {
+      if (line) runs.add(line);
+      for (const character of [...line]) runs.add(character);
+    }
+    return [...runs];
+  }
   const runs = new Set<string>();
   for (const paragraph of value.split("\n")) {
     for (const word of paragraph.match(/\S+/gu) ?? []) runs.add(word);
@@ -171,7 +178,12 @@ function textRunWidth(value: string, style: TextStyle, fontSize: number): number
       style.fontFamily, value, style.fontWeight, style.fontStyle, tracking,
       style.fontResourceId);
     const average = style.fontFamily === "monospace" ? 0.60 : 0.56;
-    return (exact ?? [...value].length * (average + tracking)) * fontSize;
+    if (exact !== undefined) return exact * fontSize;
+    const composed = [...value].reduce((width, character) => width +
+      (nativeTextAdvance(style.fontFamily as Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">,
+        character, style.fontWeight, style.fontStyle, tracking, style.fontResourceId) ??
+        average + tracking), 0);
+    return composed * fontSize;
   }
   const cell = fontSize / 7;
   return value.length * cell * 6 - cell;

@@ -734,6 +734,24 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
     const end = [...value].length;
     return { caret: end, anchor: end };
   });
+  const valueRef = useRef(value);
+  const receivedValueRef = useRef(value);
+  const selectionRef = useRef(selection);
+  // A local selection update can render before the controlled parent value
+  // commits. Only synchronize the live editor buffer when a genuinely new
+  // prop arrives, never merely because it differs from an uncommitted edit.
+  if (value !== receivedValueRef.current) {
+    receivedValueRef.current = value;
+    valueRef.current = value;
+  }
+  const updateSelection = (next: { caret: number; anchor: number }) => {
+    selectionRef.current = next;
+    setSelection(next);
+  };
+  const updateValue = (next: string) => {
+    valueRef.current = next;
+    onChange(next);
+  };
   const [dragging, setDragging] = useState(false);
   const [blinkEpoch, setBlinkEpoch] = useState(0);
   const clipboard = useNativeClipboard();
@@ -746,11 +764,10 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const caret = Math.min(selection.caret, characters.length);
   const anchor = Math.min(selection.anchor, characters.length);
   useEffect(() => {
-    setSelection((current) => {
-      const next = { caret: Math.min(current.caret, characters.length),
-        anchor: Math.min(current.anchor, characters.length) };
-      return next.caret === current.caret && next.anchor === current.anchor ? current : next;
-    });
+    const current = selectionRef.current;
+    const next = { caret: Math.min(current.caret, characters.length),
+      anchor: Math.min(current.anchor, characters.length) };
+    if (next.caret !== current.caret || next.anchor !== current.anchor) updateSelection(next);
   }, [value]);
   const displayed = value || placeholder;
   const color = value ? textStyle?.color ?? rgba(1, 1, 1) : rgba(0.55, 0.60, 0.70);
@@ -785,14 +802,21 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
     return characters.length;
   };
   const insert = (text: string) => {
+    const currentCharacters = [...valueRef.current];
+    const currentSelection = selectionRef.current;
+    const currentCaret = Math.min(currentSelection.caret, currentCharacters.length);
+    const currentAnchor = Math.min(currentSelection.anchor, currentCharacters.length);
+    const currentStart = Math.min(currentAnchor, currentCaret);
+    const currentEnd = Math.max(currentAnchor, currentCaret);
     const incoming = [...text];
-    const available = Math.max(0, maxLength - (characters.length - (selectionEnd - selectionStart)));
+    const available = Math.max(0,
+      maxLength - (currentCharacters.length - (currentEnd - currentStart)));
     const accepted = incoming.slice(0, available);
     if (accepted.length === 0) return;
-    const next = selectionStart + accepted.length;
-    onChange([...characters.slice(0, selectionStart), ...accepted,
-      ...characters.slice(selectionEnd)].join(""));
-    setSelection({ caret: next, anchor: next });
+    const next = currentStart + accepted.length;
+    updateValue([...currentCharacters.slice(0, currentStart), ...accepted,
+      ...currentCharacters.slice(currentEnd)].join(""));
+    updateSelection({ caret: next, anchor: next });
     wakeCaret();
   };
   const caretNode = <Box style={{ preferredSize: { width: 2, height: fontSize },
@@ -804,48 +828,59 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
       borderColor: focused ? rgba(0.38, 0.62, 1) : rgba(0.24, 0.28, 0.38), ...style }}
       onHoverChange={setHovered}
       onFocusChange={(next) => { setFocused(next); if (next) {
-        setSelection({ caret: characters.length, anchor: characters.length }); wakeCaret();
+        updateSelection({ caret: characters.length, anchor: characters.length }); wakeCaret();
       } }}
       onPointerDown={(point) => {
-        const index = indexAt(point); setSelection({ caret: index, anchor: index });
+        const index = indexAt(point); updateSelection({ caret: index, anchor: index });
         setDragging(true); wakeCaret();
       }}
       onPointerMove={(point) => { if (dragging) {
         const next = indexAt(point);
-        setSelection((current) => ({ ...current, caret: next }));
+        updateSelection({ ...selectionRef.current, caret: next });
       } }}
       onPointerUp={() => setDragging(false)}
       onTextInput={insert}
       onKeyDown={(key, modifiers) => {
         onKeyDown?.(key, modifiers);
         const extending = (modifiers & KeyModifier.Shift) !== 0;
+        const currentCharacters = [...valueRef.current];
+        const currentSelection = selectionRef.current;
+        const currentCaret = Math.min(currentSelection.caret, currentCharacters.length);
+        const currentAnchor = Math.min(currentSelection.anchor, currentCharacters.length);
+        const currentStart = Math.min(currentAnchor, currentCaret);
+        const currentEnd = Math.max(currentAnchor, currentCaret);
+        const currentHasSelection = currentStart !== currentEnd;
         wakeCaret();
-        if (key === Key.Backspace && hasSelection) {
-          onChange([...characters.slice(0, selectionStart), ...characters.slice(selectionEnd)].join(""));
-          setSelection({ caret: selectionStart, anchor: selectionStart });
-        } else if (key === Key.Backspace && caret > 0) {
-          onChange([...characters.slice(0, caret - 1), ...characters.slice(caret)].join(""));
-          setSelection({ caret: caret - 1, anchor: caret - 1 });
+        if (key === Key.Backspace && currentHasSelection) {
+          updateValue([...currentCharacters.slice(0, currentStart),
+            ...currentCharacters.slice(currentEnd)].join(""));
+          updateSelection({ caret: currentStart, anchor: currentStart });
+        } else if (key === Key.Backspace && currentCaret > 0) {
+          updateValue([...currentCharacters.slice(0, currentCaret - 1),
+            ...currentCharacters.slice(currentCaret)].join(""));
+          updateSelection({ caret: currentCaret - 1, anchor: currentCaret - 1 });
         } else if (key === Key.ArrowLeft) {
-          const next = !extending && hasSelection ? selectionStart : Math.max(0, caret - 1);
-          setSelection({ caret: next, anchor: extending ? anchor : next });
+          const next = !extending && currentHasSelection
+            ? currentStart : Math.max(0, currentCaret - 1);
+          updateSelection({ caret: next, anchor: extending ? currentAnchor : next });
         } else if (key === Key.ArrowRight) {
-          const next = !extending && hasSelection ? selectionEnd : Math.min(characters.length, caret + 1);
-          setSelection({ caret: next, anchor: extending ? anchor : next });
+          const next = !extending && currentHasSelection
+            ? currentEnd : Math.min(currentCharacters.length, currentCaret + 1);
+          updateSelection({ caret: next, anchor: extending ? currentAnchor : next });
         } else if (key === Key.SelectAll) {
-          setSelection({ caret: characters.length, anchor: 0 });
+          updateSelection({ caret: currentCharacters.length, anchor: 0 });
         } else if (key === Key.Copy) {
-          clipboard.writeClipboard(hasSelection
-            ? characters.slice(selectionStart, selectionEnd).join("") : value);
+          clipboard.writeClipboard(currentHasSelection
+            ? currentCharacters.slice(currentStart, currentEnd).join("") : valueRef.current);
         } else if (key === Key.Cut) {
-          clipboard.writeClipboard(hasSelection
-            ? characters.slice(selectionStart, selectionEnd).join("") : value);
-          if (hasSelection) {
-            onChange([...characters.slice(0, selectionStart),
-              ...characters.slice(selectionEnd)].join(""));
-            setSelection({ caret: selectionStart, anchor: selectionStart });
+          clipboard.writeClipboard(currentHasSelection
+            ? currentCharacters.slice(currentStart, currentEnd).join("") : valueRef.current);
+          if (currentHasSelection) {
+            updateValue([...currentCharacters.slice(0, currentStart),
+              ...currentCharacters.slice(currentEnd)].join(""));
+            updateSelection({ caret: currentStart, anchor: currentStart });
           } else {
-            onChange(""); setSelection({ caret: 0, anchor: 0 });
+            updateValue(""); updateSelection({ caret: 0, anchor: 0 });
           }
         } else if (key === Key.Paste) {
           void clipboard.readClipboard().then(insert);

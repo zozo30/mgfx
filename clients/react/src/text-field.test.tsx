@@ -23,7 +23,7 @@ function textFieldSurface(onValue: (value: string) => void): ReactSurface {
 test("sequential backspace presses advance the caret until the field is empty", async () => {
   let value = "";
   const surface = textFieldSurface((next) => { value = next; });
-  surface.textInput("NATIVE");
+  for (const character of "NATIVE") surface.textInput(character);
   assert.equal(value, "NATIVE");
   for (let index = 0; index < 6; index += 1) {
     surface.keyDown({ key: Key.Backspace, modifiers: 0, repeat: index > 0 });

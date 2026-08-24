@@ -614,7 +614,9 @@ mgfx::ipc::ResourceTrace resourceTrace(mgfx::ipc::ResourceKind kind,
     if (characters.length > 0 && (flags & (NSEventModifierFlagCommand |
                                            NSEventModifierFlagControl)) == 0) {
         const unichar first = [characters characterAtIndex:0];
-        const bool printable = first >= 0x20 && !(first >= 0xF700 && first <= 0xF8FF);
+        const bool printable = first >= 0x20 &&
+                               !(first >= 0x7f && first <= 0x9f) &&
+                               !(first >= 0xF700 && first <= 0xF8FF);
         if (printable) {
             _graphicsServer->sendTextInput(characters.UTF8String);
         }
