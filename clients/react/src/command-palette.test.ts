@@ -28,12 +28,11 @@ test("command palette ignores surrounding whitespace and returns no false match"
 
 test("command palette retains text focus while filtered rows reconcile", async () => {
   let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  let dismissed = false;
   const surface = new ReactSurface((next) => { frame = next; });
   surface.render(createElement(CommandPalette, { open: true, commands,
-    onSelect: () => {}, onDismiss: () => {} }));
+    onSelect: () => {}, onDismiss: () => { dismissed = true; } }));
   surface.resize({ width: 800, height: 600 });
-  surface.pointerDown({ x: 100, y: 145 });
-  surface.pointerUp({ x: 100, y: 145 });
   surface.textInput("graphics");
   assert.equal(frame.includes(Buffer.from("graphics")), true);
   for (let index = 0; index < 8; index += 1) {
@@ -42,4 +41,6 @@ test("command palette retains text focus while filtered rows reconcile", async (
     await new Promise<void>((resolve) => setImmediate(resolve));
   }
   assert.equal(frame.includes(Buffer.from("Type a command")), true);
+  surface.keyDown({ key: Key.Escape, modifiers: 0, repeat: false });
+  assert.equal(dismissed, true);
 });

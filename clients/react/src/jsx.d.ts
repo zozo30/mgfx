@@ -11,6 +11,7 @@ export interface MGFXProps {
   readonly value?: string;
   readonly textStyle?: TextStyle;
   readonly offsetY?: number;
+  readonly autoFocus?: boolean;
   readonly onClick?: () => void;
   readonly onHoverChange?: (hovered: boolean) => void;
   readonly onPressChange?: (pressed: boolean) => void;

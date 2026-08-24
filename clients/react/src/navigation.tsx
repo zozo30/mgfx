@@ -191,7 +191,7 @@ export function CommandPalette({ open, commands, onSelect, onDismiss }: {
         <Text value="ESC" style={{ fontSize: 15, fontWeight: "bold",
           color: rgba(0.52, 0.62, 0.74) }} />
       </Row>
-      <TextField value={query} onChange={setQuery} placeholder="Type a command…"
+      <TextField autoFocus value={query} onChange={setQuery} placeholder="Type a command…"
         style={{ preferredSize: { height: 54 }, background: rgba(0.055, 0.08, 0.13) }}
         textStyle={{ fontSize: 21 }} onKeyDown={(key) => {
           if (key === Key.Escape) onDismiss();

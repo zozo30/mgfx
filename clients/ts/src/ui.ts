@@ -331,6 +331,7 @@ export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richTex
   "vectorText" | "vectorRichText" | "vectorImage" | "scroll" | "circle" | "mesh" | "path";
 export interface Element {
   type: ElementType; key: string; style: Style; children: readonly Element[];
+  autoFocus?: boolean;
   onClick?: () => void; onHoverChange?: (hovered: boolean) => void;
   onPressChange?: (pressed: boolean) => void; value?: string; textStyle?: TextStyle;
   onPointerDown?: (point: Point) => void; onPointerMove?: (point: Point) => void;
@@ -517,11 +518,11 @@ export class ComponentHost {
     const element = this.component.build();
     if (this.root?.matches(element)) this.root.update(element);
     else this.root = new Node(element);
-    if (this.focused) {
-      const targets: Node[] = [];
-      this.root.collectTargets(targets);
-      if (!targets.includes(this.focused)) this.setFocus(targets[0]);
-    }
+    const targets: Node[] = [];
+    this.root.collectTargets(targets);
+    const requested = targets.find((target) => target.autoFocus);
+    if (this.focused && !targets.includes(this.focused)) this.setFocus(requested ?? targets[0]);
+    else if (!this.focused && requested) this.setFocus(requested);
     this.dirty = false;
   }
   private setFocus(target: Node | undefined): void {
@@ -548,6 +549,7 @@ export class ComponentHost {
 
 class Node {
   type: ElementType; key: string; style: Style = {}; children: Node[] = [];
+  autoFocus = false;
   onClick: (() => void) | undefined; value = ""; textStyle: TextStyle = {};
   onHoverChange: ((hovered: boolean) => void) | undefined;
   onPressChange: ((pressed: boolean) => void) | undefined;
@@ -574,6 +576,7 @@ class Node {
   matches(element: Element): boolean { return this.type === element.type && this.key === element.key; }
   update(element: Element): void {
     this.type = element.type; this.key = element.key; this.style = element.style;
+    this.autoFocus = element.autoFocus ?? false;
     this.onClick = element.onClick; this.onHoverChange = element.onHoverChange;
     this.onPressChange = element.onPressChange; this.onFocusChange = element.onFocusChange;
     this.onPointerDown = element.onPointerDown; this.onPointerMove = element.onPointerMove;

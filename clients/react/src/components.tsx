@@ -723,10 +723,11 @@ export interface TextFieldProps {
   readonly style?: Style;
   readonly textStyle?: TextStyle;
   readonly onKeyDown?: (key: Key, modifiers: number) => void;
+  readonly autoFocus?: boolean;
 }
 
 export function TextField({ value, onChange, placeholder = "", maxLength = 256,
-  style = {}, textStyle, onKeyDown }: TextFieldProps) {
+  style = {}, textStyle, onKeyDown, autoFocus = false }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [selection, setSelection] = useState(() => {
@@ -797,7 +798,7 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const caretNode = <Box style={{ preferredSize: { width: 2, height: fontSize },
     background: caretVisible ? rgba(0.60, 0.82, 1) : rgba(0.60, 0.82, 1, 0) }} />;
   return (
-    <mgfx-stack style={{ preferredSize: { height: 48 }, padding: all(12), cornerRadius: 10,
+    <mgfx-stack autoFocus={autoFocus} style={{ preferredSize: { height: 48 }, padding: all(12), cornerRadius: 10,
       clip: true, background: focused ? rgba(0.16, 0.28, 0.52) : rgba(0.12, 0.14, 0.21),
       borderWidth: focused ? 2 : 1,
       borderColor: focused ? rgba(0.38, 0.62, 1) : rgba(0.24, 0.28, 0.38), ...style }}

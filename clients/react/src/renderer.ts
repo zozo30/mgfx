@@ -21,7 +21,8 @@ export type HostType = "mgfx-box" | "mgfx-row" | "mgfx-column" | "mgfx-stack" |
 
 export interface HostProps {
   readonly children?: ReactNode; readonly style?: Style; readonly value?: string;
-  readonly textStyle?: TextStyle; readonly offsetY?: number; readonly onClick?: () => void;
+  readonly textStyle?: TextStyle; readonly offsetY?: number; readonly autoFocus?: boolean;
+  readonly onClick?: () => void;
   readonly onHoverChange?: (value: boolean) => void; readonly onPressChange?: (value: boolean) => void;
   readonly onFocusChange?: (value: boolean) => void; readonly onScroll?: (x: number, y: number) => void;
   readonly onPointerDown?: (point: Point) => void; readonly onPointerMove?: (point: Point) => void;
@@ -186,6 +187,7 @@ function toElement(child: HostChild): Element[] {
       ...(child.props.onPointerUp ? { onPointerUp: child.props.onPointerUp } : {}),
     };
   }
+  if (child.props.autoFocus) element = { ...element, autoFocus: true };
   return [element];
 }
 
