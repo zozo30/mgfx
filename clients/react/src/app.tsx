@@ -339,6 +339,7 @@ function NavigationDrawer({ width, expanded, onToggle, icons }: {
   ] as const;
   return <Column style={{ position: "absolute", inset: { top: 100, bottom: 20, left: 20 },
     preferredSize: { width }, zIndex: 30, padding: all(10), gap: 10, cornerRadius: 16,
+    crossAxisAlignment: "stretch",
     background: rgba(0.035, 0.052, 0.085, 0.98), borderWidth: 1,
     borderColor: rgba(0.22, 0.34, 0.56, 0.9),
     shadow: { color: rgba(0, 0, 0, 0.42), blur: 18, spread: 1, offsetX: 4 } }}>
