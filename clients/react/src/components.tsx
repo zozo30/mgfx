@@ -780,9 +780,14 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   const fontFamily = textStyle?.fontFamily ?? "system";
   const fontWeight = textStyle?.fontWeight ?? "regular";
   const fontStyle = textStyle?.fontStyle ?? "regular";
+  const lineHeight = textStyle?.lineHeight ?? fontSize * 1.2;
   const letterSpacing = (textStyle?.letterSpacing ?? 0) / fontSize;
   const fontResourceId = textStyle?.fontResourceId ?? 0;
   const paddingLeft = style.padding?.left ?? 12;
+  const paddingTop = style.padding?.top ?? 12;
+  const paddingBottom = style.padding?.bottom ?? 12;
+  const fieldHeight = style.preferredSize?.height ?? 48;
+  const lineTop = Math.max(0, (fieldHeight - paddingTop - paddingBottom - lineHeight) / 2);
   const characterWidth = (character: string) => {
     if (fontFamily !== "pixel") {
       return (nativeTextAdvance(
@@ -819,7 +824,7 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
     updateSelection({ caret: next, anchor: next });
     wakeCaret();
   };
-  const caretNode = <Box style={{ preferredSize: { width: 2, height: fontSize },
+  const caretNode = <Box style={{ preferredSize: { width: 2, height: lineHeight }, cornerRadius: 1,
     background: caretVisible ? rgba(0.60, 0.82, 1) : rgba(0.60, 0.82, 1, 0) }} />;
   return (
     <mgfx-stack autoFocus={autoFocus} style={{ preferredSize: { height: 48 }, padding: all(12), cornerRadius: 10,
@@ -890,7 +895,9 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
           void clipboard.readClipboard().then(insert);
         }
       }}>
-      {focused ? <Row style={{ gap: 0, crossAxisAlignment: "center" }}>
+      <Row style={{ position: "absolute", inset: { top: lineTop, right: 0, left: 0 },
+        preferredSize: { height: lineHeight }, gap: 0, crossAxisAlignment: "center" }}>
+      {focused ? <>
         <Text value={characters.slice(0, selectionStart).join("")}
           style={{ ...textStyle, color: textStyle?.color ?? rgba(1, 1, 1) }} />
         {hasSelection && caret === selectionStart ? caretNode : null}
@@ -902,7 +909,8 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
         <Text value={characters.length === 0 ? placeholder : characters.slice(selectionEnd).join("")}
           style={{ ...textStyle, color: characters.length === 0
             ? rgba(0.55, 0.60, 0.70) : textStyle?.color ?? rgba(1, 1, 1) }} />
-      </Row> : <Text value={displayed} style={{ ...textStyle, color }} />}
+      </> : <Text value={displayed} style={{ ...textStyle, color }} />}
+      </Row>
     </mgfx-stack>
   );
 }
