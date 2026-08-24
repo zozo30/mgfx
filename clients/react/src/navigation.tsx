@@ -175,7 +175,7 @@ export function CommandPalette({ open, commands, onSelect, onDismiss }: {
     zIndex: 2400, modal: true, background: rgba(0.004, 0.008, 0.018, 0.76),
     mainAxisAlignment: "center", crossAxisAlignment: "center" }}>
     <mgfx-column onClick={() => {}} style={{ preferredSize: { width: 680, height: 500 },
-      padding: all(20), gap: 14, cornerRadius: 18,
+      padding: all(20), gap: 14, cornerRadius: 18, crossAxisAlignment: "stretch",
       background: rgba(0.025, 0.038, 0.068, 0.995), borderWidth: 2,
       borderColor: rgba(0.32, 0.62, 0.92),
       shadow: { color: rgba(0.08, 0.34, 0.72, 0.30), blur: 32, spread: 4, offsetY: 10 } }}>
