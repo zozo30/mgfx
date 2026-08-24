@@ -582,6 +582,70 @@ fragment float4 arcFragmentMain(ArcVertexOut in [[stage_in]]) {
     return float4(in.color.rgb * in.color.a, in.color.a) * coverage;
 }
 
+struct GradientArcVertex {
+    packed_float2 position;
+    packed_float2 local;
+    packed_float2 size;
+    float startAngle;
+    float sweepAngle;
+    float thickness;
+    float roundCaps;
+    packed_float4 startColor;
+    packed_float4 endColor;
+};
+
+struct GradientArcVertexOut {
+    float4 position [[position]];
+    float2 local;
+    float2 size;
+    float startAngle;
+    float sweepAngle;
+    float thickness;
+    float roundCaps;
+    float4 startColor;
+    float4 endColor;
+};
+
+vertex GradientArcVertexOut gradientArcVertexMain(
+    const device GradientArcVertex* vertices [[buffer(0)]], uint vertexId [[vertex_id]]) {
+    const GradientArcVertex value = vertices[vertexId];
+    return {float4(value.position, 0.0, 1.0), value.local, value.size,
+            value.startAngle, value.sweepAngle, value.thickness, value.roundCaps,
+            value.startColor, value.endColor};
+}
+
+fragment float4 gradientArcFragmentMain(GradientArcVertexOut in [[stage_in]]) {
+    constexpr float twoPi = 6.28318530718;
+    const float halfThickness = in.thickness * 0.5;
+    const float radius = max(0.0, min(in.size.x, in.size.y) * 0.5 - halfThickness - 1.0);
+    const float2 point = in.local - in.size * 0.5;
+    const float radialDistance = abs(length(point) - radius) - halfThickness;
+    float angle = atan2(point.y, point.x);
+    if (angle < 0.0) angle += twoPi;
+    float start = fmod(in.startAngle, twoPi);
+    if (start < 0.0) start += twoPi;
+    const float relative = fmod(angle - start + twoPi, twoPi);
+    float angularDistance = -halfThickness;
+    if (in.sweepAngle < twoPi - 0.0001) {
+        angularDistance = relative <= in.sweepAngle
+            ? -min(relative, in.sweepAngle - relative) * max(radius, 1.0)
+            : min(relative - in.sweepAngle, twoPi - relative) * max(radius, 1.0);
+    }
+    float distance = max(radialDistance, angularDistance);
+    if (in.roundCaps > 0.5 && in.sweepAngle < twoPi - 0.0001) {
+        const float2 startCenter = float2(cos(start), sin(start)) * radius;
+        const float end = start + in.sweepAngle;
+        const float2 endCenter = float2(cos(end), sin(end)) * radius;
+        distance = min(distance, min(length(point - startCenter) - halfThickness,
+                                     length(point - endCenter) - halfThickness));
+    }
+    const float antialias = max(fwidth(distance), 0.75);
+    const float coverage = 1.0 - smoothstep(0.0, antialias, distance);
+    const float progress = clamp(relative / max(in.sweepAngle, 0.0001), 0.0, 1.0);
+    const float4 color = mix(in.startColor, in.endColor, progress);
+    return float4(color.rgb * color.a, color.a) * coverage;
+}
+
 struct PatternVertex {
     packed_float2 position;
     packed_float2 local;

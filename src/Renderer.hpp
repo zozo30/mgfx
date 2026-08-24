@@ -57,6 +57,7 @@ private:
     NS::SharedPtr<MTL::RenderPipelineState> roundedRectPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> circlePipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> arcPipelineState_;
+    NS::SharedPtr<MTL::RenderPipelineState> gradientArcPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> patternPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> gridPatternPipelineState_;
     NS::SharedPtr<MTL::RenderPipelineState> linearGradientPipelineState_;

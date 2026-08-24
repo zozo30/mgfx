@@ -418,7 +418,8 @@ void GraphicsServer::run() {
                      mgfx::ipc::encodeCapabilityWord({1,
                          mgfx::ipc::ServerCapabilityWord1::imageColorEffects |
                          mgfx::ipc::ServerCapabilityWord1::imageBlurEffects |
-                         mgfx::ipc::ServerCapabilityWord1::nativeArcs}));
+                         mgfx::ipc::ServerCapabilityWord1::nativeArcs |
+                         mgfx::ipc::ServerCapabilityWord1::nativeGradientArcs}));
         {
             const std::lock_guard<std::mutex> lock(sizeMutex_);
             if (width_ > 0 && height_ > 0) {

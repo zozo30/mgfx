@@ -101,6 +101,10 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
     auto circleFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleFragmentMain")));
     auto arcVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("arcVertexMain")));
     auto arcFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("arcFragmentMain")));
+    auto gradientArcVertexFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("gradientArcVertexMain")));
+    auto gradientArcFragmentFunction = NS::TransferPtr(
+        library->newFunction(MTLSTR("gradientArcFragmentMain")));
     auto patternVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternVertexMain")));
     auto patternFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternFragmentMain")));
     auto gridPatternVertexFunction = NS::TransferPtr(
@@ -130,6 +134,7 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         !roundedRectVertexFunction || !roundedRectFragmentFunction ||
         !circleVertexFunction || !circleFragmentFunction ||
         !arcVertexFunction || !arcFragmentFunction ||
+        !gradientArcVertexFunction || !gradientArcFragmentFunction ||
         !patternVertexFunction || !patternFragmentFunction ||
         !gridPatternVertexFunction || !gridPatternFragmentFunction ||
         !linearGradientVertexFunction || !linearGradientFragmentFunction ||
@@ -307,6 +312,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(arcDescriptor.get(), &error));
     if (!arcPipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the arc pipeline", error));
+    }
+
+    auto gradientArcDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    gradientArcDescriptor->setVertexFunction(gradientArcVertexFunction.get());
+    gradientArcDescriptor->setFragmentFunction(gradientArcFragmentFunction.get());
+    gradientArcDescriptor->setRasterSampleCount(sampleCount);
+    auto* gradientArcColor = gradientArcDescriptor->colorAttachments()->object(0);
+    gradientArcColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    gradientArcColor->setBlendingEnabled(true);
+    gradientArcColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    gradientArcColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    gradientArcColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    gradientArcColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    gradientArcPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(gradientArcDescriptor.get(), &error));
+    if (!gradientArcPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the gradient-arc pipeline", error));
     }
 
     auto patternDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -1047,6 +1069,62 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(arcPipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawGradientArc) {
+            gfx::GradientArcCommand arc{};
+            constexpr float twoPi = 6.28318530717958647692F;
+            if (!gfx::decodeGradientArc(command, arc) || !std::isfinite(arc.startAngle) ||
+                !std::isfinite(arc.sweepAngle) || !std::isfinite(arc.thickness) ||
+                arc.startAngle < -twoPi || arc.startAngle > twoPi ||
+                arc.sweepAngle <= 0.0F || arc.sweepAngle > twoPi ||
+                arc.thickness <= 0.0F || arc.thickness > 8192.0F) {
+                throw std::runtime_error("Malformed gradient-arc command");
+            }
+            if (clipEmpty() || (arc.startColor.alpha <= 0.0F && arc.endColor.alpha <= 0.0F))
+                continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (arc.destination.right - arc.destination.left) * drawableWidth * 0.5F,
+                (arc.destination.top - arc.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct GradientArcVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float startAngle;
+                float sweepAngle;
+                float thickness;
+                float roundCaps;
+                std::array<float, 4> startColor;
+                std::array<float, 4> endColor;
+            };
+            static_assert(sizeof(GradientArcVertex) == 72,
+                          "Gradient arc CPU/Metal vertex ABI changed");
+            const float opacity = opacityStack.back();
+            const std::array<float, 4> startColor = {arc.startColor.red, arc.startColor.green,
+                arc.startColor.blue, arc.startColor.alpha * opacity};
+            const std::array<float, 4> endColor = {arc.endColor.red, arc.endColor.green,
+                arc.endColor.blue, arc.endColor.alpha * opacity};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return GradientArcVertex{transformPoint(currentTransform(), {x, y}),
+                    {localX, localY}, size, arc.startAngle, arc.sweepAngle, arc.thickness,
+                    arc.roundCaps ? 1.0F : 0.0F, startColor, endColor};
+            };
+            const GradientArcVertex vertices[] = {
+                vertex(arc.destination.left, arc.destination.top, 0.0F, 0.0F),
+                vertex(arc.destination.left, arc.destination.bottom, 0.0F, size[1]),
+                vertex(arc.destination.right, arc.destination.bottom, size[0], size[1]),
+                vertex(arc.destination.left, arc.destination.top, 0.0F, 0.0F),
+                vertex(arc.destination.right, arc.destination.bottom, size[0], size[1]),
+                vertex(arc.destination.right, arc.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(gradientArcPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

@@ -473,6 +473,26 @@ test("animated semantic arcs accept rotations accumulated over long runtimes", (
   assert.equal(encoder.finish().readUInt16LE(16), 46);
 });
 
+test("gradient arcs remain one semantic server command", () => {
+  class GradientArcComponent extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 120, height: 120 }, backgroundArc: {
+        startAngle: 0, sweepAngle: 180, thickness: 16,
+        startColor: { red: 0.1, green: 0.8, blue: 1, alpha: 1 },
+        endColor: { red: 0.8, green: 0.2, blue: 1, alpha: 0.7 },
+      } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new GradientArcComponent());
+  host.layout({ width: 120, height: 120 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 120, height: 120 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 47);
+  assert.equal(frame.readUInt32LE(20), 64);
+});
+
 test("gradient circles emit one server SDF command instead of a triangle fan", () => {
   class GradientCircle extends Component {
     build(): Element {
