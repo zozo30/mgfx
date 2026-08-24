@@ -67,6 +67,8 @@ const surface = new ReactSurface(
       encodePathCreate(id, segments)),
     createMesh: (id, vertices, indices) => sendMessage(socket, MessageType.MeshCreate,
       encodeMeshCreate(id, vertices, indices)),
+    createTexture: (id, width, height, rgba) => sendMessage(socket, MessageType.TextureCreate,
+      encodeTextureCreate(id, width, height, rgba)),
     measureText: (family, text, weight, style, letterSpacing, fontResourceId) =>
       textMetrics.measure(family, text, weight, style, letterSpacing, fontResourceId),
   },

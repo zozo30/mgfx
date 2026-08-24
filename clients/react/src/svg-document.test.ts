@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TextDecoration } from "@mgfx/demo-client/protocol";
+import { PNG } from "pngjs";
 import { parseSvgVectorDocument } from "./svg-document.js";
+
+function tinyPngDataUrl(): string {
+  const png = new PNG({ width: 2, height: 1 });
+  png.data.set([255, 0, 0, 255, 0, 128, 255, 128]);
+  return `data:image/png;base64,${PNG.sync.write(png).toString("base64")}`;
+}
 
 test("SVG documents lower inherited paint, primitives, and group transforms to vector layers", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 120 80" fill="none"
@@ -28,10 +35,34 @@ test("SVG vector lowering rejects executable or external document content", () =
   /external or executable/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><image href="https://example.com/a.png"/></svg>`),
-  /external or executable/);
+  /embedded base64 PNG or JPEG/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><use href="https://example.com/a.svg#shape"/></svg>`),
   /local fragment/);
+});
+
+test("SVG embedded images become canonical persistent native textures", () => {
+  const href = tinyPngDataUrl();
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 50">
+    <g opacity="0.75" transform="rotate(8 30 20)">
+      <image href="${href}" x="10" y="5" width="40" height="30"
+        preserveAspectRatio="xMidYMid slice" image-rendering="pixelated"/>
+      <image href="${href}" x="55" y="5" width="40" height="30" preserveAspectRatio="none"/>
+    </g></svg>`);
+  assert.equal(document.layers.length, 2);
+  assert.equal(document.layers[0]?.image?.texture.resourceId,
+    document.layers[1]?.image?.texture.resourceId);
+  assert.deepEqual(document.layers[0]?.image && {
+    x: document.layers[0].image.x, y: document.layers[0].image.y,
+    width: document.layers[0].image.width, height: document.layers[0].image.height,
+    sourceWidth: document.layers[0].image.texture.width,
+    sourceHeight: document.layers[0].image.texture.height,
+    fit: document.layers[0].image.fit, sampling: document.layers[0].image.sampling,
+    opacity: document.layers[0].image.opacity,
+  }, { x: 10, y: 5, width: 40, height: 30, sourceWidth: 2, sourceHeight: 1,
+    fit: "cover", sampling: "nearest", opacity: 0.75 });
+  assert.equal(document.layers[1]?.image?.fit, "fill");
+  assert.ok(document.layers[0]?.image?.sourceTransform);
 });
 
 test("SVG local use instances expand symbols into independently transformed native paths", () => {

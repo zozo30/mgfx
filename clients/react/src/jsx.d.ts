@@ -1,5 +1,6 @@
 import type { MeshData, PathData, Point, RichTextSpan, Style, TextStyle,
-  VectorRichTextData, VectorTextData } from "@mgfx/demo-client/ui";
+  VectorImageData, VectorRichTextData, VectorTextData } from "@mgfx/demo-client/ui";
+import type { EmbeddedTexture } from "./embedded-texture.js";
 import type { Key } from "@mgfx/demo-client/protocol";
 import type { Key as ReactKey, ReactNode } from "react";
 
@@ -24,6 +25,8 @@ export interface MGFXProps {
   readonly path?: PathData;
   readonly vectorText?: VectorTextData;
   readonly vectorRichText?: VectorRichTextData;
+  readonly vectorImage?: VectorImageData;
+  readonly textureResource?: EmbeddedTexture;
   readonly richTextSpans?: readonly RichTextSpan[];
 }
 
@@ -42,6 +45,7 @@ declare module "react" {
       "mgfx-path": MGFXProps;
       "mgfx-vector-text": MGFXProps;
       "mgfx-vector-rich-text": MGFXProps;
+      "mgfx-vector-image": MGFXProps;
     }
   }
 }

@@ -63,9 +63,14 @@ and transformed fields without client tessellation. Offset focal points and nonz
 focal radii use the native two-circle solver. `stroke-dasharray`
 sequences of up to 32 values plus
 `stroke-dashoffset` lower to native dashed path paint. Odd sequences are repeated
-to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients,
-masks, text, and embedded images deliberately continue through the high-quality raster fallback.
+to form alternating paint/gap pairs. Executable or external content is rejected, while complex gradients
+and masks deliberately continue through the high-quality raster fallback.
 Missing, cyclic, or external gradient references are rejected rather than partially rendered.
+Embedded PNG/JPEG data URLs in SVG `<image>` elements decode under the same
+dimension and byte bounds as direct images, deduplicate by content hash, and
+upload once as connection-scoped textures. Native image commands preserve
+`preserveAspectRatio` meet/slice/none, opacity, rectangular clips, affine
+transforms, and linear or nearest sampling. Network and filesystem URLs remain rejected.
 Local `<use>` references to primitive, group, or symbol definitions expand before
 canonicalization. Each instance retains its own paint and transform while the
 definition itself remains non-rendering; external, missing, duplicate, cyclic,

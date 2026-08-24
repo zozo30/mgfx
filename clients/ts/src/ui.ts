@@ -291,8 +291,17 @@ export interface VectorRichTextData {
   readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
     readonly d: number; readonly e: number; readonly f: number };
 }
+export interface VectorImageData {
+  readonly textureId: number; readonly sourceSize: Size;
+  readonly x: number; readonly y: number; readonly width: number; readonly height: number;
+  readonly viewBox: Rect; readonly sourceClip?: Rect;
+  readonly fit?: "fill" | "contain" | "cover"; readonly sampling?: "linear" | "nearest";
+  readonly opacity?: number;
+  readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
+    readonly d: number; readonly e: number; readonly f: number };
+}
 export type ElementType = "box" | "row" | "column" | "stack" | "text" | "richText" |
-  "vectorText" | "vectorRichText" | "scroll" | "circle" | "mesh" | "path";
+  "vectorText" | "vectorRichText" | "vectorImage" | "scroll" | "circle" | "mesh" | "path";
 export interface Element {
   type: ElementType; key: string; style: Style; children: readonly Element[];
   onClick?: () => void; onHoverChange?: (hovered: boolean) => void;
@@ -306,6 +315,7 @@ export interface Element {
   path?: PathData;
   vectorText?: VectorTextData;
   vectorRichText?: VectorRichTextData;
+  vectorImage?: VectorImageData;
   richTextSpans?: readonly RichTextSpan[];
 }
 
@@ -321,6 +331,8 @@ export const vectorText = (data: VectorTextData, style: Style = {}, key = ""): E
   ({ ...make("vectorText", [], style, key), vectorText: data });
 export const vectorRichText = (data: VectorRichTextData, style: Style = {}, key = ""): Element =>
   ({ ...make("vectorRichText", [], style, key), vectorRichText: data });
+export const vectorImage = (data: VectorImageData, style: Style = {}, key = ""): Element =>
+  ({ ...make("vectorImage", [], style, key), vectorImage: data });
 export const row = (children: readonly Element[], style: Style = {}, key = ""): Element => make("row", children, style, key);
 export const column = (children: readonly Element[], style: Style = {}, key = ""): Element => make("column", children, style, key);
 export const stack = (children: readonly Element[], style: Style = {}, key = ""): Element => make("stack", children, style, key);
@@ -492,6 +504,7 @@ class Node {
   path: PathData | undefined = undefined;
   vectorText: VectorTextData | undefined = undefined;
   vectorRichText: VectorRichTextData | undefined = undefined;
+  vectorImage: VectorImageData | undefined = undefined;
   richTextSpans: readonly RichTextSpan[] = [];
   measured: Size = { width: 0, height: 0 };
   bounds: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -514,6 +527,7 @@ class Node {
     this.path = element.path;
     this.vectorText = element.vectorText;
     this.vectorRichText = element.vectorRichText;
+    this.vectorImage = element.vectorImage;
     this.richTextSpans = element.richTextSpans ?? [];
     const old = this.children, used = old.map(() => false);
     this.children = element.children.map((child, index) => {
@@ -711,6 +725,7 @@ class Node {
     if (this.type === "vectorText") paintVectorText(encoder, this.bounds, this.vectorText, viewport);
     if (this.type === "vectorRichText")
       paintVectorRichText(encoder, this.bounds, this.vectorRichText, viewport);
+    if (this.type === "vectorImage") paintVectorImage(encoder, this.bounds, this.vectorImage, viewport);
     for (const child of this.paintOrder()) child.paint(encoder, viewport);
     if (this.style.clip) encoder.popClip();
     if (this.style.transform) encoder.popTransform();
@@ -997,6 +1012,62 @@ function paintVectorRichText(encoder: FrameEncoder, bounds: Rect,
     fontSize / viewport.height * 2, text.anchor ?? "start", "alphabetic");
   if (text.sourceTransform) encoder.popTransform();
   if (text.sourceClip) encoder.popClip();
+}
+
+function paintVectorImage(encoder: FrameEncoder, bounds: Rect, image: VectorImageData | undefined,
+  viewport: Size): void {
+  if (!image || image.width <= 0 || image.height <= 0 || image.viewBox.width <= 0 ||
+      image.viewBox.height <= 0) return;
+  const sourceAspect = image.viewBox.width / image.viewBox.height;
+  const boundsAspect = bounds.width / bounds.height;
+  let documentBounds = bounds;
+  if (sourceAspect > boundsAspect) {
+    const height = bounds.width / sourceAspect;
+    documentBounds = { ...bounds, y: bounds.y + (bounds.height - height) / 2, height };
+  } else {
+    const width = bounds.height * sourceAspect;
+    documentBounds = { ...bounds, x: bounds.x + (bounds.width - width) / 2, width };
+  }
+  if (image.sourceClip) {
+    const clip = { x: documentBounds.x +
+        (image.sourceClip.x - image.viewBox.x) / image.viewBox.width * documentBounds.width,
+      y: documentBounds.y +
+        (image.sourceClip.y - image.viewBox.y) / image.viewBox.height * documentBounds.height,
+      width: image.sourceClip.width / image.viewBox.width * documentBounds.width,
+      height: image.sourceClip.height / image.viewBox.height * documentBounds.height };
+    if (clip.width <= 0 || clip.height <= 0) return;
+    encoder.pushClip({ left: clip.x / viewport.width, top: clip.y / viewport.height,
+      right: (clip.x + clip.width) / viewport.width,
+      bottom: (clip.y + clip.height) / viewport.height });
+  }
+  if (image.opacity !== undefined && image.opacity < 1) encoder.pushOpacity(image.opacity);
+  if (image.sourceTransform) {
+    const matrix = image.sourceTransform;
+    const sourceScaleX = documentBounds.width / image.viewBox.width / viewport.width * 2;
+    const sourceScaleY = -documentBounds.height / image.viewBox.height / viewport.height * 2;
+    const sourceTranslateX = documentBounds.x / viewport.width * 2 - 1 -
+      image.viewBox.x * sourceScaleX;
+    const sourceTranslateY = 1 - documentBounds.y / viewport.height * 2 -
+      image.viewBox.y * sourceScaleY;
+    const m21 = sourceScaleX * matrix.c / sourceScaleY;
+    const m12 = sourceScaleY * matrix.b / sourceScaleX;
+    encoder.pushTransform({ m11: matrix.a, m12, m21, m22: matrix.d,
+      translateX: sourceScaleX * matrix.e + sourceTranslateX -
+        matrix.a * sourceTranslateX - m21 * sourceTranslateY,
+      translateY: sourceScaleY * matrix.f + sourceTranslateY -
+        m12 * sourceTranslateX - matrix.d * sourceTranslateY });
+  }
+  const destination = {
+    x: documentBounds.x + (image.x - image.viewBox.x) / image.viewBox.width * documentBounds.width,
+    y: documentBounds.y + (image.y - image.viewBox.y) / image.viewBox.height * documentBounds.height,
+    width: image.width / image.viewBox.width * documentBounds.width,
+    height: image.height / image.viewBox.height * documentBounds.height,
+  };
+  paintImage(encoder, destination, { textureId: image.textureId, sourceSize: image.sourceSize,
+    fit: image.fit ?? "fill", sampling: image.sampling ?? "linear" }, 0, viewport);
+  if (image.sourceTransform) encoder.popTransform();
+  if (image.opacity !== undefined && image.opacity < 1) encoder.popOpacity();
+  if (image.sourceClip) encoder.popClip();
 }
 
 function paintMesh(encoder: FrameEncoder, bounds: Rect, mesh: MeshData | undefined,

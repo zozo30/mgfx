@@ -8,6 +8,13 @@ import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
 import { AnimationProvider } from "./animation.js";
+import { PNG } from "pngjs";
+
+function embeddedPng(): string {
+  const png = new PNG({ width: 1, height: 1 });
+  png.data.set([40, 180, 120, 255]);
+  return `data:image/png;base64,${PNG.sync.write(png).toString("base64")}`;
+}
 
 test("React JSX commits an MGFX binary frame", () => {
   let frame: Buffer | undefined;
@@ -173,6 +180,26 @@ test("React Svg emits server-shaped text with SVG anchor and alphabetic baseline
   assert.equal(frame.readUInt8(textOffset + 3), 4);
   assert.equal(frame.readUInt8(textOffset + 44), 1);
   assert.equal(frame.readUInt8(textOffset + 45), 1);
+});
+
+test("React Svg uploads embedded images once and frames reference the native texture", () => {
+  let frame: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  const uploads: { id: number; width: number; height: number; bytes: number }[] = [];
+  const surface = new ReactSurface((value) => { frame = value; }, undefined, {
+    createPath: () => {},
+    createTexture: (id, width, height, rgba) => uploads.push({ id, width, height,
+      bytes: rgba.length }),
+  });
+  const source = `<svg viewBox="0 0 20 10"><image href="${embeddedPng()}"
+    x="2" y="1" width="16" height="8" preserveAspectRatio="none"/></svg>`;
+  surface.render(<Svg source={source} style={{ preferredSize: { width: 200, height: 100 } }} />);
+  surface.resize({ width: 200, height: 100 });
+  surface.render(<Svg source={source} style={{ preferredSize: { width: 200, height: 100 } }} />);
+  assert.deepEqual(uploads, [{ id: uploads[0]!.id, width: 1, height: 1, bytes: 4 }]);
+  const opcodes: number[] = [];
+  for (let offset = 16; offset < frame.length; offset += 8 + frame.readUInt32LE(offset + 4))
+    opcodes.push(frame.readUInt16LE(offset));
+  assert.deepEqual(opcodes, [1, 6, 3]);
 });
 
 test("React Mesh uploads indexed geometry once and draws its resource ID", () => {

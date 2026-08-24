@@ -193,6 +193,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     <g class="content">
     <circle cx="34" cy="32" r="17" fill="url(#orb)" stroke="url(#orb)" stroke-width="3"
       stroke-dasharray="5 3" stroke-dashoffset="1"/>
+    <image href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGklEQVR4AWP83yX3X9GviIHF1/4hQ2wFAwMAQAkFzxdDCUIAAAAASUVORK5CYII="
+      x="49" y="8" width="12" height="12" preserveAspectRatio="none" image-rendering="pixelated"/>
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
     <use class="signal" href="#signalGlyph" x="78" y="24" width="53" height="18"
       preserveAspectRatio="xMidYMid slice"/>

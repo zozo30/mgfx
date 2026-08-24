@@ -106,6 +106,17 @@ export function Svg({ source, color, tolerance = 0.15, style }: {
     ? <mgfx-vector-rich-text key={`svg-layer-${index}${suffix}`} vectorRichText={{ ...layer.richText,
       viewBox: document.viewBox, ...(layer.clip ? { sourceClip: layer.clip } : {}) }}
       style={{ position: "absolute", inset: all(0) }} />
+    : layer.image
+    ? <mgfx-vector-image key={`svg-layer-${index}${suffix}`}
+      textureResource={layer.image.texture}
+      vectorImage={{ textureId: layer.image.texture.resourceId,
+        sourceSize: { width: layer.image.texture.width, height: layer.image.texture.height },
+        x: layer.image.x, y: layer.image.y, width: layer.image.width, height: layer.image.height,
+        viewBox: document.viewBox, fit: layer.image.fit, sampling: layer.image.sampling,
+        ...(layer.image.opacity !== undefined ? { opacity: layer.image.opacity } : {}),
+        ...(layer.image.sourceTransform ? { sourceTransform: layer.image.sourceTransform } : {}),
+        ...(layer.clip ? { sourceClip: layer.clip } : {}) }}
+      style={{ position: "absolute", inset: all(0) }} />
     : <Path key={`svg-layer-${index}${suffix}`}
       data={layer.path!}
       viewBox={document.viewBox}

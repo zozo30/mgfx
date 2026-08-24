@@ -83,8 +83,12 @@ without client glyph metrics. Nested spans inherit styles normally, and underlin
 or line-through decorations use native font positions and thicknesses. Numeric,
 percentage, `super`, and `sub` baseline shifts remain semantic run metrics. Text
 strokes and gradients remain explicit fallbacks.
-Frames then contain only `DrawPath` references at the component's current layout
-size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content
+Embedded SVG `<image>` elements accept bounded base64 PNG/JPEG data URLs. Pixels
+decode and upload once as canonical persistent textures; frames retain only
+`DrawImage` references with SVG placement, transform, opacity, clipping,
+`preserveAspectRatio`, and `image-rendering` sampling.
+Frames then contain only resource references at the component's current layout
+size. Documents using more complex gradients or non-rectangular masks
 continue through the bounded raster fallback instead of partially misrendering.
 
 React can also submit indexed normalized `Mesh` geometry directly. Positions,

@@ -1,6 +1,7 @@
 import { SVGPathData } from "svg-pathdata";
 import { TextDecoration, type Color, type RichTextRun } from "@mgfx/demo-client/protocol";
 import type { Rect } from "@mgfx/demo-client/ui";
+import { embeddedTexture, type EmbeddedTexture } from "./embedded-texture.js";
 import { svgAttributes, svgPrimitivePath } from "./icon-pack.js";
 
 type DashStyle = { readonly length: number; readonly gap: number; readonly offset?: number } |
@@ -19,6 +20,10 @@ export interface SvgVectorLayer {
   readonly richText?: { readonly runs: readonly RichTextRun[]; readonly x: number;
     readonly y: number; readonly fontSize: number;
     readonly anchor?: "start" | "middle" | "end"; readonly sourceTransform?: Matrix };
+  readonly image?: { readonly texture: EmbeddedTexture; readonly x: number; readonly y: number;
+    readonly width: number; readonly height: number; readonly fit: "fill" | "contain" | "cover";
+    readonly sampling: "linear" | "nearest"; readonly opacity?: number;
+    readonly sourceTransform?: Matrix };
   readonly clip?: Rect;
   readonly fill?: Color;
   readonly fillGradient?: LinearGradientPaint;
@@ -253,9 +258,9 @@ function expandLocalUses(source: string, cssRules: readonly CssRule[]): string {
 }
 
 export function parseSvgVectorDocument(source: string, defaultColor: Color = white): SvgVectorDocument {
-  if (Buffer.byteLength(source, "utf8") > 1024 * 1024) throw new RangeError("SVG exceeds 1 MiB");
+  if (Buffer.byteLength(source, "utf8") > 16 * 1024 * 1024) throw new RangeError("SVG exceeds 16 MiB");
   if (/\bdata-mgfx-clip\s*=/i.test(source)) throw new Error("SVG uses a reserved MGFX attribute");
-  if (/<(?:script|image|foreignObject)\b|<!\s*(?:doctype|entity)\b/i.test(source))
+  if (/<(?:script|foreignObject)\b|<!\s*(?:doctype|entity)\b/i.test(source))
     throw new Error("SVG contains external or executable content");
   const cleanedSource = source.replace(/<!--[\s\S]*?-->/g, "");
   const cssRules = parseSvgStyles(cleanedSource);
@@ -429,6 +434,30 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       }
       continue;
     }
+    if (name === "image") {
+      if (!state.displayed || !state.visible || state.opacity <= 0) continue;
+      const href = attributes.href ?? attributes["xlink:href"];
+      if (!href) throw new Error("SVG image requires an href");
+      const texture = embeddedTexture(href);
+      const x = finiteNumber(attributes.x, 0), y = finiteNumber(attributes.y, 0);
+      const width = Number(attributes.width), height = Number(attributes.height);
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0)
+        throw new Error("SVG image requires positive numeric width and height");
+      const preserve = attributes.preserveAspectRatio?.trim().toLowerCase() ?? "xmidymid meet";
+      const fit = preserve === "none" ? "fill" : preserve.includes("slice") ? "cover" : "contain";
+      const samplingValue = attributes["image-rendering"]?.trim().toLowerCase();
+      const sampling = samplingValue === "pixelated" || samplingValue === "crisp-edges"
+        ? "nearest" : "linear";
+      layers.push({ ...(state.clip ? { clip: state.clip } : {}), image: {
+        texture, x, y, width, height, fit, sampling,
+        ...(state.opacity < 1 ? { opacity: state.opacity } : {}),
+        ...(state.transform.a !== 1 || state.transform.b !== 0 || state.transform.c !== 0 ||
+          state.transform.d !== 1 || state.transform.e !== 0 || state.transform.f !== 0
+          ? { sourceTransform: state.transform } : {}) },
+        strokeWidth: 0, fillRule: state.fillRule, lineCap: state.lineCap,
+        lineJoin: state.lineJoin });
+      continue;
+    }
     if (!primitiveTags.has(name)) continue;
     if (!state.displayed || !state.visible) continue;
     const rawPath = svgPrimitivePath(name, attributes);
@@ -479,7 +508,7 @@ const cssProperties = new Set(["color", "fill", "stroke", "opacity", "fill-opaci
   "stroke-miterlimit", "stroke-dasharray", "stroke-dashoffset", "clip-path", "transform",
   "stop-color", "stop-opacity", "display", "visibility", "font-size", "font-family",
   "font-weight", "font-style", "letter-spacing", "text-decoration", "baseline-shift",
-  "text-anchor"]);
+  "text-anchor", "image-rendering"]);
 
 function parseSvgStyles(source: string): readonly CssRule[] {
   const rules: CssRule[] = [];

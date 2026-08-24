@@ -7,14 +7,16 @@ import {
   box, cacheNativeTextAdvance, circle, clickable, column, Component, ComponentHost, focusable,
   nativeTextAdvance, nativeTextMetricRuns, richText, row, scrollView, stack, text,
   type Element, type Point, type RichTextSpan, type Size, type Style, type TextStyle,
-  mesh, path as vectorPath, vectorRichText, vectorText, type MeshData, type PathData,
-  type VectorRichTextData, type VectorTextData,
+  mesh, path as vectorPath, vectorImage, vectorRichText, vectorText, type MeshData, type PathData,
+  type VectorImageData, type VectorRichTextData, type VectorTextData,
 } from "@mgfx/demo-client/ui";
+import type { EmbeddedTexture } from "./embedded-texture.js";
 import { NativeWindowProvider, type NativeWindowCommands } from "./native-window.js";
 
 export type HostType = "mgfx-box" | "mgfx-row" | "mgfx-column" | "mgfx-stack" |
   "mgfx-circle" | "mgfx-text" | "mgfx-rich-text" | "mgfx-vector-text" |
   "mgfx-vector-rich-text" |
+  "mgfx-vector-image" |
   "mgfx-scroll" | "mgfx-mesh" | "mgfx-path";
 
 export interface HostProps {
@@ -30,6 +32,8 @@ export interface HostProps {
   readonly path?: PathData;
   readonly vectorText?: VectorTextData;
   readonly vectorRichText?: VectorRichTextData;
+  readonly vectorImage?: VectorImageData;
+  readonly textureResource?: EmbeddedTexture;
   readonly richTextSpans?: readonly RichTextSpan[];
 }
 
@@ -148,6 +152,8 @@ function toElement(child: HostChild): Element[] {
     ? vectorText(child.props.vectorText, style, key) : box(style, key); break;
   case "mgfx-vector-rich-text": element = child.props.vectorRichText
     ? vectorRichText(child.props.vectorRichText, style, key) : box(style, key); break;
+  case "mgfx-vector-image": element = child.props.vectorImage
+    ? vectorImage(child.props.vectorImage, style, key) : box(style, key); break;
   case "mgfx-text": {
     const raw = child.children.filter((value): value is TextNode => value.kind === "text")
       .map((value) => value.value).join("");
@@ -190,6 +196,7 @@ export class ReactSurface {
   private readonly snapshot: SnapshotComponent;
   private viewport: Size = { width: 0, height: 0 };
   private readonly uploadedPaths = new Set<number>();
+  private readonly uploadedTextures = new Set<number>();
   private readonly uploadedMeshes = new Set<number>();
   private readonly requestedTextMetrics = new Set<string>();
   private metricRelayoutScheduled = false;
@@ -200,6 +207,8 @@ export class ReactSurface {
                 readonly createPath: (id: number, segments: readonly PathSegment[]) => void;
                 readonly createMesh?: (id: number, vertices: readonly MeshUploadVertex[],
                   indices: readonly number[]) => void;
+                readonly createTexture?: (id: number, width: number, height: number,
+                  rgba: Uint8Array) => void;
                 readonly measureText?: (family: FontFamily, text: string,
                   weight?: FontWeight, style?: FontStyle, letterSpacing?: number,
                   fontResourceId?: number) => Promise<number>;
@@ -237,6 +246,7 @@ export class ReactSurface {
     if (this.viewport.width <= 0 || this.viewport.height <= 0 || this.container.children.length === 0) return;
     this.uploadPaths(this.container.children);
     this.uploadMeshes(this.container.children);
+    this.uploadTextures(this.container.children);
     this.requestMetrics(this.container.children);
     this.host.rebuild(this.snapshot);
     this.host.layout(this.viewport);
@@ -268,6 +278,18 @@ export class ReactSurface {
         this.uploadedMeshes.add(mesh.resourceId);
       }
       this.uploadMeshes(child.children);
+    }
+  }
+  private uploadTextures(children: readonly HostChild[]): void {
+    for (const child of children) {
+      if (child.kind !== "host") continue;
+      const texture = child.props.textureResource;
+      if (texture && !this.uploadedTextures.has(texture.resourceId)) {
+        this.resourceCommands?.createTexture?.(
+          texture.resourceId, texture.width, texture.height, texture.rgba);
+        this.uploadedTextures.add(texture.resourceId);
+      }
+      this.uploadTextures(child.children);
     }
   }
   private requestMetrics(children: readonly HostChild[]): void {
