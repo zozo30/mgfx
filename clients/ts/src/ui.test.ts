@@ -255,6 +255,29 @@ test("scroll deltas clamp to the remaining content extent", () => {
   assert.equal(received, 40);
 });
 
+test("overflowing scroll views paint a retained scrollbar above their content", () => {
+  class ScrollComponent extends Component {
+    build(): Element {
+      return scrollView(box({ preferredSize: { width: 100, height: 200 } }), 50,
+        { preferredSize: { width: 100, height: 80 } }, "scroll", () => {});
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new ScrollComponent());
+  host.layout({ width: 100, height: 80 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 80 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  const opcodes: number[] = [];
+  let offset = 16;
+  for (let index = 0; index < frame.readUInt32LE(12); index++) {
+    opcodes.push(frame.readUInt16LE(offset));
+    offset += 8 + frame.readUInt32LE(offset + 4);
+  }
+  assert.equal(opcodes.filter((opcode) => opcode === 15).length, 2);
+  assert.equal(opcodes.at(-2), 5);
+  assert.equal(opcodes.at(-1), 3);
+});
+
 test("vertical scroll content stretches across the viewport cross axis", () => {
   let clicked = false;
   class WideScrollComponent extends Component {

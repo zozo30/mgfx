@@ -763,6 +763,7 @@ class Node {
       paintVectorRichText(encoder, this.bounds, this.vectorRichText, viewport);
     if (this.type === "vectorImage") paintVectorImage(encoder, this.bounds, this.vectorImage, viewport);
     for (const child of this.paintOrder()) child.paint(encoder, viewport);
+    if (this.type === "scroll") this.paintScrollIndicator(encoder, viewport);
     if (this.style.clip) encoder.popClip();
     if (this.style.transform) encoder.popTransform();
     if (this.style.opacity !== undefined) encoder.popOpacity();
@@ -818,6 +819,26 @@ class Node {
     const padding = insets(this.style.padding);
     const viewportHeight = extent(this.bounds.height, padding.top, padding.bottom);
     return Math.max(0, child.measured.height - viewportHeight);
+  }
+  private paintScrollIndicator(encoder: FrameEncoder, viewport: Size): void {
+    const child = this.children[0];
+    const maximum = this.maximumScrollOffset();
+    if (!child || maximum <= 0.5 || this.bounds.width < 12 || this.bounds.height < 32) return;
+    const padding = insets(this.style.padding);
+    const visibleHeight = extent(this.bounds.height, padding.top, padding.bottom);
+    const trackHeight = Math.max(1, this.bounds.height - 10);
+    const thumbHeight = Math.min(trackHeight,
+      Math.max(24, trackHeight * Math.min(1, visibleHeight / child.measured.height)));
+    const current = Math.max(0, Math.min(this.scrollOffsetY, maximum));
+    const travel = Math.max(0, trackHeight - thumbHeight);
+    const thumbY = this.bounds.y + 5 + (maximum > 0 ? travel * current / maximum : 0);
+    const track = { x: this.bounds.x + this.bounds.width - 8, y: this.bounds.y + 5,
+      width: 4, height: trackHeight };
+    const thumb = { ...track, y: thumbY, height: thumbHeight };
+    paintServerRoundedRect(encoder, track, 2,
+      { red: 0.10, green: 0.16, blue: 0.25, alpha: 0.48 }, 0, undefined, viewport);
+    paintServerRoundedRect(encoder, thumb, 2,
+      { red: 0.36, green: 0.70, blue: 0.92, alpha: 0.82 }, 0, undefined, viewport);
   }
   private isFocusable(): boolean {
     return this.onClick !== undefined || this.onKeyDown !== undefined || this.onTextInput !== undefined ||
