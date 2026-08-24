@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
 import { Box, Button, Circle, Column, Image, Path, RichText, Row, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
-import { Window, useNativeClipboard } from "./native-window.js";
+import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
 import { AnimationProvider, useAnimationTime } from "./animation.js";
@@ -270,12 +270,67 @@ function DrawerIcon({ icon, fallback, color }: { readonly icon: VectorIcon | und
     style={{ preferredSize: { width: 30, height: 30 } }} />;
 }
 
+function DrawerToggle({ expanded, showLabels, labelOpacity, onPress }: {
+  readonly expanded: boolean; readonly showLabels: boolean; readonly labelOpacity: number;
+  readonly onPress: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  useNativeCursor("pointer", hovered);
+  return <mgfx-row onClick={onPress} onHoverChange={setHovered} onPressChange={setPressed}
+    style={{ preferredSize: { height: 48 }, padding: all(9), gap: 14, cornerRadius: 10,
+      background: pressed ? rgba(0.07, 0.10, 0.18)
+        : hovered ? rgba(0.15, 0.22, 0.36) : rgba(0.11, 0.16, 0.27),
+      crossAxisAlignment: "center", mainAxisAlignment: showLabels ? "start" : "center" }}>
+    <Path data={expanded ? "M15 5L8 12L15 19" : "M9 5L16 12L9 19"}
+      viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+      strokeColor={rgba(0.70, 0.88, 1)} strokeWidth={2.5}
+      style={{ preferredSize: { width: 28, height: 28 } }} />
+    {showLabels ? <Stack style={{ opacity: labelOpacity }}><Text value="COLLAPSE"
+      style={{ fontSize: 18, fontWeight: "semibold", color: rgba(0.70, 0.88, 1) }} />
+    </Stack> : null}
+  </mgfx-row>;
+}
+
+function DrawerItem({ active, label, icon, fallback, showLabel, labelOpacity, onPress }: {
+  readonly active: boolean; readonly label: string; readonly icon: VectorIcon | undefined;
+  readonly fallback: string; readonly showLabel: boolean; readonly labelOpacity: number;
+  readonly onPress: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  useNativeCursor("pointer", hovered);
+  const background = active
+    ? pressed ? rgba(0.12, 0.25, 0.56) : hovered ? rgba(0.23, 0.42, 0.84) : rgba(0.18, 0.34, 0.72)
+    : pressed ? rgba(0.035, 0.05, 0.085) : hovered ? rgba(0.09, 0.13, 0.21) : rgba(0.055, 0.075, 0.12);
+  return <mgfx-stack onClick={onPress} onHoverChange={setHovered} onPressChange={setPressed}
+    style={{ preferredSize: { height: 58 }, cornerRadius: 12, background,
+      borderWidth: active ? 1.5 : 0,
+      borderColor: active ? rgba(0.36, 0.76, 1) : rgba(0, 0, 0, 0),
+      ...(active ? { shadow: { color: rgba(0.12, 0.48, 1, 0.24),
+        blur: 9, spread: 0 } } : {}) }}>
+    <Row style={{ position: "absolute", inset: all(0), padding: all(12), gap: 16,
+      crossAxisAlignment: "center", mainAxisAlignment: showLabel ? "start" : "center" }}>
+      <DrawerIcon icon={icon} fallback={fallback}
+        color={active ? rgba(0.78, 0.96, 1) : hovered
+          ? rgba(0.72, 0.84, 0.98) : rgba(0.55, 0.66, 0.80)} />
+      {showLabel ? <Stack style={{ opacity: labelOpacity }}><Text value={label} style={{ fontSize: 21,
+        fontWeight: active ? "bold" : "medium",
+        color: active ? rgba(0.92, 0.98, 1) : rgba(0.66, 0.74, 0.86) }} />
+      </Stack> : null}
+    </Row>
+    {active ? <Box style={{ position: "absolute", inset: { top: 12, bottom: 12, left: 0 },
+      preferredSize: { width: 4 }, cornerRadius: 2, background: rgba(0.48, 0.88, 1) }} /> : null}
+  </mgfx-stack>;
+}
+
 function NavigationDrawer({ width, expanded, onToggle, icons }: {
   readonly width: number; readonly expanded: boolean; readonly onToggle: () => void;
   readonly icons: readonly VectorIcon[];
 }) {
   const router = useRouter();
-  const showLabels = width >= 150;
+  const labelOpacity = Math.max(0, Math.min(1, (width - 104) / 76));
+  const showLabels = labelOpacity > 0.01;
   const items = [
     { route: "dashboard", label: "HOME", icon: icons.find((item) => item.name === "grid") ?? icons[3],
       fallback: "M4 4H10V10H4ZM14 4H20V10H14ZM4 14H10V20H4ZM14 14H20V20H14Z" },
@@ -287,30 +342,13 @@ function NavigationDrawer({ width, expanded, onToggle, icons }: {
     background: rgba(0.035, 0.052, 0.085, 0.98), borderWidth: 1,
     borderColor: rgba(0.22, 0.34, 0.56, 0.9),
     shadow: { color: rgba(0, 0, 0, 0.42), blur: 18, spread: 1, offsetX: 4 } }}>
-    <mgfx-row onClick={onToggle} style={{ preferredSize: { height: 48 }, padding: all(9),
-      gap: 14, cornerRadius: 10, background: rgba(0.11, 0.16, 0.27),
-      crossAxisAlignment: "center", mainAxisAlignment: showLabels ? "start" : "center" }}>
-      <Path data={expanded ? "M15 5L8 12L15 19" : "M9 5L16 12L9 19"}
-        viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
-        strokeColor={rgba(0.70, 0.88, 1)} strokeWidth={2.5}
-        style={{ preferredSize: { width: 28, height: 28 } }} />
-      {showLabels ? <Text value="COLLAPSE" style={{ fontSize: 18, fontWeight: "semibold",
-        color: rgba(0.70, 0.88, 1) }} /> : null}
-    </mgfx-row>
+    <DrawerToggle expanded={expanded} showLabels={showLabels} labelOpacity={labelOpacity}
+      onPress={onToggle} />
     {items.map((item) => {
       const active = router.route === item.route;
-      return <mgfx-row key={item.route} onClick={() => router.replace(item.route)} style={{
-        preferredSize: { height: 58 }, padding: all(12), gap: 16, cornerRadius: 12,
-        crossAxisAlignment: "center", mainAxisAlignment: showLabels ? "start" : "center",
-        background: active ? rgba(0.18, 0.34, 0.72) : rgba(0.055, 0.075, 0.12),
-        borderWidth: active ? 1.5 : 0,
-        borderColor: active ? rgba(0.36, 0.76, 1) : rgba(0, 0, 0, 0) }}>
-        <DrawerIcon icon={item.icon} fallback={item.fallback}
-          color={active ? rgba(0.78, 0.96, 1) : rgba(0.55, 0.66, 0.80)} />
-        {showLabels ? <Text value={item.label} style={{ fontSize: 21,
-          fontWeight: active ? "bold" : "medium",
-          color: active ? rgba(0.92, 0.98, 1) : rgba(0.66, 0.74, 0.86) }} /> : null}
-      </mgfx-row>;
+      return <DrawerItem key={item.route} active={active} label={item.label} icon={item.icon}
+        fallback={item.fallback} showLabel={showLabels} labelOpacity={labelOpacity}
+        onPress={() => router.replace(item.route)} />;
     })}
   </Column>;
 }
