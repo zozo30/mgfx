@@ -10,6 +10,11 @@ function tinyPngDataUrl(): string {
   return `data:image/png;base64,${PNG.sync.write(png).toString("base64")}`;
 }
 
+function tinySvgDataUrl(source = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="8"
+    viewBox="0 0 12 8"><rect width="12" height="8" fill="#20d890"/></svg>`): string {
+  return `data:image/svg+xml;base64,${Buffer.from(source).toString("base64")}`;
+}
+
 test("SVG documents lower inherited paint, primitives, and group transforms to vector layers", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 120 80" fill="none"
       stroke="currentColor" stroke-width="2" stroke-dasharray="3 2" stroke-dashoffset="-1">
@@ -35,7 +40,7 @@ test("SVG vector lowering rejects executable or external document content", () =
   /external or executable/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><image href="https://example.com/a.png"/></svg>`),
-  /embedded base64 PNG or JPEG/);
+  /embedded base64 PNG, JPEG, or SVG/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 10 10"><use href="https://example.com/a.svg#shape"/></svg>`),
   /local fragment/);
@@ -71,6 +76,27 @@ test("SVG embedded images reject invalid preserveAspectRatio values", () => {
   assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 10 10">
     <image href="${tinyPngDataUrl()}" width="10" height="10"
       preserveAspectRatio="xMiddleYMid meet"/></svg>`), /Unsupported SVG preserveAspectRatio/);
+});
+
+test("nested SVG images rasterize once into bounded native textures", () => {
+  const href = tinySvgDataUrl();
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 40 20">
+    <image href="${href}" width="30" height="20" preserveAspectRatio="xMinYMax meet"/>
+    <image href="${href}" x="30" width="10" height="10"/>
+  </svg>`);
+  const first = document.layers[0]?.image, second = document.layers[1]?.image;
+  assert.ok(first && second);
+  assert.equal(first.texture.resourceId, second.texture.resourceId);
+  assert.deepEqual({ width: first.texture.width, height: first.texture.height,
+    fit: first.fit, alignX: first.alignX, alignY: first.alignY },
+  { width: 12, height: 8, fit: "contain", alignX: "start", alignY: "end" });
+});
+
+test("nested SVG images cannot resolve external resources", () => {
+  const href = tinySvgDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">
+    <image href="https://example.com/pixel.png" width="10" height="10"/></svg>`);
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 10 10">
+    <image href="${href}" width="10" height="10"/></svg>`), /external image references/);
 });
 
 test("SVG local use instances expand symbols into independently transformed native paths", () => {

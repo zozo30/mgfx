@@ -83,7 +83,8 @@ without client glyph metrics. Nested spans inherit styles normally, and underlin
 or line-through decorations use native font positions and thicknesses. Numeric,
 percentage, `super`, and `sub` baseline shifts remain semantic run metrics. Text
 strokes and gradients remain explicit fallbacks.
-Embedded SVG `<image>` elements accept bounded base64 PNG/JPEG data URLs. Pixels
+Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
+data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
 decode and upload once as canonical persistent textures; frames retain only
 `DrawImage` references with SVG placement, transform, opacity, clipping,
 all nine `preserveAspectRatio` alignments for meet/slice (plus `none`), and
