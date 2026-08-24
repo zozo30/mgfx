@@ -107,6 +107,7 @@ export const ExtendedServerCapability = {
   NineSliceImages: 1n << 57n,
   StyledNativeText: 1n << 58n,
   StyledRichTextRuns: 1n << 59n,
+  GradientNativeText: 1n << 60n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -1259,6 +1260,44 @@ export class FrameEncoder {
     [strokeColor.red, strokeColor.green, strokeColor.blue, strokeColor.alpha, strokeWidth]
       .forEach((value, index) => payload.writeFloatLE(value, 44 + index * 4));
     utf8.copy(payload, 64); this.command(41, payload);
+  }
+
+  gradientSystemText(text: string, left: number, top: number, fontSize: number,
+    gradient: PathGradientPaint, family: FontFamily = "system",
+    weight: FontWeight = "regular", style: FontStyle = "regular", letterSpacing = 0,
+    decoration: TextDecoration = TextDecoration.None, fontResourceId = 0,
+    anchor: "start" | "middle" | "end" = "start",
+    baseline: "top" | "alphabetic" = "top"): void {
+    const utf8 = Buffer.from(text, "utf8");
+    const stops = gradient.stops ?? [
+      { offset: 0, color: gradient.startColor }, { offset: 1, color: gradient.endColor }];
+    const finite = [left, top, fontSize, letterSpacing, gradient.start.x, gradient.start.y,
+      gradient.end.x, gradient.end.y,
+      ...stops.flatMap((stop) => [stop.offset, stop.color.red, stop.color.green,
+        stop.color.blue, stop.color.alpha])].every(Number.isFinite);
+    if (utf8.length === 0 || utf8.length > 65536 || utf8.includes(0) || !finite ||
+        fontSize <= 0 || Math.abs(letterSpacing) > 10 || stops.length < 2 || stops.length > 8 ||
+        stops.some((stop, index) => stop.offset < 0 || stop.offset > 1 ||
+          index > 0 && stop.offset < stops[index - 1]!.offset) ||
+        !Number.isInteger(decoration) || decoration < 0 || decoration > 3 ||
+        !Number.isInteger(fontResourceId) || fontResourceId < 0 || fontResourceId > 0xffff_ffff)
+      throw new RangeError("Gradient system text values are outside supported bounds");
+    const payload = Buffer.alloc(48 + stops.length * 20 + utf8.length);
+    payload.writeUInt8(fontFamilyCode(family), 0); payload.writeUInt8(fontWeightCode(weight), 1);
+    payload.writeUInt8(style === "italic" ? 1 : 0, 2); payload.writeUInt8(decoration, 3);
+    [left, top, fontSize, letterSpacing]
+      .forEach((value, index) => payload.writeFloatLE(value, 4 + index * 4));
+    payload.writeUInt32LE(fontResourceId, 20);
+    payload.writeUInt8(anchor === "middle" ? 1 : anchor === "end" ? 2 : 0, 24);
+    payload.writeUInt8(baseline === "alphabetic" ? 1 : 0, 25);
+    [gradient.start.x, gradient.start.y, gradient.end.x, gradient.end.y]
+      .forEach((value, index) => payload.writeFloatLE(value, 28 + index * 4));
+    payload.writeUInt8(stops.length, 44);
+    payload.writeUInt8(gradient.spread === "repeat" ? 1 : gradient.spread === "reflect" ? 2 : 0, 45);
+    stops.forEach((stop, index) => [stop.offset, stop.color.red, stop.color.green,
+      stop.color.blue, stop.color.alpha].forEach((value, component) =>
+        payload.writeFloatLE(value, 48 + index * 20 + component * 4)));
+    utf8.copy(payload, 48 + stops.length * 20); this.command(43, payload);
   }
 
   endFrame(): void {

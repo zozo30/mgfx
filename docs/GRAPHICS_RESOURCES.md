@@ -196,6 +196,9 @@ Outlined run lists use `DrawStyledRichText`: each run adds a straight-alpha stro
 color and an em-relative width while preserving its UTF-8 and font semantics.
 CoreText supplies glyph contours and the server tessellates both filled and
 stroke-only spans; the client never sends glyph meshes.
+`DrawGradientText` applies 2–8 stop user-space linear paint to the same cached
+CoreText contours. Stops and pad/repeat/reflect semantics remain compact protocol
+data; Metal interpolates color over the server-generated glyph triangles.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is

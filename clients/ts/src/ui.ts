@@ -1,6 +1,6 @@
 import { FrameEncoder, Key, TextDecoration,
   type ClipRect, type Color, type PathConicGradientPaint, type PathRadialGradientPaint,
-  type PathTexturePaint,
+  type PathGradientPaint, type PathTexturePaint,
   type PathSegment, type RichTextRun, type Vertex } from "./protocol.js";
 
 export interface Point { readonly x: number; readonly y: number }
@@ -287,6 +287,7 @@ export interface VectorTextData {
   readonly family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">;
   readonly weight?: TextStyle["fontWeight"]; readonly fontStyle?: TextStyle["fontStyle"];
   readonly letterSpacing?: number; readonly decoration?: TextDecoration;
+  readonly fillGradient?: PathGradientPaint;
   readonly strokeColor?: Color; readonly strokeWidth?: number;
   readonly anchor?: "start" | "middle" | "end";
   readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
@@ -922,7 +923,9 @@ function paintPath(encoder: FrameEncoder, bounds: Rect, path: PathData | undefin
 
 function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextData | undefined,
   viewport: Size): void {
-  if (!text || !text.value || text.fontSize <= 0 || text.color.alpha <= 0 ||
+  if (!text || !text.value || text.fontSize <= 0 ||
+      (!text.fillGradient && text.color.alpha <= 0 &&
+        !(text.strokeColor && (text.strokeWidth ?? 0) > 0)) ||
       text.viewBox.width <= 0 || text.viewBox.height <= 0) return;
   const sourceAspect = text.viewBox.width / text.viewBox.height;
   const boundsAspect = bounds.width / bounds.height;
@@ -967,7 +970,18 @@ function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextDa
   const fontSize = text.fontSize / text.viewBox.height * destination.height;
   const args = [text.value, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
     fontSize / viewport.height * 2] as const;
-  if (text.strokeColor && (text.strokeWidth ?? 0) > 0) {
+  if (text.fillGradient) {
+    const mapPoint = (point: Point) => ({
+      x: (destination.x + (point.x - text.viewBox.x) / text.viewBox.width * destination.width) /
+        viewport.width * 2 - 1,
+      y: 1 - (destination.y + (point.y - text.viewBox.y) / text.viewBox.height *
+        destination.height) / viewport.height * 2,
+    });
+    encoder.gradientSystemText(...args, { ...text.fillGradient,
+      start: mapPoint(text.fillGradient.start), end: mapPoint(text.fillGradient.end) },
+      text.family, text.weight, text.fontStyle, text.letterSpacing ?? 0,
+      text.decoration ?? TextDecoration.None, 0, text.anchor ?? "start", "alphabetic");
+  } else if (text.strokeColor && (text.strokeWidth ?? 0) > 0) {
     encoder.styledSystemText(...args, text.color, text.strokeColor,
       text.strokeWidth! / text.fontSize, text.family, text.weight, text.fontStyle,
       text.letterSpacing ?? 0, text.decoration ?? TextDecoration.None, 0,

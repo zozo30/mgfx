@@ -196,6 +196,16 @@ int main() {
         gfx::TextBaseline::alphabetic};
     outlined.strokeColor = {1.0F, 0.4F, 0.1F, 1.0F}; outlined.strokeWidth = 0.08F;
     encoder.drawStyledText(outlined);
+    gfx::GradientTextCommand gradientText{};
+    gradientText.text = {gfx::FontFamily::systemSans, gfx::FontWeight::semibold,
+        gfx::FontStyle::regular, 0.0F, gfx::noTextDecoration, 0, -0.5F, 0.1F, 0.09F,
+        {0.0F, 0.0F, 0.0F, 0.0F}, "GRADIENT", gfx::TextAnchor::middle,
+        gfx::TextBaseline::alphabetic};
+    gradientText.gradient = {-0.8F, 0.0F, 0.2F, 0.0F,
+        {1.0F, 0.2F, 0.1F, 1.0F}, {0.1F, 0.8F, 1.0F, 1.0F},
+        {{0.0F, {1.0F, 0.2F, 0.1F, 1.0F}}, {0.5F, {0.3F, 1.0F, 0.5F, 1.0F}},
+         {1.0F, {0.1F, 0.8F, 1.0F, 1.0F}}}, gfx::PathGradient::Spread::reflect};
+    encoder.drawGradientText(gradientText);
     gfx::RichTextCommand richSource{-0.7F, 0.5F, 0.07F, {
         {gfx::FontFamily::systemSans, gfx::FontWeight::bold, gfx::FontStyle::regular,
          0.0F, gfx::noTextDecoration, 0, {1.0F, 0.4F, 0.2F, 1.0F}, "Rich "},
@@ -465,6 +475,13 @@ int main() {
         !nearlyEqual(outlinedDecoded.strokeColor.red, 1.0F) ||
         !nearlyEqual(outlinedDecoded.strokeWidth, 0.08F) || !decoder.next(command)) {
         return fail("Styled text decoding failed");
+    }
+    gfx::GradientTextCommand gradientDecoded{};
+    if (!gfx::decodeGradientText(command, gradientDecoded) ||
+        gradientDecoded.text.text != "GRADIENT" || gradientDecoded.gradient.stops.size() != 3 ||
+        gradientDecoded.gradient.spread != gfx::PathGradient::Spread::reflect ||
+        !nearlyEqual(gradientDecoded.gradient.stops[1].offset, 0.5F) || !decoder.next(command)) {
+        return fail("Gradient text decoding failed");
     }
     gfx::RichTextCommand rich{};
     if (!gfx::decodeRichText(command, rich) || rich.runs.size() != 2 ||

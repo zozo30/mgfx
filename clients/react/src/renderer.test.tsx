@@ -235,6 +235,19 @@ test("React Svg emits outlined text as one native styled-text command", () => {
   assert.ok(Math.abs(frame.readFloatLE(40 + 8 + 60) - 0.1) < 0.00001);
 });
 
+test("React Svg emits gradient text as one native semantic command", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Svg source={`<svg viewBox="0 0 100 40"><defs><linearGradient id="g"
+    gradientUnits="userSpaceOnUse" x1="10" y1="0" x2="90" y2="0">
+    <stop stop-color="#ff8a1e"/><stop offset="1" stop-color="#4cc9ff"/>
+    </linearGradient></defs><text x="50" y="28" text-anchor="middle" font-size="20"
+    fill="url(#g)">GRADIENT</text></svg>`} style={{ preferredSize: { width: 200, height: 80 } }} />);
+  surface.resize({ width: 200, height: 80 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 43);
+});
+
 test("React Svg emits independently outlined tspans as styled rich text", () => {
   let frame: Buffer | undefined;
   const surface = new ReactSurface((value) => { frame = value; });

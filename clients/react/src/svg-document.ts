@@ -15,6 +15,7 @@ export interface SvgVectorLayer {
     readonly weight?: "regular" | "medium" | "semibold" | "bold";
     readonly fontStyle?: "regular" | "italic";
     readonly letterSpacing?: number; readonly decoration?: TextDecoration;
+    readonly fillGradient?: LinearGradientPaint;
     readonly strokeColor?: Color; readonly strokeWidth?: number;
     readonly anchor?: "start" | "middle" | "end";
     readonly sourceTransform?: Matrix };
@@ -386,7 +387,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const drawablePieces = normalized.filter((piece) => piece.value.length > 0 &&
         piece.state.displayed && piece.state.visible);
       for (const piece of drawablePieces) {
-        if (piece.state.fillGradientId)
+        if (hasSpans && piece.state.fillGradientId)
           throw new Error(`SVG ${hasSpans ? "tspan" : "text"} gradient fill is not supported natively`);
         if (piece.state.strokeGradientId && piece.state.strokeWidth > 0)
           throw new Error(`SVG ${hasSpans ? "tspan" : "text"} gradient stroke is not supported natively`);
@@ -395,6 +396,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       }
       const visiblePieces = drawablePieces.filter((piece) =>
         piece.state.fill && piece.state.fill.alpha > 0 ||
+        piece.state.fillGradientId !== undefined ||
         piece.state.stroke && piece.state.stroke.alpha > 0 && piece.state.strokeWidth > 0);
       const value = visiblePieces.map((piece) => piece.value).join("");
       if (!value) continue;
@@ -407,8 +409,13 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const commonLayer = { ...(state.clip ? { clip: state.clip } : {}), strokeWidth: 0,
         fillRule: state.fillRule, lineCap: state.lineCap, lineJoin: state.lineJoin } as const;
       if (!hasSpans) {
+        const fillGradient = state.fillGradientId
+          ? resolveTextGradient(gradients, state.fillGradientId, state, viewBox, state.fillOpacity)
+          : undefined;
         layers.push({ ...commonLayer, text: { ...placement, value,
-          color: multiplyAlpha(state.fill!, state.opacity * state.fillOpacity),
+          color: state.fill ? multiplyAlpha(state.fill, state.opacity * state.fillOpacity)
+            : { red: 0, green: 0, blue: 0, alpha: 0 },
+          ...(fillGradient ? { fillGradient } : {}),
           family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
           ...(state.textDecoration !== TextDecoration.None
             ? { decoration: state.textDecoration } : {}),
@@ -984,6 +991,25 @@ function resolveGradient(definitions: ReadonlyMap<string, GradientDefinition>, i
     color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
   return { start, end, startColor: stops[0]!.color,
     endColor: stops[stops.length - 1]!.color, ...(stops.length > 2 ? { stops } : {}),
+    ...(definition.spread !== "pad" ? { spread: definition.spread } : {}) };
+}
+
+function resolveTextGradient(definitions: ReadonlyMap<string, GradientDefinition>, id: string,
+  state: PaintState, viewBox: Rect, paintOpacity: number): LinearGradientPaint {
+  const definition = definitions.get(id);
+  if (!definition) throw new Error(`SVG linear gradient #${id} is not defined or has unsupported stops`);
+  if (definition.units !== "userSpaceOnUse")
+    throw new Error("SVG text object-bounding-box gradients require server-shaped bounds");
+  const start = transformPoint(definition.transform,
+    { x: coordinate(definition.x1, viewBox.x, viewBox.width),
+      y: coordinate(definition.y1, viewBox.y, viewBox.height) });
+  const end = transformPoint(definition.transform,
+    { x: coordinate(definition.x2, viewBox.x, viewBox.width),
+      y: coordinate(definition.y2, viewBox.y, viewBox.height) });
+  const stops = definition.stops.map((stop) => ({ offset: stop.offset,
+    color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
+  return { start, end, startColor: stops[0]!.color, endColor: stops[stops.length - 1]!.color,
+    ...(stops.length > 2 ? { stops } : {}),
     ...(definition.spread !== "pad" ? { spread: definition.spread } : {}) };
 }
 

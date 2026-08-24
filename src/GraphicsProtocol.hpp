@@ -53,6 +53,7 @@ enum class Opcode : std::uint16_t {
     drawNineSliceImage = 40,
     drawStyledText = 41,
     drawStyledRichText = 42,
+    drawGradientText = 43,
 };
 
 enum class Primitive : std::uint8_t {
@@ -387,6 +388,11 @@ struct RichTextCommand {
     TextBaseline baseline = TextBaseline::top;
 };
 
+struct GradientTextCommand {
+    TextCommand text;
+    PathGradient gradient;
+};
+
 class CommandEncoder final {
 public:
     CommandEncoder();
@@ -404,6 +410,7 @@ public:
     void drawPath(const PathCommand& path);
     void drawText(const TextCommand& text);
     void drawStyledText(const TextCommand& text);
+    void drawGradientText(const GradientTextCommand& text);
     void drawRichText(const RichTextCommand& text);
     void pushTransform(AffineTransform transform);
     void popTransform();
@@ -458,6 +465,7 @@ bool decodeMesh(const CommandView& command, MeshCommand& mesh);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);
 bool decodeStyledText(const CommandView& command, TextCommand& text);
+bool decodeGradientText(const CommandView& command, GradientTextCommand& text);
 bool decodeRichText(const CommandView& command, RichTextCommand& text);
 bool decodePushTransform(const CommandView& command, AffineTransform& transform);
 bool decodePushOpacity(const CommandView& command, float& opacity);

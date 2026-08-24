@@ -175,7 +175,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       font-style: italic; font-weight: 700; }
     .native-decoration { fill: #07111f; stroke: #58e6b5; stroke-width: 0.7;
       font-size: 7; baseline-shift: super; text-decoration: underline; }
-    .outline-label { fill: #d8fff0; stroke: #ff8a1e; stroke-width: 0.8;
+    .outline-label { fill: url(#textGlow);
       font-family: rounded; font-size: 8; font-weight: 700; }
   </style>
   <defs>
@@ -191,6 +191,9 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     </linearGradient>
     <linearGradient id="signal" href="#signalPalette" gradientUnits="userSpaceOnUse"
       x1="78" y1="24" x2="131" y2="42"/>
+    <linearGradient id="textGlow" gradientUnits="userSpaceOnUse" x1="68" y1="0" x2="112" y2="0"
+      spreadMethod="reflect"><stop offset="0" stop-color="#ff8a1e"/>
+      <stop offset="0.5" stop-color="#58e6b5"/><stop offset="1" stop-color="#4cc9ff"/></linearGradient>
     <symbol id="signalGlyph" viewBox="0 0 53 24">
       <polyline points="0,21 11,3 21,21 32,3 43,21 53,3"/>
     </symbol>

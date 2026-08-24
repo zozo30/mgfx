@@ -98,7 +98,11 @@ server tessellates the SVG stroke width once, advertised as `styledNativeText`.
 Individual `<tspan>` runs can independently select solid fill, outline color, and
 outline width through `styledRichTextRuns`; even stroke-only runs remain compact
 UTF-8 plus semantic font data. Numeric, percentage, `super`, and `sub` baseline shifts
-remain semantic run metrics. Text gradients remain explicit fallbacks.
+remain semantic run metrics. Plain SVG text also lowers 2–8 stop
+`userSpaceOnUse` linear gradients to `DrawGradientText`; gradient coordinates,
+stops, spread mode, and UTF-8 cross the socket while CoreText still owns all glyph
+geometry. Object-bounding-box text gradients remain explicit until the server
+exposes shaped bounds.
 Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
 data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
 decode and upload once as canonical persistent textures; frames retain only

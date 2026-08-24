@@ -289,6 +289,23 @@ test("SVG plain text lowers solid outlines to native styled text", () => {
   assert.ok(Math.abs((document.layers[0]?.text?.strokeColor?.alpha ?? 0) - 0.8) < 0.00001);
 });
 
+test("SVG user-space linear-gradient text remains server-shaped", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 40"><defs>
+    <linearGradient id="label" gradientUnits="userSpaceOnUse" x1="20" y1="0" x2="80" y2="0">
+      <stop offset="0" stop-color="#ff8a1e"/><stop offset="0.5" stop-color="#58e6b5"/>
+      <stop offset="1" stop-color="#4cc9ff"/>
+    </linearGradient></defs><text x="50" y="28" text-anchor="middle" font-size="20"
+      fill="url(#label)">NATIVE</text></svg>`);
+  const text = document.layers[0]?.text;
+  assert.equal(text?.value, "NATIVE");
+  assert.deepEqual(text?.fillGradient?.start, { x: 20, y: 0 });
+  assert.equal(text?.fillGradient?.stops?.length, 3);
+  assert.equal(text?.color.alpha, 0);
+  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 100 40"><defs>
+    <linearGradient id="g"><stop/><stop offset="1"/></linearGradient></defs>
+    <text fill="url(#g)">bounds</text></svg>`), /server-shaped bounds/);
+});
+
 test("SVG tspans lower independent solid outlines to styled rich-text runs", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 120 30">
     <text x="60" y="22" text-anchor="middle" font-size="16" fill="#d8fff0">

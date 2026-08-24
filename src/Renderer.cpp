@@ -1759,10 +1759,16 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 path.strokeConicGradient ? &path.conicGradient : nullptr,
                 path.strokeTexture ? &path.texturePaint : nullptr);
         } else if (command.opcode == gfx::Opcode::drawText ||
-                   command.opcode == gfx::Opcode::drawStyledText) {
+                   command.opcode == gfx::Opcode::drawStyledText ||
+                   command.opcode == gfx::Opcode::drawGradientText) {
             gfx::TextCommand text{};
+            gfx::GradientTextCommand gradientText{};
+            const bool gradientFill = command.opcode == gfx::Opcode::drawGradientText;
             const bool decoded = command.opcode == gfx::Opcode::drawText
-                ? gfx::decodeText(command, text) : gfx::decodeStyledText(command, text);
+                ? gfx::decodeText(command, text) : command.opcode == gfx::Opcode::drawStyledText
+                    ? gfx::decodeStyledText(command, text)
+                    : gfx::decodeGradientText(command, gradientText);
+            if (gradientFill) text = gradientText.text;
             if (!decoded || !std::isfinite(text.left) ||
                 !std::isfinite(text.top) || !std::isfinite(text.fontSize) ||
                 text.fontSize <= 0.0F) {
@@ -1823,16 +1829,51 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 ? text.top + shaped.ascent * text.fontSize : text.top;
             const auto drawTextTriangles = [&](const std::vector<gfx::PathPoint>& points,
                                                 const gfx::Color& paint) {
-                const std::array<float, 4> color = {paint.red, paint.green, paint.blue,
-                    paint.alpha * opacityStack.back()};
                 for (std::size_t first = 0; first < points.size();) {
                     const std::size_t count = std::min(maxVertices, points.size() - first);
                     std::vector<gfx::Vertex> vertices; vertices.reserve(count);
                     for (std::size_t index = 0; index < count; ++index) {
                         const gfx::PathPoint& point = points[first + index];
-                        vertices.push_back({transformPoint(currentTransform(),
-                            {textLeft + point[0] * text.fontSize * aspect,
-                             textTop - point[1] * text.fontSize}), color});
+                        const gfx::PathPoint position = {
+                            textLeft + point[0] * text.fontSize * aspect,
+                            textTop - point[1] * text.fontSize};
+                        gfx::Color color = paint;
+                        if (gradientFill) {
+                            const gfx::PathGradient& gradient = gradientText.gradient;
+                            const float dx = gradient.endX - gradient.startX;
+                            const float dy = gradient.endY - gradient.startY;
+                            const float lengthSquared = dx * dx + dy * dy;
+                            float amount = lengthSquared > 0.0000001F
+                                ? ((position[0] - gradient.startX) * dx +
+                                   (position[1] - gradient.startY) * dy) / lengthSquared : 0.0F;
+                            if (gradient.spread == gfx::PathGradient::Spread::pad) {
+                                amount = std::clamp(amount, 0.0F, 1.0F);
+                            } else {
+                                const float cycle = std::floor(amount);
+                                amount -= cycle;
+                                if (gradient.spread == gfx::PathGradient::Spread::reflect &&
+                                    (static_cast<long long>(cycle) & 1LL) != 0) amount = 1.0F - amount;
+                            }
+                            gfx::PathGradient::Stop start = gradient.stops.front();
+                            gfx::PathGradient::Stop end = gradient.stops.back();
+                            for (std::size_t stop = 1; stop < gradient.stops.size(); ++stop) {
+                                if (amount <= gradient.stops[stop].offset) {
+                                    start = gradient.stops[stop - 1]; end = gradient.stops[stop];
+                                    break;
+                                }
+                            }
+                            const float span = end.offset - start.offset;
+                            const float local = span > 0.0F
+                                ? std::clamp((amount - start.offset) / span, 0.0F, 1.0F) : 0.0F;
+                            const auto mix = [local](float a, float b) { return a + (b - a) * local; };
+                            color = {mix(start.color.red, end.color.red),
+                                mix(start.color.green, end.color.green),
+                                mix(start.color.blue, end.color.blue),
+                                mix(start.color.alpha, end.color.alpha)};
+                        }
+                        const std::array<float, 4> vertexColor = {color.red, color.green, color.blue,
+                            color.alpha * opacityStack.back()};
+                        vertices.push_back({transformPoint(currentTransform(), position), vertexColor});
                     }
                     encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(gfx::Vertex), 0);
                     encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
