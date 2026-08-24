@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Arc, Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, SplitPane, Stack, Stepper, Svg, Tabs, Text, TextField, TreeView, all, rgba, type TreeItem } from "./components.js";
+import { Arc, Box, Button, Checkbox, Circle, Column, Disclosure, GradientArc, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, SplitPane, Stack, Stepper, Svg, Tabs, Text, TextField, TreeView, all, rgba, type TreeItem } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { CommandPalette, Dialog, Menu, Router, Toast, useRouter,
@@ -821,13 +821,16 @@ function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, content
             <Stack style={{ preferredSize: { width: 140, height: 140 } }}>
               <Arc startAngle={0} sweepAngle={360} thickness={13} roundCaps={false}
                 color={rgba(0.11, 0.18, 0.28)} style={{ position: "absolute", inset: all(0) }} />
-              <Arc startAngle={-90} sweepAngle={210 + Math.sin(animationTime / 700) * 55}
-                thickness={13} color={rgba(0.20, 0.84, 1)}
+              <GradientArc startAngle={-90}
+                sweepAngle={210 + Math.sin(animationTime / 700) * 55}
+                thickness={13} startColor={rgba(0.20, 0.84, 1)}
+                endColor={rgba(0.62, 0.28, 1)}
                 style={{ position: "absolute", inset: all(0) }} />
             </Stack>
             <Stack style={{ preferredSize: { width: 140, height: 140 } }}>
-              <Arc startAngle={animationTime / 8} sweepAngle={82} thickness={18}
-                color={rgba(0.54, 0.30, 1)} style={{ position: "absolute", inset: all(0) }} />
+              <GradientArc startAngle={animationTime / 8} sweepAngle={82} thickness={18}
+                startColor={rgba(0.54, 0.30, 1)} endColor={rgba(1, 0.32, 0.54)}
+                style={{ position: "absolute", inset: all(0) }} />
               <Arc startAngle={animationTime / 8 + 145} sweepAngle={54} thickness={8}
                 color={rgba(0.26, 1, 0.68)} style={{ position: "absolute", inset: all(12) }} />
             </Stack>

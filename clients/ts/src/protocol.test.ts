@@ -344,6 +344,21 @@ test("MGFX arc carries semantic angles, thickness, and cap style", () => {
     color: { red: 1, green: 1, blue: 1, alpha: 1 } }));
 });
 
+test("MGFX gradient arc carries endpoint colors without another geometry format", () => {
+  const frame = new FrameEncoder();
+  frame.gradientArc({ destination: { left: -0.5, top: 0.5, right: 0.5, bottom: -0.5 },
+    startAngle: 0, sweepAngle: Math.PI, thickness: 16, roundCaps: false,
+    startColor: { red: 0.1, green: 0.8, blue: 1, alpha: 1 },
+    endColor: { red: 0.8, green: 0.2, blue: 1, alpha: 0.7 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 47);
+  assert.equal(bytes.readUInt32LE(20), 64);
+  assert.ok(Math.abs(bytes.readFloatLE(44) - Math.PI) < 0.00001);
+  assert.equal(bytes.readFloatLE(48), 16);
+  assert.ok(Math.abs(bytes.readFloatLE(84) - 0.7) < 0.00001);
+});
+
 test("MGFX diagonal pattern is constant-size regardless of area", () => {
   const frame = new FrameEncoder();
   frame.diagonalPattern({ destination: { left: -1, top: 1, right: 1, bottom: -1 },

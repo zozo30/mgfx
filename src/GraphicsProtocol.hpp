@@ -57,6 +57,7 @@ enum class Opcode : std::uint16_t {
     drawRadialGradientText = 44,
     drawFilteredImageSurface = 45,
     drawArc = 46,
+    drawGradientArc = 47,
 };
 
 enum class Primitive : std::uint8_t {
@@ -179,6 +180,16 @@ struct ArcCommand {
     float thickness;
     bool roundCaps;
     Color color;
+};
+
+struct GradientArcCommand {
+    ClipRect destination;
+    float startAngle;
+    float sweepAngle;
+    float thickness;
+    bool roundCaps;
+    Color startColor;
+    Color endColor;
 };
 
 struct DiagonalPatternCommand {
@@ -447,6 +458,7 @@ public:
     void drawRoundedRect(const RoundedRectCommand& rectangle);
     void drawCircle(const CircleCommand& circle);
     void drawArc(const ArcCommand& arc);
+    void drawGradientArc(const GradientArcCommand& arc);
     void drawDiagonalPattern(const DiagonalPatternCommand& pattern);
     void drawLinearGradient(const LinearGradientCommand& gradient);
     void drawLinearGradientCircle(const LinearGradientCircleCommand& gradient);
@@ -503,6 +515,7 @@ bool decodeRadialGradient(const CommandView& command, RadialGradientCommand& gra
 bool decodeRoundedRect(const CommandView& command, RoundedRectCommand& rectangle);
 bool decodeCircle(const CommandView& command, CircleCommand& circle);
 bool decodeArc(const CommandView& command, ArcCommand& arc);
+bool decodeGradientArc(const CommandView& command, GradientArcCommand& arc);
 bool decodeDiagonalPattern(const CommandView& command, DiagonalPatternCommand& pattern);
 bool decodeLinearGradient(const CommandView& command, LinearGradientCommand& gradient);
 bool decodeLinearGradientCircle(const CommandView& command,

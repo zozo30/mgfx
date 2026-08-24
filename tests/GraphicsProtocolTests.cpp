@@ -46,6 +46,9 @@ int main() {
                         {0.7F, 1.0F, 0.8F, 0.9F}});
     encoder.drawArc({{-0.5F, 0.5F, 0.5F, -0.5F}, -1.5707963F, 4.712389F, 12.0F, true,
                      {0.2F, 0.8F, 1.0F, 0.9F}});
+    encoder.drawGradientArc({{-0.6F, 0.6F, 0.6F, -0.6F}, 0.0F, 3.1415926F, 16.0F, false,
+                             {0.1F, 0.8F, 1.0F, 1.0F},
+                             {0.8F, 0.2F, 1.0F, 0.7F}});
     encoder.drawDiagonalPattern({{-0.9F, 0.3F, 0.9F, -0.3F}, 8.0F, 10.0F, 3.5F, true,
                                  {1.0F, 0.5F, 0.1F, 0.8F}});
     encoder.drawLinearGradient({{-0.8F, 0.2F, 0.8F, -0.2F}, 12.0F,
@@ -299,6 +302,14 @@ int main() {
         !nearlyEqual(arc.sweepAngle, 4.712389F) || !nearlyEqual(arc.thickness, 12.0F) ||
         !arc.roundCaps || !nearlyEqual(arc.color.alpha, 0.9F) || !decoder.next(command)) {
         return fail("Arc decoding failed");
+    }
+    gfx::GradientArcCommand gradientArc{};
+    if (!gfx::decodeGradientArc(command, gradientArc) ||
+        !nearlyEqual(gradientArc.sweepAngle, 3.1415926F) ||
+        !nearlyEqual(gradientArc.thickness, 16.0F) || gradientArc.roundCaps ||
+        !nearlyEqual(gradientArc.startColor.green, 0.8F) ||
+        !nearlyEqual(gradientArc.endColor.alpha, 0.7F) || !decoder.next(command)) {
+        return fail("Gradient-arc decoding failed");
     }
     gfx::DiagonalPatternCommand pattern{};
     if (!gfx::decodeDiagonalPattern(command, pattern) ||

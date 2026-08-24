@@ -118,6 +118,7 @@ export const ServerCapabilityWord1 = {
   ImageColorEffects: 1n << 0n,
   ImageBlurEffects: 1n << 1n,
   NativeArcs: 1n << 2n,
+  NativeGradientArcs: 1n << 3n,
 } as const;
 export interface CapabilityWord { readonly index: number; readonly capabilities: bigint }
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
@@ -236,6 +237,11 @@ export interface CirclePaint {
 export interface ArcPaint {
   readonly destination: ClipRect; readonly startAngle: number; readonly sweepAngle: number;
   readonly thickness: number; readonly roundCaps: boolean; readonly color: Color;
+}
+export interface GradientArcPaint {
+  readonly destination: ClipRect; readonly startAngle: number; readonly sweepAngle: number;
+  readonly thickness: number; readonly roundCaps: boolean;
+  readonly startColor: Color; readonly endColor: Color;
 }
 export interface DiagonalPatternPaint {
   readonly destination: ClipRect; readonly stripeWidth: number; readonly gap: number;
@@ -1520,6 +1526,22 @@ export class FrameEncoder {
     const payload = Buffer.alloc(48);
     values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
     this.command(46, payload);
+  }
+
+  gradientArc(value: GradientArcPaint): void {
+    const values = [value.destination.left, value.destination.top, value.destination.right,
+      value.destination.bottom, value.startAngle, value.sweepAngle, value.thickness,
+      value.roundCaps ? 1 : 0,
+      value.startColor.red, value.startColor.green, value.startColor.blue, value.startColor.alpha,
+      value.endColor.red, value.endColor.green, value.endColor.blue, value.endColor.alpha];
+    const twoPi = Math.PI * 2;
+    if (values.some((item) => !Number.isFinite(item)) || value.startAngle < -twoPi ||
+        value.startAngle > twoPi || value.sweepAngle <= 0 || value.sweepAngle > twoPi ||
+        value.thickness <= 0 || value.thickness > 8192)
+      throw new RangeError("Gradient arc values are outside supported bounds");
+    const payload = Buffer.alloc(64);
+    values.forEach((item, index) => payload.writeFloatLE(item, index * 4));
+    this.command(47, payload);
   }
 
   diagonalPattern(value: DiagonalPatternPaint): void {

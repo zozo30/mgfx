@@ -1003,17 +1003,28 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
-        } else if (command.opcode == gfx::Opcode::drawArc) {
-            gfx::ArcCommand arc{};
+        } else if (command.opcode == gfx::Opcode::drawArc ||
+                   command.opcode == gfx::Opcode::drawGradientArc) {
+            gfx::GradientArcCommand arc{};
+            bool decoded = false;
+            if (command.opcode == gfx::Opcode::drawArc) {
+                gfx::ArcCommand solid{};
+                decoded = gfx::decodeArc(command, solid);
+                if (decoded) arc = {solid.destination, solid.startAngle, solid.sweepAngle,
+                    solid.thickness, solid.roundCaps, solid.color, solid.color};
+            } else {
+                decoded = gfx::decodeGradientArc(command, arc);
+            }
             constexpr float twoPi = 6.28318530717958647692F;
-            if (!gfx::decodeArc(command, arc) || !std::isfinite(arc.startAngle) ||
+            if (!decoded || !std::isfinite(arc.startAngle) ||
                 !std::isfinite(arc.sweepAngle) || !std::isfinite(arc.thickness) ||
                 arc.startAngle < -twoPi || arc.startAngle > twoPi ||
                 arc.sweepAngle <= 0.0F || arc.sweepAngle > twoPi ||
                 arc.thickness <= 0.0F || arc.thickness > 8192.0F) {
                 throw std::runtime_error("Malformed arc command");
             }
-            if (clipEmpty() || arc.color.alpha <= 0.0F) continue;
+            if (clipEmpty() || (arc.startColor.alpha <= 0.0F && arc.endColor.alpha <= 0.0F))
+                continue;
             const float drawableWidth = static_cast<float>(drawable->texture()->width());
             const float drawableHeight = static_cast<float>(drawable->texture()->height());
             const std::array<float, 2> size = {
@@ -1028,14 +1039,17 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 float sweepAngle;
                 float thickness;
                 float roundCaps;
-                std::array<float, 4> color;
+                std::array<float, 4> startColor;
+                std::array<float, 4> endColor;
             };
-            const std::array<float, 4> color = {arc.color.red, arc.color.green, arc.color.blue,
-                arc.color.alpha * opacityStack.back()};
+            const std::array<float, 4> startColor = {arc.startColor.red, arc.startColor.green,
+                arc.startColor.blue, arc.startColor.alpha * opacityStack.back()};
+            const std::array<float, 4> endColor = {arc.endColor.red, arc.endColor.green,
+                arc.endColor.blue, arc.endColor.alpha * opacityStack.back()};
             const auto vertex = [&](float x, float y, float localX, float localY) {
                 return ArcVertex{transformPoint(currentTransform(), {x, y}), {localX, localY},
                     size, arc.startAngle, arc.sweepAngle, arc.thickness,
-                    arc.roundCaps ? 1.0F : 0.0F, color};
+                    arc.roundCaps ? 1.0F : 0.0F, startColor, endColor};
             };
             const ArcVertex vertices[] = {
                 vertex(arc.destination.left, arc.destination.top, 0.0F, 0.0F),

@@ -531,7 +531,8 @@ struct ArcVertex {
     float sweepAngle;
     float thickness;
     float roundCaps;
-    packed_float4 color;
+    packed_float4 startColor;
+    packed_float4 endColor;
 };
 
 struct ArcVertexOut {
@@ -542,14 +543,16 @@ struct ArcVertexOut {
     float sweepAngle;
     float thickness;
     float roundCaps;
-    float4 color;
+    float4 startColor;
+    float4 endColor;
 };
 
 vertex ArcVertexOut arcVertexMain(const device ArcVertex* vertices [[buffer(0)]],
                                   uint vertexId [[vertex_id]]) {
     const ArcVertex value = vertices[vertexId];
     return {float4(value.position, 0.0, 1.0), value.local, value.size,
-            value.startAngle, value.sweepAngle, value.thickness, value.roundCaps, value.color};
+            value.startAngle, value.sweepAngle, value.thickness, value.roundCaps,
+            value.startColor, value.endColor};
 }
 
 fragment float4 arcFragmentMain(ArcVertexOut in [[stage_in]]) {
@@ -579,7 +582,11 @@ fragment float4 arcFragmentMain(ArcVertexOut in [[stage_in]]) {
     }
     const float antialias = max(fwidth(distance), 0.75);
     const float coverage = 1.0 - smoothstep(0.0, antialias, distance);
-    return float4(in.color.rgb * in.color.a, in.color.a) * coverage;
+    const float progress = relative <= in.sweepAngle
+        ? clamp(relative / max(in.sweepAngle, 0.0001), 0.0, 1.0)
+        : ((relative - in.sweepAngle) < (twoPi - relative) ? 1.0 : 0.0);
+    const float4 color = mix(in.startColor, in.endColor, progress);
+    return float4(color.rgb * color.a, color.a) * coverage;
 }
 
 struct PatternVertex {
