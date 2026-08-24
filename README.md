@@ -79,8 +79,9 @@ into the normalized display-list transform stack around the text command. Direct
 `<tspan>` children with independent solid color, family, weight, style, and tracking
 lower to anchored `DrawRichText` run lists. A span with an explicit numeric `x`
 can restart the native pen and apply `y/dx/dy`, covering multiline SVG labels
-without client glyph metrics. Nested spans and text strokes or gradients remain
-explicit fallbacks.
+without client glyph metrics. Nested spans inherit styles normally, and underline
+or line-through decorations use native font positions and thicknesses. Text
+strokes and gradients remain explicit fallbacks.
 Frames then contain only `DrawPath` references at the component's current layout
 size. Documents using more complex gradients, non-rectangular masks, text, embedded images, or external content
 continue through the bounded raster fallback instead of partially misrendering.

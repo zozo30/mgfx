@@ -1,5 +1,5 @@
 import { SVGPathData } from "svg-pathdata";
-import type { Color, RichTextRun } from "@mgfx/demo-client/protocol";
+import { TextDecoration, type Color, type RichTextRun } from "@mgfx/demo-client/protocol";
 import type { Rect } from "@mgfx/demo-client/ui";
 import { svgAttributes, svgPrimitivePath } from "./icon-pack.js";
 
@@ -13,7 +13,8 @@ export interface SvgVectorLayer {
     readonly family: "system" | "monospace" | "serif" | "rounded";
     readonly weight?: "regular" | "medium" | "semibold" | "bold";
     readonly fontStyle?: "regular" | "italic";
-    readonly letterSpacing?: number; readonly anchor?: "start" | "middle" | "end";
+    readonly letterSpacing?: number; readonly decoration?: TextDecoration;
+    readonly anchor?: "start" | "middle" | "end";
     readonly sourceTransform?: Matrix };
   readonly richText?: { readonly runs: readonly RichTextRun[]; readonly x: number;
     readonly y: number; readonly fontSize: number;
@@ -74,6 +75,7 @@ interface PaintState {
   readonly fontWeight: "regular" | "medium" | "semibold" | "bold";
   readonly fontStyle: "regular" | "italic";
   readonly letterSpacing: number;
+  readonly textDecoration: TextDecoration;
   readonly textAnchor: "start" | "middle" | "end";
   readonly fillOpacity: number;
   readonly strokeOpacity: number;
@@ -268,7 +270,7 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
     strokeWidth: 1, opacity: 1, displayed: true, visible: true,
     fillOpacity: 1, strokeOpacity: 1,
     fontSize: 16, fontFamily: "system", fontWeight: "regular", fontStyle: "regular",
-    letterSpacing: 0, textAnchor: "start",
+    letterSpacing: 0, textDecoration: TextDecoration.None, textAnchor: "start",
     fillRule: "nonzero", lineCap: "butt", lineJoin: "bevel",
     currentColor: defaultColor, transform: identity };
   const stack: PaintState[] = [initial];
@@ -310,52 +312,68 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
       const baseX = finiteNumber(attributes.x, 0);
       const baseY = finiteNumber(attributes.y, 0);
       let currentY = baseY;
-      const spanPattern = /<tspan\b([^>]*)>([\s\S]*?)<\/tspan\s*>/gi;
       const pieces: { value: string; state: PaintState; x?: number; y?: number }[] = [];
+      const spanStates: PaintState[] = [state];
+      const appendText = (raw: string) => {
+        if (/[<>]/.test(raw)) throw new Error("SVG text contains an unsupported child element");
+        if (raw) pieces.push({ value: decodeSvgText(raw), state: spanStates[spanStates.length - 1]! });
+      };
+      const coordinate = (spanAttributes: Readonly<Record<string, string>>,
+        name: "x" | "y" | "dx" | "dy", fallback: number) => {
+        const raw = spanAttributes[name];
+        if (raw === undefined) return fallback;
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) throw new Error(`SVG tspan ${name} must be one finite number`);
+        return parsed;
+      };
+      const spanTokens = [...body.matchAll(/<\/?\s*tspan\b[^>]*>/gi)];
       let bodyOffset = 0;
-      for (const span of body.matchAll(spanPattern)) {
-        const before = body.slice(bodyOffset, span.index);
-        if (/<[^>]*>/.test(before)) throw new Error("SVG text supports direct tspan children only");
-        if (before) pieces.push({ value: decodeSvgText(before), state });
-        const spanAttributes = styledAttributes(span[1]!, "tspan", cssRules);
+      for (const span of spanTokens) {
+        appendText(body.slice(bodyOffset, span.index));
+        const rawTag = span[0];
+        const closingSpan = /^<\//.test(rawTag);
+        if (closingSpan) {
+          if (spanStates.length === 1) throw new Error("SVG text contains an unmatched tspan close tag");
+          spanStates.pop();
+          bodyOffset = span.index + rawTag.length;
+          continue;
+        }
+        const attributeSource = rawTag.replace(/^<\s*tspan\b|\/?\s*>$/gi, "");
+        const spanAttributes = styledAttributes(attributeSource, "tspan", cssRules);
         if (["rotate", "transform"].some((key) => spanAttributes[key] !== undefined))
           throw new Error("SVG tspan rotation requires a separate transform scope");
         const positioned = ["x", "y", "dx", "dy"].some((key) => spanAttributes[key] !== undefined);
         if (positioned && spanAttributes.x === undefined)
           throw new Error("Positioned SVG tspans require an explicit x coordinate");
-        const coordinate = (name: "x" | "y" | "dx" | "dy", fallback: number) => {
-          const raw = spanAttributes[name];
-          if (raw === undefined) return fallback;
-          const parsed = Number(raw);
-          if (!Number.isFinite(parsed)) throw new Error(`SVG tspan ${name} must be one finite number`);
-          return parsed;
-        };
-        const spanState = inherit(state, spanAttributes, clipPaths);
+        const spanState = inherit(spanStates[spanStates.length - 1]!, spanAttributes, clipPaths);
         if (Math.abs(spanState.fontSize - state.fontSize) > 1e-6 ||
             spanState.textAnchor !== state.textAnchor)
           throw new Error("SVG tspan font-size and text-anchor changes require run metrics");
-        if (/<[^>]*>/.test(span[2]!)) throw new Error("Nested SVG tspans are not supported");
-        if (spanAttributes.y !== undefined) currentY = coordinate("y", currentY);
-        currentY += coordinate("dy", 0);
-        pieces.push({ value: decodeSvgText(span[2]!), state: spanState,
-          ...(positioned ? { x: coordinate("x", baseX) + coordinate("dx", 0), y: currentY } : {}) });
-        bodyOffset = span.index + span[0].length;
+        if (spanAttributes.y !== undefined) currentY = coordinate(spanAttributes, "y", currentY);
+        currentY += coordinate(spanAttributes, "dy", 0);
+        if (positioned) pieces.push({ value: "", state: spanState,
+          x: coordinate(spanAttributes, "x", baseX) + coordinate(spanAttributes, "dx", 0),
+          y: currentY });
+        if (!/\/\s*>$/.test(rawTag)) spanStates.push(spanState);
+        bodyOffset = span.index + rawTag.length;
       }
-      const after = body.slice(bodyOffset);
-      if (/<[^>]*>/.test(after)) throw new Error("SVG text supports direct tspan children only");
-      if (after) pieces.push({ value: decodeSvgText(after), state });
+      appendText(body.slice(bodyOffset));
+      if (spanStates.length !== 1) throw new Error("SVG text contains an unclosed tspan");
       if (pieces.length === 0) pieces.push({ value: decodeSvgText(body), state });
       const normalized = pieces.map((piece) => ({ ...piece, value: piece.value.replace(/\s+/g, " ") }));
-      if (normalized.length > 0) {
-        normalized[0] = { ...normalized[0]!, value: normalized[0]!.value.trimStart() };
-        normalized[normalized.length - 1] = { ...normalized[normalized.length - 1]!,
-          value: normalized[normalized.length - 1]!.value.trimEnd() };
-        for (let index = 1; index < normalized.length; ++index) {
-          if (normalized[index - 1]!.value.endsWith(" ") && normalized[index]!.value.startsWith(" "))
+      const textIndices = normalized.map((piece, index) => piece.value ? index : -1)
+        .filter((index) => index >= 0);
+      if (textIndices.length > 0) {
+        const first = textIndices[0]!, last = textIndices[textIndices.length - 1]!;
+        normalized[first] = { ...normalized[first]!, value: normalized[first]!.value.trimStart() };
+        normalized[last] = { ...normalized[last]!, value: normalized[last]!.value.trimEnd() };
+        for (let position = 1; position < textIndices.length; ++position) {
+          const previous = textIndices[position - 1]!, index = textIndices[position]!;
+          if (normalized[previous]!.value.endsWith(" ") && normalized[index]!.value.startsWith(" "))
             normalized[index] = { ...normalized[index]!, value: normalized[index]!.value.slice(1) };
         }
       }
-      const hasSpans = [...body.matchAll(/<tspan\b/gi)].length > 0;
+      const hasSpans = spanTokens.some((span) => !/^<\//.test(span[0]));
       if (!state.displayed || !state.visible) continue;
       const drawablePieces = normalized.filter((piece) => piece.value.length > 0 &&
         piece.state.displayed && piece.state.visible);
@@ -380,6 +398,8 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
         layers.push({ ...commonLayer, text: { ...placement, value,
           color: multiplyAlpha(state.fill!, state.opacity * state.fillOpacity),
           family: state.fontFamily, weight: state.fontWeight, fontStyle: state.fontStyle,
+          ...(state.textDecoration !== TextDecoration.None
+            ? { decoration: state.textDecoration } : {}),
           ...(state.letterSpacing !== 0
             ? { letterSpacing: state.letterSpacing / state.fontSize } : {}) } });
         continue;
@@ -393,6 +413,8 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
         groups[groups.length - 1]!.runs.push({ text: piece.value,
           color: multiplyAlpha(piece.state.fill, piece.state.opacity * piece.state.fillOpacity),
           family: piece.state.fontFamily, weight: piece.state.fontWeight, style: piece.state.fontStyle,
+          ...(piece.state.textDecoration !== TextDecoration.None
+            ? { decoration: piece.state.textDecoration } : {}),
           ...(piece.state.letterSpacing !== 0
             ? { letterSpacing: piece.state.letterSpacing / state.fontSize } : {}) });
       }
@@ -452,7 +474,7 @@ const cssProperties = new Set(["color", "fill", "stroke", "opacity", "fill-opaci
   "stroke-opacity", "stroke-width", "fill-rule", "stroke-linecap", "stroke-linejoin",
   "stroke-miterlimit", "stroke-dasharray", "stroke-dashoffset", "clip-path", "transform",
   "stop-color", "stop-opacity", "display", "visibility", "font-size", "font-family",
-  "font-weight", "font-style", "letter-spacing", "text-anchor"]);
+  "font-weight", "font-style", "letter-spacing", "text-decoration", "text-anchor"]);
 
 function parseSvgStyles(source: string): readonly CssRule[] {
   const rules: CssRule[] = [];
@@ -627,6 +649,15 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
   const fontStyle = attributes["font-style"] === undefined ? parent.fontStyle
     : attributes["font-style"]?.trim().toLowerCase() === "italic" ? "italic" : "regular";
   const letterSpacing = finiteNumber(attributes["letter-spacing"], parent.letterSpacing);
+  const decorationValue = attributes["text-decoration"]?.trim().toLowerCase();
+  const decorationTokens = decorationValue?.split(/\s+/).filter(Boolean) ?? [];
+  if (decorationTokens.some((value) => value !== "none" && value !== "underline" &&
+      value !== "line-through") || decorationTokens.includes("none") && decorationTokens.length > 1)
+    throw new Error(`Unsupported SVG text-decoration ${attributes["text-decoration"]}`);
+  const textDecoration = decorationValue === undefined ? parent.textDecoration
+    : decorationValue === "none" ? TextDecoration.None
+      : (decorationTokens.includes("underline") ? TextDecoration.Underline : 0) |
+        (decorationTokens.includes("line-through") ? TextDecoration.LineThrough : 0);
   const anchorValue = attributes["text-anchor"]?.trim().toLowerCase();
   const textAnchor = anchorValue === undefined ? parent.textAnchor
     : anchorValue === "middle" ? "middle" : anchorValue === "end" ? "end" : "start";
@@ -675,7 +706,7 @@ function inherit(parent: PaintState, attributes: Readonly<Record<string, string>
     ...(stroke ? { stroke } : {}),
     ...(inheritedStrokeGradientId ? { strokeGradientId: inheritedStrokeGradientId } : {}),
     strokeWidth, opacity, displayed, visible, fontSize, fontFamily, fontWeight, fontStyle,
-    letterSpacing, textAnchor, fillOpacity, strokeOpacity,
+    letterSpacing, textDecoration, textAnchor, fillOpacity, strokeOpacity,
     fillRule, lineCap, lineJoin, currentColor,
     ...(miterLimit !== undefined ? { miterLimit } : {}),
     ...(inheritedDash ? { dash: inheritedDash } : {}),

@@ -162,6 +162,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     .native-label { fill: #d8fff0; font-family: rounded; font-size: 7;
       font-weight: 600; letter-spacing: 0.45; text-anchor: middle; }
     .native-accent { fill: #ff8a1e; font-family: serif; font-style: italic; font-weight: 700; }
+    .native-decoration { text-decoration: underline; }
   </style>
   <defs>
     <linearGradient id="panel" gradientUnits="userSpaceOnUse" x1="5" y1="5" x2="80" y2="36"
@@ -194,7 +195,7 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     <path d="M70 15H137L125 49H70Z" fill="#101827" stroke="#ff8a1e" stroke-width="2"/>
     <use class="signal" href="#signalGlyph" x="78" y="24" width="53" height="18"
       preserveAspectRatio="xMidYMid slice"/>
-    <text class="native-label" x="104" y="59" transform="rotate(-4 104 59)"><tspan x="104" y="59">NATIVE </tspan><tspan class="native-accent">SVG</tspan> TEXT</text>
+    <text class="native-label" x="104" y="59" transform="rotate(-4 104 59)"><tspan x="104" y="59">NATIVE </tspan><tspan class="native-accent"><tspan class="native-decoration">SVG</tspan></tspan> TEXT</text>
     </g>
   </g>
 </svg>`;

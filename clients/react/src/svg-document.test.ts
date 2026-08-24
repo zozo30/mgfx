@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { TextDecoration } from "@mgfx/demo-client/protocol";
 import { parseSvgVectorDocument } from "./svg-document.js";
 
 test("SVG documents lower inherited paint, primitives, and group transforms to vector layers", () => {
@@ -161,7 +162,7 @@ test("SVG CSS styles retain symbol paint and compose use transforms with instanc
 test("SVG text lowers native typography, baseline position, entities, transforms, and anchor", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 80 40"><style>
     .label { fill: #4cc9ff; font-family: rounded; font-size: 10; font-weight: 700;
-      font-style: italic; letter-spacing: 0.5; text-anchor: middle; }
+      font-style: italic; letter-spacing: 0.5; text-decoration: underline; text-anchor: middle; }
   </style><g transform="translate(2 3)"><text class="label" x="20" y="25">MGFX &amp; Ω</text></g>
   </svg>`);
   assert.equal(document.layers.length, 1);
@@ -169,6 +170,7 @@ test("SVG text lowers native typography, baseline position, entities, transforms
     value: "MGFX & Ω", x: 20, y: 25, fontSize: 10,
     color: { red: 0.2980392156862745, green: 0.788235294117647, blue: 1, alpha: 1 },
     family: "rounded", weight: "bold", fontStyle: "italic", letterSpacing: 0.05,
+    decoration: TextDecoration.Underline,
     anchor: "middle",
     sourceTransform: { a: 1, b: 0, c: 0, d: 1, e: 2, f: 3 },
   });
@@ -201,6 +203,9 @@ test("SVG text rejects unsupported positioned spans, strokes, and entities", () 
     `<svg viewBox="0 0 40 20"><text stroke="red">outlined</text></svg>`), /stroke is not supported/);
   assert.throws(() => parseSvgVectorDocument(
     `<svg viewBox="0 0 40 20"><text>bad &unknown;</text></svg>`), /Unsupported SVG text entity/);
+  assert.throws(() => parseSvgVectorDocument(
+    `<svg viewBox="0 0 40 20"><text text-decoration="overline">bad</text></svg>`),
+  /Unsupported SVG text-decoration/);
 });
 
 test("SVG positioned tspans restart compact native run groups without glyph geometry", () => {
@@ -218,6 +223,23 @@ test("SVG positioned tspans restart compact native run groups without glyph geom
   ]);
   assert.equal(document.layers[1]?.richText?.runs[0]?.color.green, 0.8470588235294118);
   assert.equal(document.layers[2]?.richText?.runs[0]?.weight, "bold");
+});
+
+test("SVG nested tspans inherit native styles and font-metric decorations", () => {
+  const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 30"><style>
+    .marked { fill: #ff8a1e; text-decoration: underline; }
+    .removed { font-family: serif; font-style: italic; text-decoration: underline line-through; }
+  </style><text x="8" y="20" font-size="12">outer <tspan class="marked">nested
+    <tspan class="removed">deep</tspan></tspan> tail</text></svg>`);
+  const runs = document.layers[0]?.richText?.runs;
+  assert.deepEqual(runs?.map((run) => ({ text: run.text, family: run.family,
+    style: run.style, decoration: run.decoration ?? TextDecoration.None })), [
+    { text: "outer ", family: "system", style: "regular", decoration: TextDecoration.None },
+    { text: "nested ", family: "system", style: "regular", decoration: TextDecoration.Underline },
+    { text: "deep", family: "serif", style: "italic",
+      decoration: TextDecoration.Underline | TextDecoration.LineThrough },
+    { text: " tail", family: "system", style: "regular", decoration: TextDecoration.None },
+  ]);
 });
 
 test("SVG text preserves rotation, skew, and nonuniform scaling as affine display state", () => {

@@ -157,6 +157,9 @@ direct SVG `<tspan>` children. Native rich-text placement anchors the full shape
 advance and aligns mixed fonts on a shared alphabetic baseline. Explicit numeric
 `x` positions split an SVG label into compact native run groups; `y/dx/dy` adjust
 each restarted pen without asking the client to measure or construct glyphs.
+Nested spans flatten into the same run table. SVG `text-decoration` maps to the
+existing underline and line-through flags, whose geometry comes from native font
+metrics on the server.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is

@@ -279,7 +279,8 @@ export interface VectorTextData {
   readonly viewBox: Rect; readonly sourceClip?: Rect; readonly color: Color;
   readonly family: Exclude<NonNullable<TextStyle["fontFamily"]>, "pixel">;
   readonly weight?: TextStyle["fontWeight"]; readonly fontStyle?: TextStyle["fontStyle"];
-  readonly letterSpacing?: number; readonly anchor?: "start" | "middle" | "end";
+  readonly letterSpacing?: number; readonly decoration?: TextDecoration;
+  readonly anchor?: "start" | "middle" | "end";
   readonly sourceTransform?: { readonly a: number; readonly b: number; readonly c: number;
     readonly d: number; readonly e: number; readonly f: number };
 }
@@ -941,7 +942,8 @@ function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextDa
   const fontSize = text.fontSize / text.viewBox.height * destination.height;
   encoder.systemText(text.value, x / viewport.width * 2 - 1, 1 - y / viewport.height * 2,
     fontSize / viewport.height * 2, text.color, text.family, text.weight, text.fontStyle,
-    text.letterSpacing ?? 0, TextDecoration.None, 0, text.anchor ?? "start", "alphabetic");
+    text.letterSpacing ?? 0, text.decoration ?? TextDecoration.None, 0,
+    text.anchor ?? "start", "alphabetic");
   if (text.sourceTransform) encoder.popTransform();
   if (text.sourceClip) encoder.popClip();
 }
