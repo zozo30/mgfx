@@ -207,20 +207,6 @@ void CommandEncoder::drawArc(const ArcCommand& arc) {
     }
 }
 
-void CommandEncoder::drawGradientArc(const GradientArcCommand& arc) {
-    beginCommand(Opcode::drawGradientArc, 16 * sizeof(float));
-    for (float value : {arc.destination.left, arc.destination.top,
-                        arc.destination.right, arc.destination.bottom,
-                        arc.startAngle, arc.sweepAngle, arc.thickness,
-                        arc.roundCaps ? 1.0F : 0.0F,
-                        arc.startColor.red, arc.startColor.green,
-                        arc.startColor.blue, arc.startColor.alpha,
-                        arc.endColor.red, arc.endColor.green,
-                        arc.endColor.blue, arc.endColor.alpha}) {
-        appendFloat(bytes_, value);
-    }
-}
-
 void CommandEncoder::drawDiagonalPattern(const DiagonalPatternCommand& pattern) {
     beginCommand(Opcode::drawDiagonalPattern, 12 * sizeof(float));
     for (float value : {pattern.destination.left, pattern.destination.top,
@@ -1008,23 +994,6 @@ bool decodeArc(const CommandView& command, ArcCommand& arc) {
     arc.roundCaps = caps == 1.0F;
     arc.color = {readFloat(command.payload + 32), readFloat(command.payload + 36),
                  readFloat(command.payload + 40), readFloat(command.payload + 44)};
-    return true;
-}
-
-bool decodeGradientArc(const CommandView& command, GradientArcCommand& arc) {
-    if (command.opcode != Opcode::drawGradientArc || command.payloadSize != 64) return false;
-    arc.destination = {readFloat(command.payload), readFloat(command.payload + 4),
-                       readFloat(command.payload + 8), readFloat(command.payload + 12)};
-    arc.startAngle = readFloat(command.payload + 16);
-    arc.sweepAngle = readFloat(command.payload + 20);
-    arc.thickness = readFloat(command.payload + 24);
-    const float caps = readFloat(command.payload + 28);
-    if (caps != 0.0F && caps != 1.0F) return false;
-    arc.roundCaps = caps == 1.0F;
-    arc.startColor = {readFloat(command.payload + 32), readFloat(command.payload + 36),
-                      readFloat(command.payload + 40), readFloat(command.payload + 44)};
-    arc.endColor = {readFloat(command.payload + 48), readFloat(command.payload + 52),
-                    readFloat(command.payload + 56), readFloat(command.payload + 60)};
     return true;
 }
 

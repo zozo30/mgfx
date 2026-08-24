@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Arc, Box, Button, Checkbox, Column, GradientArc, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, SplitPane, Stepper, Svg, Tabs, Text, TextField, TreeView, type TreeItem } from "./components.js";
+import { Arc, Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, SplitPane, Stepper, Svg, Tabs, Text, TextField, TreeView, type TreeItem } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Menu, Router, useRouter } from "./navigation.js";
@@ -218,19 +218,6 @@ test("React Arc lowers to one semantic native SDF draw", () => {
   assert.ok(frame);
   assert.equal(frame.readUInt16LE(40), 46);
   assert.equal(frame.readUInt32LE(44), 48);
-});
-
-test("React GradientArc lowers colors into the shared native arc shader", () => {
-  let frame: Buffer | undefined;
-  const surface = new ReactSurface((value) => { frame = value; });
-  surface.render(<GradientArc startAngle={0} sweepAngle={180} thickness={16}
-    startColor={{ red: 0.1, green: 0.8, blue: 1, alpha: 1 }}
-    endColor={{ red: 0.8, green: 0.2, blue: 1, alpha: 0.7 }}
-    style={{ preferredSize: { width: 120, height: 120 } }} />);
-  surface.resize({ width: 120, height: 120 });
-  assert.ok(frame);
-  assert.equal(frame.readUInt16LE(40), 47);
-  assert.equal(frame.readUInt32LE(44), 64);
 });
 
 test("React RichText lowers styled spans to one native command", () => {

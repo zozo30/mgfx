@@ -42,9 +42,7 @@ export interface ArcStyle {
   readonly startAngle: number;
   readonly sweepAngle: number;
   readonly thickness: number;
-  readonly color?: Color;
-  readonly startColor?: Color;
-  readonly endColor?: Color;
+  readonly color: Color;
   readonly roundCaps?: boolean;
 }
 export interface ImagePaint {
@@ -1311,17 +1309,12 @@ function paintWaveDots(encoder: FrameEncoder, bounds: Rect, pattern: WaveDotPatt
 
 function paintArc(encoder: FrameEncoder, bounds: Rect, arc: ArcStyle | undefined,
   viewport: Size): void {
-  const startColor = arc?.startColor ?? arc?.color;
-  const endColor = arc?.endColor ?? arc?.color;
-  if (!arc || !startColor || !endColor || bounds.width <= 0 || bounds.height <= 0 ||
-      (startColor.alpha <= 0 && endColor.alpha <= 0) ||
+  if (!arc || bounds.width <= 0 || bounds.height <= 0 || arc.color.alpha <= 0 ||
       arc.sweepAngle <= 0 || arc.thickness <= 0) return;
-  const shared = { destination: normalizedRect(bounds, viewport),
+  encoder.arc({ destination: normalizedRect(bounds, viewport),
     startAngle: arc.startAngle * Math.PI / 180,
     sweepAngle: Math.min(360, arc.sweepAngle) * Math.PI / 180,
-    thickness: arc.thickness, roundCaps: arc.roundCaps ?? true };
-  if (arc.startColor || arc.endColor) encoder.gradientArc({ ...shared, startColor, endColor });
-  else encoder.arc({ ...shared, color: startColor });
+    thickness: arc.thickness, roundCaps: arc.roundCaps ?? true, color: arc.color });
 }
 
 export function constrain(size: Size, c: Constraints): Size {

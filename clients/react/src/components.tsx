@@ -35,13 +35,6 @@ export const Arc = ({ startAngle, sweepAngle, thickness, color, roundCaps = true
   readonly color: Color; readonly roundCaps?: boolean; readonly style?: Style;
 }) => <mgfx-box style={{ ...style,
   backgroundArc: { startAngle, sweepAngle, thickness, color, roundCaps } }} />;
-export const GradientArc = ({ startAngle, sweepAngle, thickness, startColor, endColor,
-  roundCaps = true, style }: {
-  readonly startAngle: number; readonly sweepAngle: number; readonly thickness: number;
-  readonly startColor: Color; readonly endColor: Color; readonly roundCaps?: boolean;
-  readonly style?: Style;
-}) => <mgfx-box style={{ ...style,
-  backgroundArc: { startAngle, sweepAngle, thickness, startColor, endColor, roundCaps } }} />;
 export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling,
   sourceRect, tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY, nineSlice,
   effects }: {
