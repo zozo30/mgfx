@@ -614,7 +614,23 @@ class Node {
   }
   measure(constraints: Constraints): Size {
     const padding = insets(this.style.padding);
-    const gutter = this.type === "scroll" ? scrollIndicatorGutter : 0;
+    let gutter = 0;
+    if (this.type === "scroll") {
+      const probe = { minWidth: 0,
+        maxWidth: extent(constraints.maxWidth, padding.left, padding.right),
+        minHeight: 0, maxHeight: 1_000_000 };
+      let contentHeight = 0;
+      for (const child of this.children) {
+        const size = child.measure(probe);
+        if (child.style.position !== "absolute") contentHeight = Math.max(contentHeight, size.height);
+      }
+      const preferredHeight = this.style.preferredSize?.height;
+      const desiredHeight = preferredHeight !== undefined ? preferredHeight
+        : contentHeight + padding.top + padding.bottom;
+      const viewportHeight = extent(constrain({ width: constraints.minWidth,
+        height: desiredHeight }, constraints).height, padding.top, padding.bottom);
+      if (contentHeight > viewportHeight + 0.5) gutter = scrollIndicatorGutter;
+    }
     const inner = { minWidth: 0,
       maxWidth: extent(constraints.maxWidth, padding.left, padding.right + gutter),
       minHeight: 0, maxHeight: extent(constraints.maxHeight, padding.top, padding.bottom) };
@@ -663,8 +679,9 @@ class Node {
       const child = this.children[0];
       if (child) {
         const offset = Math.max(0, Math.min(this.scrollOffsetY, Math.max(0, child.measured.height - content.height)));
+        const gutter = child.measured.height > content.height + 0.5 ? scrollIndicatorGutter : 0;
         child.layout({ x: content.x, y: content.y - offset,
-          width: extent(content.width, 0, scrollIndicatorGutter), height: child.measured.height });
+          width: extent(content.width, 0, gutter), height: child.measured.height });
       }
       return;
     }

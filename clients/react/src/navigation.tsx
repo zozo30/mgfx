@@ -105,7 +105,8 @@ export function Menu({ open, items, activeIndex, onActiveChange, onSelect, onDis
   return <mgfx-stack onClick={onDismiss} style={{ position: "absolute", inset: all(0),
     zIndex: 1800, modal: true }}>
     <mgfx-column onClick={() => {}} style={{ position: "absolute", inset: { top, right },
-      preferredSize: { width }, padding: all(7), gap: 4, cornerRadius: 14,
+      preferredSize: { width }, padding: all(7), gap: 4, crossAxisAlignment: "stretch",
+      cornerRadius: 14,
       background: rgba(0.018, 0.028, 0.052, 0.99), borderWidth: 1.5,
       borderColor: rgba(0.28, 0.50, 0.76),
       shadow: { color: rgba(0, 0, 0, 0.62), blur: 22, spread: 2, offsetY: 8 } }}>

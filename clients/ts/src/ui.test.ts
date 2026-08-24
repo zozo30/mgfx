@@ -255,6 +255,19 @@ test("scroll deltas clamp to the remaining content extent", () => {
   assert.equal(received, 40);
 });
 
+test("non-overflowing scroll views give their content the full viewport width", () => {
+  class ScrollComponent extends Component {
+    build(): Element {
+      return scrollView({ ...box({ preferredSize: { height: 40 } }),
+        onClick: () => {} }, 0, { preferredSize: { width: 100, height: 80 } },
+      "scroll", () => {});
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new ScrollComponent());
+  host.layout({ width: 100, height: 80 });
+  assert.equal(host.pointerDown({ x: 95, y: 20 }), true);
+});
+
 test("overflowing scroll views paint a retained scrollbar above their content", () => {
   class ScrollComponent extends Component {
     build(): Element {
