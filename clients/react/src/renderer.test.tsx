@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, Stepper, Svg, Tabs, Text, TextField } from "./components.js";
+import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, SplitPane, Stepper, Svg, Tabs, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Menu, Router, useRouter } from "./navigation.js";
@@ -137,6 +137,23 @@ test("React Tabs select by pointer and wrap with arrow keys", () => {
   assert.equal(value, 2);
   surface.keyDown({ key: Key.ArrowRight, modifiers: 0, repeat: false });
   assert.equal(value, 0);
+});
+
+test("React SplitPane drags within constraints and supports keyboard resizing", () => {
+  let value = 0.5;
+  function Harness() {
+    const [ratio, setRatio] = useState(0.5);
+    return <SplitPane ratio={ratio} width={500} height={120} minimum={0.25} maximum={0.75}
+      onChange={(next) => { value = next; setRatio(next); }} primary={<Text value="LEFT" />}
+      secondary={<Text value="RIGHT" />} />;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Harness />); surface.resize({ width: 500, height: 120 });
+  surface.pointerDown({ x: 250, y: 60 });
+  surface.pointerMove({ x: 430, y: 60 }); surface.pointerUp({ x: 490, y: 60 });
+  assert.equal(value, 0.75);
+  surface.keyDown({ key: Key.ArrowLeft, modifiers: 0, repeat: false });
+  assert.equal(value, 0.71);
 });
 
 test("native menu selects an anchored option and dismisses its modal hit layer", () => {

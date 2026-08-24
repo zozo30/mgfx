@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, SplitPane, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { CommandPalette, Dialog, Menu, Router, Toast, useRouter,
@@ -567,6 +567,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [theme, setTheme] = useState(0);
   const [section, setSection] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [splitRatio, setSplitRatio] = useState(0.44);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -639,6 +640,23 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
             style={{ fontSize: 18, fontWeight: "semibold", color: rgba(0.42, 0.90, 0.70),
               wrap: true }} />
         </Disclosure>
+        <SplitPane ratio={splitRatio} onChange={setSplitRatio} width={1120} height={154}
+          minimum={0.28} maximum={0.72}
+          primary={<>
+            <Text value="SCENE GRAPH" style={{ fontSize: 21, fontWeight: "bold",
+              color: rgba(0.52, 0.86, 1) }} />
+            <Text value="WINDOW / ROUTE / COMPONENT TREE" style={{ fontSize: 17,
+              color: rgba(0.58, 0.68, 0.82) }} />
+            <ProgressBar value={splitRatio} height={12} />
+          </>}
+          secondary={<>
+            <Text value="NATIVE INSPECTOR" style={{ fontSize: 21, fontWeight: "bold",
+              color: rgba(0.44, 0.94, 0.72) }} />
+            <Text value={`${Math.round(splitRatio * 100)}% / ${Math.round((1 - splitRatio) * 100)}%`}
+              style={{ fontSize: 19, color: rgba(0.70, 0.80, 0.90) }} />
+            <Text value="DRAG DIVIDER OR USE LEFT / RIGHT ARROWS" style={{ fontSize: 16,
+              color: rgba(0.48, 0.58, 0.72) }} />
+          </>} />
         <Column style={{ padding: all(20), gap: 18, cornerRadius: 16,
           background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
           borderColor: rgba(0.20, 0.30, 0.48) }}>

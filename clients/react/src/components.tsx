@@ -548,6 +548,64 @@ export function Disclosure({ title, open, onChange, children, contentHeight = 96
   </Column>;
 }
 
+export function clampSplitRatio(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+export function SplitPane({ ratio, onChange, primary, secondary, width = 900, height = 170,
+  minimum = 0.2, maximum = 0.8, step = 0.04 }: {
+  readonly ratio: number; readonly onChange: (ratio: number) => void;
+  readonly primary?: ReactNode; readonly secondary?: ReactNode;
+  readonly width?: number; readonly height?: number; readonly minimum?: number;
+  readonly maximum?: number; readonly step?: number;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const dividerWidth = 12;
+  const contentWidth = Math.max(1, width - dividerWidth);
+  const clamped = clampSplitRatio(ratio, minimum, maximum);
+  const dividerX = contentWidth * clamped;
+  const updateAt = (point: Point) => onChange(clampSplitRatio(
+    (point.x - dividerWidth / 2) / contentWidth, minimum, maximum));
+  const resizeWithKey = (key: Key) => {
+    if (key === Key.ArrowLeft) onChange(clampSplitRatio(clamped - step, minimum, maximum));
+    if (key === Key.ArrowRight) onChange(clampSplitRatio(clamped + step, minimum, maximum));
+  };
+  useNativeCursor("resize-horizontal", hovered || dragging);
+  return <mgfx-stack style={{ preferredSize: { width, height }, cornerRadius: 14, clip: true,
+    background: rgba(0.025, 0.038, 0.065), borderWidth: focused ? 2 : 1,
+    borderColor: focused ? rgba(0.38, 0.76, 1) : rgba(0.18, 0.28, 0.44) }}
+    onFocusChange={setFocused}
+    onKeyDown={resizeWithKey}>
+    <Column style={{ position: "absolute", inset: { top: 0, bottom: 0, left: 0 },
+      preferredSize: { width: dividerX }, padding: all(16), gap: 8,
+      background: rgba(0.045, 0.07, 0.12) }}>{primary}</Column>
+    <Column style={{ position: "absolute", inset: { top: 0, right: 0, bottom: 0,
+      left: dividerX + dividerWidth }, padding: all(16), gap: 8,
+      background: rgba(0.035, 0.052, 0.09) }}>{secondary}</Column>
+    <mgfx-stack onHoverChange={setHovered} onFocusChange={setFocused}
+      onPointerDown={() => setDragging(true)}
+      onPointerMove={(point) => {
+        if (dragging) updateAt({ x: dividerX + point.x, y: point.y });
+      }}
+      onPointerUp={(point) => {
+        if (dragging) updateAt({ x: dividerX + point.x, y: point.y });
+        setDragging(false);
+      }} onKeyDown={resizeWithKey} style={{ position: "absolute",
+      inset: { top: 0, bottom: 0, left: dividerX }, preferredSize: { width: dividerWidth },
+      background: dragging ? rgba(0.24, 0.76, 1)
+        : hovered ? rgba(0.30, 0.66, 0.94) : rgba(0.16, 0.30, 0.50) }}>
+      <Column style={{ position: "absolute", inset: { top: height / 2 - 20, left: 3 },
+        preferredSize: { width: 6, height: 40 }, gap: 4,
+        mainAxisAlignment: "center", crossAxisAlignment: "center" }}>
+        {[0, 1, 2].map((dot) => <Circle key={dot} style={{ preferredSize: { width: 4, height: 4 },
+          background: rgba(0.76, 0.92, 1) }} />)}
+      </Column>
+    </mgfx-stack>
+  </mgfx-stack>;
+}
+
 export interface TextFieldProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
