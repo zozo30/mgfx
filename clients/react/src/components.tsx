@@ -338,6 +338,29 @@ export function ProgressBar({ value, height = 22 }: { readonly value: number;
   </Row>;
 }
 
+function StepperIconButton({ kind, disabled, onPress }: { readonly kind: "minus" | "plus";
+  readonly disabled: boolean; readonly onPress: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useNativeCursor("pointer", hovered && !disabled);
+  const handlers = disabled ? {} : { onClick: onPress, onHoverChange: setHovered,
+    onPressChange: setPressed, onFocusChange: setFocused };
+  const base = kind === "plus" ? rgba(0.14, 0.48, 0.40) : rgba(0.16, 0.24, 0.38);
+  return <mgfx-stack {...handlers} style={{ preferredSize: { width: 48, height: 44 },
+    cornerRadius: 8, opacity: disabled ? 0.45 : 1,
+    background: pressed ? rgba(base.red * 0.72, base.green * 0.72, base.blue * 0.72)
+      : hovered ? rgba(Math.min(1, base.red * 1.16), Math.min(1, base.green * 1.16),
+        Math.min(1, base.blue * 1.16)) : base,
+    borderWidth: focused ? 2 : 0,
+    borderColor: focused ? rgba(0.48, 0.84, 1) : rgba(0, 0, 0, 0) }}>
+    <Path data={kind === "plus" ? "M12 5V19M5 12H19" : "M5 12H19"}
+      viewBox={{ x: 0, y: 0, width: 24, height: 24 }} strokeColor={rgba(0.92, 0.98, 1)}
+      strokeWidth={2.6} lineCap="square"
+      style={{ position: "absolute", inset: { top: 10, right: 12, bottom: 10, left: 12 } }} />
+  </mgfx-stack>;
+}
+
 export function Stepper({ value, onChange, minimum = 0, maximum = 100, step = 1 }: {
   readonly value: number; readonly onChange: (value: number) => void;
   readonly minimum?: number; readonly maximum?: number; readonly step?: number;
@@ -353,18 +376,16 @@ export function Stepper({ value, onChange, minimum = 0, maximum = 100, step = 1 
       if (key === Key.ArrowUp || key === Key.ArrowRight) update(clamped + step);
       if (key === Key.ArrowDown || key === Key.ArrowLeft) update(clamped - step);
     }}>
-    <Button label="−" disabled={clamped <= minimum} onPress={() => update(clamped - step)}
-      background={rgba(0.16, 0.24, 0.38)} style={{ preferredSize: { width: 48, height: 44 } }}
-      textStyle={{ fontSize: 26 }} />
+    <StepperIconButton kind="minus" disabled={clamped <= minimum}
+      onPress={() => update(clamped - step)} />
     <Stack style={{ preferredSize: { height: 44 }, flexGrow: 1, padding: all(10),
       cornerRadius: 8, background: rgba(0.08, 0.105, 0.16) }}>
       <Text value={Number.isInteger(clamped) ? `${clamped}` : clamped.toFixed(2)}
         style={{ fontSize: 21, fontWeight: "bold", textAlign: "center",
           color: rgba(0.82, 0.92, 1) }} />
     </Stack>
-    <Button label="+" disabled={clamped >= maximum} onPress={() => update(clamped + step)}
-      background={rgba(0.14, 0.48, 0.40)} style={{ preferredSize: { width: 48, height: 44 } }}
-      textStyle={{ fontSize: 24 }} />
+    <StepperIconButton kind="plus" disabled={clamped >= maximum}
+      onPress={() => update(clamped + step)} />
   </mgfx-row>;
 }
 
