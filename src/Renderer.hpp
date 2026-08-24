@@ -2,6 +2,7 @@
 
 #include "GraphicsProtocol.hpp"
 #include "SystemText.hpp"
+#include "TextGeometryCache.hpp"
 #include "VectorPath.hpp"
 
 #include <Foundation/Foundation.hpp>
@@ -74,5 +75,5 @@ private:
     };
     std::unordered_map<std::uint32_t, PathResource> paths_;
     std::unordered_map<std::uint32_t, std::vector<gfx::Vertex>> meshes_;
-    std::unordered_map<std::string, gfx::ShapedText> textCache_;
+    gfx::TextGeometryCache textCache_;
 };

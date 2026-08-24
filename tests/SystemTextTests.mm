@@ -1,4 +1,5 @@
 #include "SystemText.hpp"
+#include "TextGeometryCache.hpp"
 
 #include <cmath>
 #include <fstream>
@@ -6,6 +7,40 @@
 #include <iterator>
 
 int main() {
+    gfx::TextGeometryCache cache(2, 9);
+    int factories = 0;
+    const auto cachedShape = [&](const char* key, std::size_t points) -> gfx::ShapedText& {
+        return cache.getOrCreate(key, [&]() {
+            ++factories;
+            gfx::ShapedText shaped;
+            shaped.triangles.resize(points);
+            return shaped;
+        });
+    };
+    cachedShape("a", 3); cachedShape("b", 3); cachedShape("a", 3); cachedShape("c", 3);
+    cache.trim();
+    auto cacheStats = cache.stats();
+    if (cacheStats.entries != 2 || cacheStats.points != 6 || cacheStats.hits != 1 ||
+        cacheStats.misses != 3 || cacheStats.evictions != 1 || factories != 3) {
+        std::cerr << "Text geometry LRU did not retain the most recently used entries\n";
+        return 1;
+    }
+    cachedShape("b", 3); cache.trim();
+    cacheStats = cache.stats();
+    if (cacheStats.entries != 2 || cacheStats.misses != 4 || cacheStats.evictions != 2 ||
+        factories != 4) {
+        std::cerr << "Evicted text geometry did not rebuild deterministically\n";
+        return 1;
+    }
+    gfx::TextGeometryCache pointBudget(10, 5);
+    pointBudget.getOrCreate("small", [] { gfx::ShapedText value; value.triangles.resize(4); return value; });
+    pointBudget.getOrCreate("large", [] { gfx::ShapedText value; value.triangles.resize(8); return value; });
+    pointBudget.trim();
+    if (pointBudget.stats().entries != 1 || pointBudget.stats().points != 8 ||
+        pointBudget.stats().evictions != 1) {
+        std::cerr << "Text point budget did not retain one oversized newest entry\n";
+        return 1;
+    }
     const gfx::ShapedText sans = gfx::shapeSystemText("Hello, MGFX — Ω", gfx::FontFamily::systemSans);
     if (sans.ascent <= 0.0F) {
         std::cerr << "System text ascent was not reported\n";

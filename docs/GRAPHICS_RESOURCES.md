@@ -401,7 +401,9 @@ color glyph atlases remain available for small text and emoji.
    shaping, persistent font uploads, cached glyph-outline geometry, exact
    asynchronous advance metrics, and frontend-owned multiline rich-text wrapping.
    Next add atlas caching.
-5. Add cache budgets, device-loss recreation, and resource tracing tools.
+5. **Partially implemented:** bounded LRU text-geometry entries/point budgets with
+   deterministic hit, miss, and eviction counters. Next add budgets for persistent
+   GPU resources, device-loss recreation, and protocol-visible resource tracing.
 
 None of these stages changes window, layout, event, or component ownership: the
 client remains the program and the endless native process remains a graphics,

@@ -426,6 +426,10 @@ advances the pen between runs and batches their colored glyph geometry. Explicit
 newlines plus optional word wrapping, line height, and start/center/end alignment
 share the native metric cache with plain text. Each resulting line remains one
 compact command, and exact per-run measurements feed retained layout asynchronously.
+Server-shaped fill and outline geometry lives in a bounded LRU: at most 512 text
+identities and roughly two million tessellated points are retained. Hit, miss,
+point, and eviction counters belong to the cache policy; trimming occurs at frame
+boundaries so rich-text references remain stable during encoding.
 
 ## Requirements
 

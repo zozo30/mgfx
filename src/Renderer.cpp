@@ -1790,28 +1790,27 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             const std::uint64_t fontVersion = gfx::fontResourceVersion(text.fontResourceId);
             cacheKey.append(reinterpret_cast<const char*>(&fontVersion), sizeof(fontVersion));
             cacheKey += text.text;
-            auto [found, inserted] = textCache_.try_emplace(cacheKey);
-            gfx::ShapedText& shaped = found->second;
-            if (inserted) {
-                shaped = gfx::shapeSystemText(
+            gfx::ShapedText& shaped = textCache_.getOrCreate(std::move(cacheKey), [&]() {
+                gfx::ShapedText created = gfx::shapeSystemText(
                     text.text, text.family, text.weight, text.style, text.letterSpacing,
                     text.fontResourceId, text.strokeWidth);
                 const auto appendDecoration = [&](float position, float thickness) {
                     const float half = std::max(thickness, 0.04F) * 0.5F;
-                    const float left = 0.0F, right = shaped.advance;
+                    const float left = 0.0F, right = created.advance;
                     const float top = position - half, bottom = position + half;
-                    shaped.triangles.insert(shaped.triangles.end(), {
+                    created.triangles.insert(created.triangles.end(), {
                         {left, top}, {left, bottom}, {right, bottom},
                         {left, top}, {right, bottom}, {right, top}});
                 };
                 if ((text.decoration & gfx::underlineText) != 0) {
-                    appendDecoration(shaped.underlinePosition, shaped.underlineThickness);
+                    appendDecoration(created.underlinePosition, created.underlineThickness);
                 }
                 if ((text.decoration & gfx::strikeThroughText) != 0) {
-                    appendDecoration(shaped.strikeThroughPosition,
-                                     shaped.strikeThroughThickness);
+                    appendDecoration(created.strikeThroughPosition,
+                                     created.strikeThroughThickness);
                 }
-            }
+                return created;
+            });
             if ((shaped.triangles.empty() && shaped.strokeTriangles.empty()) || clipEmpty()) continue;
             if (encoder == nullptr) {
                 encoder = commandBuffer->renderCommandEncoder(renderPass);
@@ -1975,24 +1974,23 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                 const std::uint64_t version = gfx::fontResourceVersion(run.fontResourceId);
                 key.append(reinterpret_cast<const char*>(&version), sizeof(version));
                 key += run.text;
-                auto [found, inserted] = textCache_.try_emplace(key);
-                gfx::ShapedText& shaped = found->second;
-                if (inserted) {
-                    shaped = gfx::shapeSystemText(run.text, run.family, run.weight, run.style,
+                gfx::ShapedText& shaped = textCache_.getOrCreate(std::move(key), [&]() {
+                    gfx::ShapedText created = gfx::shapeSystemText(run.text, run.family, run.weight, run.style,
                                                   run.letterSpacing, run.fontResourceId,
                                                   run.strokeWidth);
                     const auto decorate = [&](float position, float thickness) {
                         const float half = std::max(thickness, 0.04F) * 0.5F;
-                        shaped.triangles.insert(shaped.triangles.end(), {
+                        created.triangles.insert(created.triangles.end(), {
                             {0.0F, position - half}, {0.0F, position + half},
-                            {shaped.advance, position + half}, {0.0F, position - half},
-                            {shaped.advance, position + half}, {shaped.advance, position - half}});
+                            {created.advance, position + half}, {0.0F, position - half},
+                            {created.advance, position + half}, {created.advance, position - half}});
                     };
                     if ((run.decoration & gfx::underlineText) != 0)
-                        decorate(shaped.underlinePosition, shaped.underlineThickness);
+                        decorate(created.underlinePosition, created.underlineThickness);
                     if ((run.decoration & gfx::strikeThroughText) != 0)
-                        decorate(shaped.strikeThroughPosition, shaped.strikeThroughThickness);
-                }
+                        decorate(created.strikeThroughPosition, created.strikeThroughThickness);
+                    return created;
+                });
                 shapedRuns.push_back(&shaped);
                 totalAdvance += shaped.advance * run.fontScale;
             }
@@ -2082,6 +2080,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
     if (opacityStack.size() != 1) {
         throw std::runtime_error("Unbalanced graphics opacity stack");
     }
+    textCache_.trim();
     if (encoder == nullptr) {
         encoder = commandBuffer->renderCommandEncoder(renderPass);
     }

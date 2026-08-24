@@ -87,6 +87,7 @@ add_executable(MGFXServer MACOSX_BUNDLE
     src/Renderer.hpp
     src/SystemText.mm
     src/SystemText.hpp
+    src/TextGeometryCache.hpp
     src/VectorPath.cpp
     src/VectorPath.hpp
     src/MetalCpp.cpp
