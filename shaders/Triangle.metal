@@ -462,7 +462,8 @@ fragment float4 roundedRectFragmentMain(RoundedRectVertexOut in [[stage_in]]) {
     const float outerDistance = length(max(outerQ, 0.0)) +
         min(max(outerQ.x, outerQ.y), 0.0) - radius;
     const float outerAA = max(fwidth(outerDistance), 0.75);
-    const float outerCoverage = 1.0 - smoothstep(0.0, outerAA, outerDistance);
+    const float outerCoverage = 1.0 -
+        smoothstep(-outerAA, outerAA, outerDistance);
 
     const float border = min(in.borderWidth, min(halfSize.x, halfSize.y));
     const float2 innerHalf = max(halfSize - border, 0.0);
@@ -472,7 +473,7 @@ fragment float4 roundedRectFragmentMain(RoundedRectVertexOut in [[stage_in]]) {
         min(max(innerQ.x, innerQ.y), 0.0) - innerRadius;
     const float innerAA = max(fwidth(innerDistance), 0.75);
     const float innerCoverage = border > 0.0
-        ? 1.0 - smoothstep(0.0, innerAA, innerDistance) : outerCoverage;
+        ? 1.0 - smoothstep(-innerAA, innerAA, innerDistance) : outerCoverage;
     const float borderCoverage = max(0.0, outerCoverage - innerCoverage);
     const float4 fill = float4(in.fillColor.rgb * in.fillColor.a, in.fillColor.a) * innerCoverage;
     const float4 stroke = float4(in.borderColor.rgb * in.borderColor.a,
