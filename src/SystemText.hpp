@@ -4,6 +4,7 @@
 #include "ResourceBudget.hpp"
 #include "VectorPath.hpp"
 
+#include <cstddef>
 #include <string>
 #include <cstdint>
 #include <vector>
@@ -19,6 +20,14 @@ struct ShapedText {
     float underlineThickness = 0.0F;
     float strikeThroughPosition = 0.0F;
     float strikeThroughThickness = 0.0F;
+};
+
+struct GlyphGeometryCacheStats final {
+    std::size_t entries = 0;
+    std::size_t points = 0;
+    std::uint64_t hits = 0;
+    std::uint64_t misses = 0;
+    std::uint64_t evictions = 0;
 };
 
 // Shapes UTF-8 with the platform text engine and returns glyph outlines in em
@@ -39,5 +48,7 @@ void destroyFontResource(std::uint32_t id);
 void clearFontResources();
 std::uint64_t fontResourceVersion(std::uint32_t id);
 ResourceUsage fontResourceUsage();
+GlyphGeometryCacheStats glyphGeometryCacheStats();
+void clearGlyphGeometryCache();
 
 } // namespace gfx

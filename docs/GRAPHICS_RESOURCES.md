@@ -376,14 +376,13 @@ border, and trough/crest gradient paints. One animated phase float drives the en
 row while the backend evaluates circle coverage and color per fragment. Support is
 advertised by `waveDots`.
 
-Deterministic application fonts will use uploaded font-byte resources and
-explicit shaped glyph runs with glyph IDs, advances, offsets, direction, and
-cluster mapping. This keeps line breaking, selection, and accessibility
-semantics with the component system. A future atlas path can rasterize requested
-glyph IDs into persistent textures and draw cached textured quads. Atlas
-entries are keyed by font generation, size, variation axes, glyph ID, and render
-mode. SDF/MSDF atlases may later improve scalable UI text, while grayscale or
-color glyph atlases remain available for small text and emoji.
+Deterministic application fonts use uploaded font-byte resources. The current
+outline atlas keys native glyph geometry by resolved face, uploaded-font generation,
+glyph ID, and outline width; CoreText still owns advances, offsets, direction, and
+cluster shaping. A future raster companion can place grayscale or color glyphs into
+persistent texture pages for small text and emoji. SDF/MSDF pages may later improve
+scalable UI text, while vector atlas entries remain the exact path for gradients,
+outlines, and arbitrary affine transforms.
 
 ## Proposed implementation order
 
@@ -397,10 +396,11 @@ color glyph atlases remain available for small text and emoji.
    Direct `<Mesh>` remains available.
    Persistent colored mesh resources and selective lowering of complete `<Svg>`
    documents are also implemented.
-4. **Partially implemented:** compact Unicode `DrawText` and `DrawRichText`, native
+4. **Implemented:** compact Unicode `DrawText` and `DrawRichText`, native
    shaping, persistent font uploads, cached glyph-outline geometry, exact
    asynchronous advance metrics, and frontend-owned multiline rich-text wrapping.
-   Next add atlas caching.
+   A bounded server-owned glyph geometry atlas shares resolved CoreText outlines
+   across text identities while preserving vector gradients, strokes, and transforms.
 5. **Implemented:** bounded LRU text geometry plus transactional per-client
    texture-byte, path-segment, mesh-vertex, and font-byte/count budgets. Rejection
    preserves replacements and uses `ResourceStatus`. Protocol-visible trace events

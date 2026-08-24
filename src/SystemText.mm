@@ -5,9 +5,12 @@
 #import <CoreText/CoreText.h>
 #import <Foundation/Foundation.h>
 
-#include <vector>
+#include <limits>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace gfx {
 namespace {
@@ -28,6 +31,21 @@ std::mutex fontResourceMutex;
 std::unordered_map<std::uint32_t, FontResource> fontResources;
 ResourceBudget fontBudget{32, 64U * 1024U * 1024U};
 std::uint64_t nextFontVersion = 1;
+
+struct GlyphGeometryEntry {
+    std::shared_ptr<const PathTriangles> triangles;
+    std::uint64_t lastUsed = 0;
+    std::size_t points = 0;
+};
+constexpr std::size_t maximumGlyphGeometryEntries = 4096;
+constexpr std::size_t maximumGlyphGeometryPoints = 1'000'000;
+std::mutex glyphGeometryMutex;
+std::unordered_map<std::string, GlyphGeometryEntry> glyphGeometry;
+std::size_t glyphGeometryPoints = 0;
+std::uint64_t glyphGeometryClock = 0;
+std::uint64_t glyphGeometryHits = 0;
+std::uint64_t glyphGeometryMisses = 0;
+std::uint64_t glyphGeometryEvictions = 0;
 
 struct PathBuilder {
     std::vector<mgfx::ipc::PathSegment> segments;
@@ -129,6 +147,78 @@ CTFontRef createFont(FontFamily family, FontWeight weight, FontStyle style,
     return font;
 }
 
+std::string glyphGeometryKey(CTFontRef font, CGGlyph glyph, float strokeWidth,
+                             std::uint64_t fontVersion) {
+    CFStringRef name = CTFontCopyPostScriptName(font);
+    const char* utf8 = name == nullptr ? nullptr : [(__bridge NSString*)name UTF8String];
+    std::string key = utf8 == nullptr ? std::string{} : std::string(utf8);
+    if (name != nullptr) CFRelease(name);
+    key.push_back('\0');
+    const CTFontSymbolicTraits traits = CTFontGetSymbolicTraits(font);
+    key.append(reinterpret_cast<const char*>(&traits), sizeof(traits));
+    key.append(reinterpret_cast<const char*>(&glyph), sizeof(glyph));
+    key.append(reinterpret_cast<const char*>(&strokeWidth), sizeof(strokeWidth));
+    key.append(reinterpret_cast<const char*>(&fontVersion), sizeof(fontVersion));
+    return key;
+}
+
+void trimGlyphGeometry() {
+    while (glyphGeometry.size() > maximumGlyphGeometryEntries ||
+           (glyphGeometryPoints > maximumGlyphGeometryPoints && glyphGeometry.size() > 1)) {
+        auto oldest = glyphGeometry.end();
+        std::uint64_t oldestUse = std::numeric_limits<std::uint64_t>::max();
+        for (auto entry = glyphGeometry.begin(); entry != glyphGeometry.end(); ++entry) {
+            if (entry->second.lastUsed < oldestUse) {
+                oldest = entry;
+                oldestUse = entry->second.lastUsed;
+            }
+        }
+        if (oldest == glyphGeometry.end()) break;
+        glyphGeometryPoints -= oldest->second.points;
+        glyphGeometry.erase(oldest);
+        ++glyphGeometryEvictions;
+    }
+}
+
+std::shared_ptr<const PathTriangles> glyphTriangles(CTFontRef font, CGGlyph glyph,
+                                                    float strokeWidth,
+                                                    std::uint64_t fontVersion) {
+    std::string key = glyphGeometryKey(font, glyph, strokeWidth, fontVersion);
+    {
+        const std::lock_guard<std::mutex> lock(glyphGeometryMutex);
+        const auto found = glyphGeometry.find(key);
+        if (found != glyphGeometry.end()) {
+            ++glyphGeometryHits;
+            found->second.lastUsed = ++glyphGeometryClock;
+            return found->second.triangles;
+        }
+        ++glyphGeometryMisses;
+    }
+    PathBuilder builder;
+    CGPathRef path = CTFontCreatePathForGlyph(font, glyph, nullptr);
+    if (path != nullptr) {
+        CGPathApply(path, &builder, appendPathElement);
+        CFRelease(path);
+    }
+    auto created = std::make_shared<const PathTriangles>(builder.segments.empty()
+        ? PathTriangles{}
+        : tessellatePath(builder.segments, true, strokeWidth > 0.0F,
+              FillRule::nonzero, LineCap::butt, LineJoin::round,
+              strokeWidth * designSize, 0.5F));
+    const std::size_t points = created->fill.size() + created->stroke.size();
+    const std::lock_guard<std::mutex> lock(glyphGeometryMutex);
+    auto [inserted, wasInserted] = glyphGeometry.try_emplace(
+        std::move(key), GlyphGeometryEntry{created, ++glyphGeometryClock, points});
+    if (wasInserted) {
+        glyphGeometryPoints += points;
+        trimGlyphGeometry();
+        return created;
+    }
+    ++glyphGeometryHits;
+    inserted->second.lastUsed = ++glyphGeometryClock;
+    return inserted->second.triangles;
+}
+
 } // namespace
 
 ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeight weight,
@@ -164,6 +254,7 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
     shaped.strikeThroughPosition = static_cast<float>(
         (ascent - CTFontGetXHeight(baseFont) * 0.5) / designSize);
     shaped.strikeThroughThickness = shaped.underlineThickness;
+    const std::uint64_t resourceVersion = fontResourceVersion(fontResourceId);
     const CFArrayRef runs = CTLineGetGlyphRuns(line);
     for (CFIndex runIndex = 0; runIndex < CFArrayGetCount(runs); ++runIndex) {
         CTRunRef run = static_cast<CTRunRef>(const_cast<void*>(
@@ -179,23 +270,16 @@ ShapedText shapeSystemText(const std::string& utf8, FontFamily family, FontWeigh
             CFDictionaryGetValue(runAttributes, kCTFontAttributeName)));
         if (runFont == nullptr) runFont = baseFont;
         for (CFIndex index = 0; index < count; ++index) {
-            CGPathRef path = CTFontCreatePathForGlyph(
-                runFont, glyphs[static_cast<std::size_t>(index)], nullptr);
-            if (path == nullptr) continue;
-            PathBuilder builder;
-            CGPathApply(path, &builder, appendPathElement);
-            CFRelease(path);
-            if (builder.segments.empty()) continue;
-            PathTriangles glyph = tessellatePath(builder.segments, true, strokeWidth > 0.0F,
-                FillRule::nonzero, LineCap::butt, LineJoin::round,
-                strokeWidth * designSize, 0.5F);
+            const std::shared_ptr<const PathTriangles> glyph = glyphTriangles(
+                runFont, glyphs[static_cast<std::size_t>(index)], strokeWidth,
+                resourceVersion);
             const CGPoint position = positions[static_cast<std::size_t>(index)];
-            for (const PathPoint& point : glyph.fill) {
+            for (const PathPoint& point : glyph->fill) {
                 shaped.triangles.push_back({
                     static_cast<float>(position.x + point[0]) / designSize,
                     static_cast<float>(ascent - position.y - point[1]) / designSize});
             }
-            for (const PathPoint& point : glyph.stroke) {
+            for (const PathPoint& point : glyph->stroke) {
                 shaped.strokeTriangles.push_back({
                     static_cast<float>(position.x + point[0]) / designSize,
                     static_cast<float>(ascent - position.y - point[1]) / designSize});
@@ -284,6 +368,22 @@ std::uint64_t fontResourceVersion(std::uint32_t id) {
 ResourceUsage fontResourceUsage() {
     const std::lock_guard<std::mutex> lock(fontResourceMutex);
     return fontBudget.usage();
+}
+
+GlyphGeometryCacheStats glyphGeometryCacheStats() {
+    const std::lock_guard<std::mutex> lock(glyphGeometryMutex);
+    return {glyphGeometry.size(), glyphGeometryPoints, glyphGeometryHits,
+            glyphGeometryMisses, glyphGeometryEvictions};
+}
+
+void clearGlyphGeometryCache() {
+    const std::lock_guard<std::mutex> lock(glyphGeometryMutex);
+    glyphGeometry.clear();
+    glyphGeometryPoints = 0;
+    glyphGeometryClock = 0;
+    glyphGeometryHits = 0;
+    glyphGeometryMisses = 0;
+    glyphGeometryEvictions = 0;
 }
 
 } // namespace gfx

@@ -67,6 +67,31 @@ int main() {
         std::cerr << "Text point budget did not retain one oversized newest entry\n";
         return 1;
     }
+    gfx::clearGlyphGeometryCache();
+    const gfx::ShapedText repeatedGlyphs = gfx::shapeSystemText(
+        "AAAA", gfx::FontFamily::systemSans);
+    const gfx::GlyphGeometryCacheStats repeatedStats = gfx::glyphGeometryCacheStats();
+    if (repeatedGlyphs.triangles.empty() || repeatedStats.entries != 1 ||
+        repeatedStats.misses != 1 || repeatedStats.hits < 3 || repeatedStats.points == 0) {
+        std::cerr << "Native glyph geometry was not reused within one shaped run\n";
+        return 1;
+    }
+    gfx::shapeSystemText("A", gfx::FontFamily::systemSans);
+    const gfx::GlyphGeometryCacheStats reusedStats = gfx::glyphGeometryCacheStats();
+    if (reusedStats.entries != 1 || reusedStats.hits <= repeatedStats.hits ||
+        reusedStats.misses != repeatedStats.misses) {
+        std::cerr << "Native glyph geometry was not reused between text identities\n";
+        return 1;
+    }
+    const gfx::ShapedText outlinedGlyph = gfx::shapeSystemText(
+        "A", gfx::FontFamily::systemSans, gfx::FontWeight::regular,
+        gfx::FontStyle::regular, 0.0F, 0, 0.04F);
+    const gfx::GlyphGeometryCacheStats outlineStats = gfx::glyphGeometryCacheStats();
+    if (outlinedGlyph.strokeTriangles.empty() || outlineStats.entries != 2 ||
+        outlineStats.misses != reusedStats.misses + 1) {
+        std::cerr << "Outlined glyph geometry did not receive a distinct atlas entry\n";
+        return 1;
+    }
     const gfx::ShapedText sans = gfx::shapeSystemText("Hello, MGFX — Ω", gfx::FontFamily::systemSans);
     if (sans.ascent <= 0.0F) {
         std::cerr << "System text ascent was not reported\n";

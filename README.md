@@ -430,6 +430,11 @@ Server-shaped fill and outline geometry lives in a bounded LRU: at most 512 text
 identities and roughly two million tessellated points are retained. Hit, miss,
 point, and eviction counters belong to the cache policy; trimming occurs at frame
 boundaries so rich-text references remain stable during encoding.
+Below that string cache, a second native glyph-geometry atlas reuses CoreText glyph
+outlines across unrelated labels. It is keyed by resolved font face, uploaded-font
+generation, glyph ID, and outline width, and is bounded to 4096 entries or roughly
+one million points. This keeps vector/MSAA text, gradients, and outlines intact while
+avoiding repeated curve extraction and tessellation for common characters.
 Persistent connection resources are transactionally budgeted as well: 256 textures
 and 256 MiB of RGBA pixels, 4096 paths and one million canonical segments, 1024
 meshes and four million expanded vertices, plus 32 fonts and 64 MiB of font bytes.
