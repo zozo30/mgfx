@@ -470,9 +470,9 @@ export class ComponentHost {
     return true;
   }
   scroll(point: Point, deltaX: number, deltaY: number): boolean {
-    const target = this.root?.scrollTarget(point);
+    const target = this.root?.scrollTarget(point, deltaY);
     if (!target?.onScroll) return false;
-    target.onScroll(deltaX, deltaY);
+    target.onScroll(deltaX, target.clampScrollDelta(deltaY));
     return true;
   }
   textInput(text: string): boolean {
@@ -788,17 +788,34 @@ class Node {
     const layoutPoint = this.pointFromRoot(point);
     return { x: layoutPoint.x - this.bounds.x, y: layoutPoint.y - this.bounds.y };
   }
-  scrollTarget(point: Point): Node | undefined {
+  scrollTarget(point: Point, deltaY = 0): Node | undefined {
     const transformedPoint = this.inverseTransform(point);
     if (!contains(this.bounds, transformedPoint)) return undefined;
     const modal = this.modalChild();
-    if (modal) return modal.scrollTarget(transformedPoint);
+    if (modal) return modal.scrollTarget(transformedPoint, deltaY);
     const ordered = this.paintOrder();
     for (let i = ordered.length - 1; i >= 0; i--) {
-      const target = ordered[i]!.scrollTarget(transformedPoint);
+      const target = ordered[i]!.scrollTarget(transformedPoint, deltaY);
       if (target) return target;
     }
-    return this.onScroll ? this : undefined;
+    return this.onScroll && this.canScroll(deltaY) ? this : undefined;
+  }
+  clampScrollDelta(deltaY: number): number {
+    const maximum = this.maximumScrollOffset();
+    const current = Math.max(0, Math.min(this.scrollOffsetY, maximum));
+    return Math.max(0, Math.min(current + deltaY, maximum)) - current;
+  }
+  private canScroll(deltaY: number): boolean {
+    if (deltaY === 0) return this.maximumScrollOffset() > 0;
+    return Math.abs(this.clampScrollDelta(deltaY)) > 0.0001;
+  }
+  private maximumScrollOffset(): number {
+    if (this.type !== "scroll") return 0;
+    const child = this.children[0];
+    if (!child) return 0;
+    const padding = insets(this.style.padding);
+    const viewportHeight = extent(this.bounds.height, padding.top, padding.bottom);
+    return Math.max(0, child.measured.height - viewportHeight);
   }
   private isFocusable(): boolean {
     return this.onClick !== undefined || this.onKeyDown !== undefined || this.onTextInput !== undefined ||

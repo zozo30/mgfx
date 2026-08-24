@@ -221,6 +221,40 @@ test("scroll events target the clipped container under the pointer", () => {
   assert.equal(host.scroll({ x: 120, y: 20 }, 0, 12), false);
 });
 
+test("scrolling chains to an outer view when a nested view reaches its edge", () => {
+  let innerDelta = 0, outerDelta = 0;
+  class NestedScrollComponent extends Component {
+    build(): Element {
+      const inner = scrollView(box({ preferredSize: { width: 100, height: 100 } }), 50,
+        { preferredSize: { width: 100, height: 50 } }, "inner",
+        (_x, y) => { innerDelta += y; });
+      const content = column([inner, box({ preferredSize: { width: 100, height: 150 } })]);
+      return scrollView(content, 0, { preferredSize: { width: 100, height: 50 } }, "outer",
+        (_x, y) => { outerDelta += y; });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new NestedScrollComponent());
+  host.layout({ width: 100, height: 50 });
+  assert.equal(host.scroll({ x: 20, y: 20 }, 0, 18), true);
+  assert.equal(innerDelta, 0);
+  assert.equal(outerDelta, 18);
+});
+
+test("scroll deltas clamp to the remaining content extent", () => {
+  let received = 0;
+  class ScrollComponent extends Component {
+    build(): Element {
+      return scrollView(box({ preferredSize: { width: 100, height: 90 } }), 0,
+        { preferredSize: { width: 100, height: 50 } }, "scroll",
+        (_x, y) => { received += y; });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new ScrollComponent());
+  host.layout({ width: 100, height: 50 });
+  assert.equal(host.scroll({ x: 20, y: 20 }, 0, 200), true);
+  assert.equal(received, 40);
+});
+
 test("vertical scroll content stretches across the viewport cross axis", () => {
   let clicked = false;
   class WideScrollComponent extends Component {
