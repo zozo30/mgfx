@@ -149,7 +149,9 @@ function CommandOption({ item, active, onSelect, onActivate }: {
     <Column style={{ preferredSize: { width: 34, height: 34 }, cornerRadius: 9,
       mainAxisAlignment: "center", crossAxisAlignment: "center",
       background: active ? rgba(0.22, 0.58, 0.78) : rgba(0.10, 0.16, 0.25) }}>
-      <Text value="›" style={{ fontSize: 27, color: rgba(0.78, 0.94, 1), textAlign: "center" }} />
+      <Path data="M9 6L15 12L9 18" viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+        strokeColor={rgba(0.78, 0.94, 1)} strokeWidth={2.4}
+        style={{ preferredSize: { width: 22, height: 22 } }} />
     </Column>
     <Column style={{ flexGrow: 1, gap: 3 }}>
       <Text value={item.label} style={{ fontSize: 20, fontWeight: "semibold",
