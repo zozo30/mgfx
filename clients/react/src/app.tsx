@@ -277,21 +277,37 @@ function DrawerToggle({ expanded, showLabels, labelOpacity, onPress }: {
 }) {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
   useNativeCursor("pointer", hovered);
-  return <mgfx-row onClick={onPress} onHoverChange={setHovered} onPressChange={setPressed}
+  return <mgfx-stack onClick={onPress} onHoverChange={setHovered} onPressChange={setPressed}
+    onFocusChange={setFocused}
     style={{ preferredSize: { height: 48 },
-      padding: { top: 9, right: 9, bottom: 9, left: 14 }, gap: 14, cornerRadius: 10,
+      cornerRadius: 10,
       background: pressed ? rgba(0.07, 0.10, 0.18)
         : hovered ? rgba(0.15, 0.22, 0.36) : rgba(0.11, 0.16, 0.27),
+      borderWidth: focused ? 2 : 0,
+      borderColor: focused ? rgba(0.48, 0.84, 1) : rgba(0, 0, 0, 0) }}>
+    <Row style={{ position: "absolute", inset: all(0),
+      padding: { top: 9, right: 9, bottom: 9, left: 14 }, gap: 14,
       crossAxisAlignment: "center", mainAxisAlignment: "start" }}>
-    <Path data={expanded ? "M15 5L8 12L15 19" : "M9 5L16 12L9 19"}
-      viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
-      strokeColor={rgba(0.70, 0.88, 1)} strokeWidth={2.5}
-      style={{ preferredSize: { width: 28, height: 28 } }} />
-    {showLabels ? <Stack style={{ opacity: labelOpacity }}><Text value="COLLAPSE"
-      style={{ fontSize: 18, fontWeight: "semibold", color: rgba(0.70, 0.88, 1) }} />
+      <Path data={expanded ? "M15 5L8 12L15 19" : "M9 5L16 12L9 19"}
+        viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+        strokeColor={rgba(0.70, 0.88, 1)} strokeWidth={2.5}
+        style={{ preferredSize: { width: 28, height: 28 } }} />
+      {showLabels ? <Stack style={{ opacity: labelOpacity }}><Text value="COLLAPSE"
+        style={{ fontSize: 18, fontWeight: "semibold", color: rgba(0.70, 0.88, 1) }} />
+      </Stack> : null}
+    </Row>
+    {!showLabels && (hovered || focused) ? <Stack style={{ position: "absolute",
+      inset: { top: 4, left: 64 }, preferredSize: { width: 160, height: 40 },
+      zIndex: 120, padding: all(10), cornerRadius: 9,
+      background: rgba(0.025, 0.045, 0.08, 0.98), borderWidth: 1,
+      borderColor: rgba(0.34, 0.54, 0.82),
+      shadow: { color: rgba(0, 0, 0, 0.5), blur: 12, spread: 1, offsetX: 5 } }}>
+      <Text value="EXPAND MENU" style={{ fontSize: 17, fontWeight: "semibold",
+        color: rgba(0.78, 0.90, 1) }} />
     </Stack> : null}
-  </mgfx-row>;
+  </mgfx-stack>;
 }
 
 function DrawerItem({ active, label, icon, fallback, showLabel, labelOpacity, onPress }: {
@@ -301,14 +317,17 @@ function DrawerItem({ active, label, icon, fallback, showLabel, labelOpacity, on
 }) {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
   useNativeCursor("pointer", hovered);
   const background = active
     ? pressed ? rgba(0.12, 0.25, 0.56) : hovered ? rgba(0.23, 0.42, 0.84) : rgba(0.18, 0.34, 0.72)
     : pressed ? rgba(0.035, 0.05, 0.085) : hovered ? rgba(0.09, 0.13, 0.21) : rgba(0.055, 0.075, 0.12);
   return <mgfx-stack onClick={onPress} onHoverChange={setHovered} onPressChange={setPressed}
+    onFocusChange={setFocused}
     style={{ preferredSize: { height: 58 }, cornerRadius: 12, background,
-      borderWidth: active ? 1.5 : 0,
-      borderColor: active ? rgba(0.36, 0.76, 1) : rgba(0, 0, 0, 0),
+      borderWidth: active ? 1.5 : focused ? 2 : 0,
+      borderColor: active ? rgba(0.36, 0.76, 1)
+        : focused ? rgba(0.48, 0.84, 1) : rgba(0, 0, 0, 0),
       ...(active ? { shadow: { color: rgba(0.12, 0.48, 1, 0.24),
         blur: 9, spread: 0 } } : {}) }}>
     <Row style={{ position: "absolute", inset: all(0),
@@ -324,6 +343,15 @@ function DrawerItem({ active, label, icon, fallback, showLabel, labelOpacity, on
     </Row>
     {active ? <Box style={{ position: "absolute", inset: { top: 12, bottom: 12, left: 0 },
       preferredSize: { width: 4 }, cornerRadius: 2, background: rgba(0.48, 0.88, 1) }} /> : null}
+    {!showLabel && (hovered || focused) ? <Stack style={{ position: "absolute",
+      inset: { top: 9, left: 64 }, preferredSize: { width: 170, height: 40 },
+      zIndex: 120, padding: all(10), cornerRadius: 9,
+      background: rgba(0.025, 0.045, 0.08, 0.98), borderWidth: 1,
+      borderColor: rgba(0.34, 0.54, 0.82),
+      shadow: { color: rgba(0, 0, 0, 0.5), blur: 12, spread: 1, offsetX: 5 } }}>
+      <Text value={label} style={{ fontSize: 17, fontWeight: "semibold",
+        color: rgba(0.78, 0.90, 1) }} />
+    </Stack> : null}
   </mgfx-stack>;
 }
 
