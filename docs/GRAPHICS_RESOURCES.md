@@ -403,8 +403,9 @@ color glyph atlases remain available for small text and emoji.
    Next add atlas caching.
 5. **Partially implemented:** bounded LRU text geometry plus transactional per-client
    texture-byte, path-segment, mesh-vertex, and font-byte/count budgets. Rejection
-   preserves replacements and uses `ResourceStatus`. Next add device-loss recreation
-   and protocol-visible resource tracing.
+   preserves replacements and uses `ResourceStatus`. Protocol-visible trace events
+   expose accepted, rejected, and destroyed resources with current count/cost and
+   quota. Next add device-loss recreation.
 
 None of these stages changes window, layout, event, or component ownership: the
 client remains the program and the endless native process remains a graphics,

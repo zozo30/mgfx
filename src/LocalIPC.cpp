@@ -462,6 +462,34 @@ bool decodeResourceStatus(const std::vector<std::uint8_t>& payload, ResourceStat
     return true;
 }
 
+std::vector<std::uint8_t> encodeResourceTrace(ResourceTrace trace) {
+    std::vector<std::uint8_t> payload(32);
+    payload[0] = static_cast<std::uint8_t>(trace.kind);
+    payload[1] = static_cast<std::uint8_t>(trace.action);
+    writeU32(payload.data() + 4, trace.id);
+    writeU32(payload.data() + 8, trace.resources);
+    writeU32(payload.data() + 12, trace.maximumResources);
+    writeU64(payload.data() + 16, trace.cost);
+    writeU64(payload.data() + 24, trace.maximumCost);
+    return payload;
+}
+
+bool decodeResourceTrace(const std::vector<std::uint8_t>& payload, ResourceTrace& trace) {
+    if (payload.size() != 32 ||
+        payload[0] < static_cast<std::uint8_t>(ResourceKind::texture) ||
+        payload[0] > static_cast<std::uint8_t>(ResourceKind::font) ||
+        payload[1] < static_cast<std::uint8_t>(ResourceAction::created) ||
+        payload[1] > static_cast<std::uint8_t>(ResourceAction::rejected) ||
+        payload[2] != 0 || payload[3] != 0 || readU32(payload.data() + 4) == 0 ||
+        readU32(payload.data() + 8) > readU32(payload.data() + 12) ||
+        readU64(payload.data() + 16) > readU64(payload.data() + 24)) return false;
+    trace = {static_cast<ResourceKind>(payload[0]), static_cast<ResourceAction>(payload[1]),
+             readU32(payload.data() + 4), readU32(payload.data() + 8),
+             readU32(payload.data() + 12), readU64(payload.data() + 16),
+             readU64(payload.data() + 24)};
+    return true;
+}
+
 std::vector<std::uint8_t> encodeAnimationTime(std::uint64_t nanoseconds) {
     std::vector<std::uint8_t> payload(8);
     writeU64(payload.data(), nanoseconds);

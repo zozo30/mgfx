@@ -34,6 +34,9 @@ public:
                     const std::vector<std::uint32_t>& indices);
     void destroyMesh(std::uint32_t id);
     void clearMeshes();
+    gfx::ResourceUsage textureUsage() const { return textureBudget_.usage(); }
+    gfx::ResourceUsage pathUsage() const { return pathBudget_.usage(); }
+    gfx::ResourceUsage meshUsage() const { return meshBudget_.usage(); }
 
 private:
     NS::SharedPtr<MTL::Device> device_;

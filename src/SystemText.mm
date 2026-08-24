@@ -281,4 +281,9 @@ std::uint64_t fontResourceVersion(std::uint32_t id) {
     return found == fontResources.end() ? 0 : found->second.version;
 }
 
+ResourceUsage fontResourceUsage() {
+    const std::lock_guard<std::mutex> lock(fontResourceMutex);
+    return fontBudget.usage();
+}
+
 } // namespace gfx

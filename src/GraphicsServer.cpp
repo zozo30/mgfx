@@ -201,9 +201,9 @@ std::vector<PendingResourceUpload<mgfx::ipc::TextureUpload>> GraphicsServer::tak
     return result;
 }
 
-std::vector<std::uint32_t> GraphicsServer::takeTextureDestroys() {
+std::vector<PendingResourceDestroy> GraphicsServer::takeTextureDestroys() {
     const std::lock_guard<std::mutex> lock(resourceMutex_);
-    std::vector<std::uint32_t> result;
+    std::vector<PendingResourceDestroy> result;
     result.swap(pendingTextureDestroys_);
     return result;
 }
@@ -215,9 +215,9 @@ std::vector<PendingResourceUpload<mgfx::ipc::PathUpload>> GraphicsServer::takePa
     return result;
 }
 
-std::vector<std::uint32_t> GraphicsServer::takePathDestroys() {
+std::vector<PendingResourceDestroy> GraphicsServer::takePathDestroys() {
     const std::lock_guard<std::mutex> lock(resourceMutex_);
-    std::vector<std::uint32_t> result;
+    std::vector<PendingResourceDestroy> result;
     result.swap(pendingPathDestroys_);
     return result;
 }
@@ -229,9 +229,9 @@ std::vector<PendingResourceUpload<mgfx::ipc::MeshUpload>> GraphicsServer::takeMe
     return result;
 }
 
-std::vector<std::uint32_t> GraphicsServer::takeMeshDestroys() {
+std::vector<PendingResourceDestroy> GraphicsServer::takeMeshDestroys() {
     const std::lock_guard<std::mutex> lock(resourceMutex_);
-    std::vector<std::uint32_t> result;
+    std::vector<PendingResourceDestroy> result;
     result.swap(pendingMeshDestroys_);
     return result;
 }
@@ -262,6 +262,20 @@ void GraphicsServer::sendResourceStatus(std::uint64_t connectionGeneration,
     if (active) {
         active->send(mgfx::ipc::MessageType::resourceStatus,
                      mgfx::ipc::encodeResourceStatus(status));
+    }
+}
+
+void GraphicsServer::sendResourceTrace(std::uint64_t connectionGeneration,
+                                       mgfx::ipc::ResourceTrace trace) {
+    std::shared_ptr<mgfx::ipc::Connection> active;
+    {
+        const std::lock_guard<std::mutex> lock(connectionMutex_);
+        if (connectionGeneration_ != connectionGeneration) return;
+        active = connection_;
+    }
+    if (active) {
+        active->send(mgfx::ipc::MessageType::resourceTrace,
+                     mgfx::ipc::encodeResourceTrace(trace));
     }
 }
 
@@ -392,7 +406,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::styledRichTextRuns |
             mgfx::ipc::ServerCapability::gradientNativeText |
             mgfx::ipc::ServerCapability::shapedTextGradientBounds |
-            mgfx::ipc::ServerCapability::radialGradientNativeText;
+            mgfx::ipc::ServerCapability::radialGradientNativeText |
+            mgfx::ipc::ServerCapability::resourceTracing;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
@@ -495,7 +510,7 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
             std::uint32_t id = 0;
             if (mgfx::ipc::decodeResourceId(message.payload, id)) {
                 const std::lock_guard<std::mutex> lock(resourceMutex_);
-                pendingTextureDestroys_.push_back(id);
+                pendingTextureDestroys_.push_back({generation, id});
             }
         } else if (message.type == mgfx::ipc::MessageType::pathCreate) {
             mgfx::ipc::PathUpload path{};
@@ -507,7 +522,7 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
             std::uint32_t id = 0;
             if (mgfx::ipc::decodeResourceId(message.payload, id)) {
                 const std::lock_guard<std::mutex> lock(resourceMutex_);
-                pendingPathDestroys_.push_back(id);
+                pendingPathDestroys_.push_back({generation, id});
             }
         } else if (message.type == mgfx::ipc::MessageType::meshCreate) {
             mgfx::ipc::MeshUpload mesh{};
@@ -519,7 +534,7 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
             std::uint32_t id = 0;
             if (mgfx::ipc::decodeResourceId(message.payload, id)) {
                 const std::lock_guard<std::mutex> lock(resourceMutex_);
-                pendingMeshDestroys_.push_back(id);
+                pendingMeshDestroys_.push_back({generation, id});
             }
         } else if (message.type == mgfx::ipc::MessageType::fontCreate) {
             mgfx::ipc::FontUpload font{};
@@ -528,11 +543,24 @@ void GraphicsServer::readConnection(const std::shared_ptr<mgfx::ipc::Connection>
                 sendResourceStatus(generation, {mgfx::ipc::ResourceKind::font,
                     ready ? mgfx::ipc::ResourceState::ready : mgfx::ipc::ResourceState::rejected,
                     font.id});
+                const gfx::ResourceUsage usage = gfx::fontResourceUsage();
+                sendResourceTrace(generation, {mgfx::ipc::ResourceKind::font,
+                    ready ? mgfx::ipc::ResourceAction::created
+                          : mgfx::ipc::ResourceAction::rejected,
+                    font.id, static_cast<std::uint32_t>(usage.resources),
+                    static_cast<std::uint32_t>(usage.maximumResources), usage.cost,
+                    usage.maximumCost});
             }
         } else if (message.type == mgfx::ipc::MessageType::fontDestroy) {
             std::uint32_t id = 0;
             if (mgfx::ipc::decodeResourceId(message.payload, id)) {
                 gfx::destroyFontResource(id);
+                const gfx::ResourceUsage usage = gfx::fontResourceUsage();
+                sendResourceTrace(generation, {mgfx::ipc::ResourceKind::font,
+                    mgfx::ipc::ResourceAction::destroyed, id,
+                    static_cast<std::uint32_t>(usage.resources),
+                    static_cast<std::uint32_t>(usage.maximumResources), usage.cost,
+                    usage.maximumCost});
             }
         } else if (message.type == mgfx::ipc::MessageType::textMeasure &&
                    message.sequence != 0) {

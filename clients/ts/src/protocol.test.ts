@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeResourceStatus, decodeServerCapabilities, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, ExtendedServerCapability, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ResourceKind, ResourceState, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeResourceStatus, decodeResourceTrace, decodeServerCapabilities, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, ExtendedServerCapability, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ResourceAction, ResourceKind, ResourceState, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -61,7 +61,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.GradientNativeText |
     ExtendedServerCapability.ShapedTextGradientBounds;
   const finalCapabilities = completeCapabilities |
-    ExtendedServerCapability.RadialGradientNativeText;
+    ExtendedServerCapability.RadialGradientNativeText |
+    ExtendedServerCapability.ResourceTracing;
   payload.writeBigUInt64LE(finalCapabilities);
   assert.equal(decodeServerCapabilities(payload), finalCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -79,6 +80,24 @@ test("resource status identifies native readiness and rejection", () => {
   assert.equal(decodeResourceStatus(payload).state, ResourceState.Rejected);
   payload.writeUInt16LE(1, 2);
   assert.throws(() => decodeResourceStatus(payload));
+});
+
+test("resource trace exposes server-side quota accounting", () => {
+  const payload = Buffer.alloc(32);
+  payload.writeUInt8(ResourceKind.Texture, 0);
+  payload.writeUInt8(ResourceAction.Created, 1);
+  payload.writeUInt32LE(17, 4);
+  payload.writeUInt32LE(3, 8);
+  payload.writeUInt32LE(256, 12);
+  payload.writeBigUInt64LE(4096n, 16);
+  payload.writeBigUInt64LE(256n * 1024n * 1024n, 24);
+  assert.deepEqual(decodeResourceTrace(payload), {
+    kind: ResourceKind.Texture, action: ResourceAction.Created, id: 17,
+    resources: 3, maximumResources: 256, cost: 4096n,
+    maximumCost: 256n * 1024n * 1024n,
+  });
+  payload.writeUInt32LE(257, 8);
+  assert.throws(() => decodeResourceTrace(payload));
 });
 
 test("frame pacer keeps only the newest frame while one is in flight", () => {

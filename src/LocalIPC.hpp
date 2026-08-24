@@ -49,6 +49,7 @@ enum class MessageType : std::uint16_t {
     fontDestroy = 33,
     serverCapabilities = 34,
     resourceStatus = 35,
+    resourceTrace = 36,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -121,6 +122,7 @@ enum ServerCapability : std::uint64_t {
     gradientNativeText = 1ULL << 60U,
     shapedTextGradientBounds = 1ULL << 61U,
     radialGradientNativeText = 1ULL << 62U,
+    resourceTracing = 1ULL << 63U,
 };
 
 enum class ResourceKind : std::uint8_t {
@@ -139,6 +141,22 @@ struct ResourceStatus {
     ResourceKind kind;
     ResourceState state;
     std::uint32_t id;
+};
+
+enum class ResourceAction : std::uint8_t {
+    created = 1,
+    destroyed = 2,
+    rejected = 3,
+};
+
+struct ResourceTrace {
+    ResourceKind kind;
+    ResourceAction action;
+    std::uint32_t id;
+    std::uint32_t resources;
+    std::uint32_t maximumResources;
+    std::uint64_t cost;
+    std::uint64_t maximumCost;
 };
 
 enum class TextFamily : std::uint8_t {
@@ -348,6 +366,8 @@ bool decodeServerCapabilities(const std::vector<std::uint8_t>& payload,
                               std::uint64_t& capabilities);
 std::vector<std::uint8_t> encodeResourceStatus(ResourceStatus status);
 bool decodeResourceStatus(const std::vector<std::uint8_t>& payload, ResourceStatus& status);
+std::vector<std::uint8_t> encodeResourceTrace(ResourceTrace trace);
+bool decodeResourceTrace(const std::vector<std::uint8_t>& payload, ResourceTrace& trace);
 std::vector<std::uint8_t> encodeAnimationTime(std::uint64_t nanoseconds);
 bool decodeAnimationTime(const std::vector<std::uint8_t>& payload,
                          std::uint64_t& nanoseconds);

@@ -435,6 +435,9 @@ and 256 MiB of RGBA pixels, 4096 paths and one million canonical segments, 1024
 meshes and four million expanded vertices, plus 32 fonts and 64 MiB of font bytes.
 Rejected uploads emit the normal resource-status event and preserve any previous
 resource with the same ID; destroy, replacement, and disconnect release accounting.
+Servers also emit compact resource-trace events for creates, rejects, and explicit
+destroys. TypeScript clients can inspect live count/cost against each quota without
+polling or coupling application code to Metal.
 
 ## Requirements
 

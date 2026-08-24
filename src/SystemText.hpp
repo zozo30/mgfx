@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GraphicsProtocol.hpp"
+#include "ResourceBudget.hpp"
 #include "VectorPath.hpp"
 
 #include <string>
@@ -37,5 +38,6 @@ bool createFontResource(std::uint32_t id, const std::vector<std::uint8_t>& bytes
 void destroyFontResource(std::uint32_t id);
 void clearFontResources();
 std::uint64_t fontResourceVersion(std::uint32_t id);
+ResourceUsage fontResourceUsage();
 
 } // namespace gfx

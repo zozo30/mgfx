@@ -79,6 +79,7 @@ created or shown a drawable surface.
 | 33 | `FontDestroy` | client → server | Nonzero `u32` resource ID |
 | 34 | `ServerCapabilities` | server → client | Full `u64` capability mask; sent after legacy `ServerHello` |
 | 35 | `ResourceStatus` | server → client | `u8` kind, `u8` state, reserved zero `u16`, nonzero `u32` resource ID |
+| 36 | `ResourceTrace` | server → client | Kind/action/ID plus current and maximum resource count and cost |
 
 Backend is `1` Metal, `2` Vulkan, or `3` DirectX. Capability bits are client
 window lifecycle (`1 << 0`), pointer input (`1 << 1`), keyboard input (`1 << 2`),
@@ -126,12 +127,23 @@ Native anchored text and rich-text placement are advertised by `1 << 52` and
 One-command tiled image surfaces are advertised by `1 << 56`.
 One-command nine-slice images are advertised by `1 << 57`.
 Server-shaped text with a solid native outline is advertised by `1 << 58`.
+Styled rich-text runs, linear-gradient text, shaped gradient bounds, and radial-
+gradient text are advertised by `1 << 59` through `1 << 62`. Protocol-visible
+persistent resource accounting is advertised by `1 << 63`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
 (`2`) when native validation or allocation fails. Status belongs to the current
 connection generation, so a completion from a retired client is never forwarded
 to its replacement.
+
+When resource tracing is available, every create, reject, and explicit destroy
+also emits a fixed 32-byte `ResourceTrace`. It contains kind (`u8`), action
+(`1` created, `2` destroyed, `3` rejected), reserved zero `u16`, ID (`u32`),
+current and maximum counts (`u32` each), then current and maximum cost (`u64`
+each). Texture/font cost is bytes, path cost is canonical segments, and mesh
+cost is expanded indexed vertices. A rejected replacement reports unchanged
+accounting, making quota behavior observable without backend-specific APIs.
 
 Texture IDs are nonzero and scoped to one client connection. Dimensions are
 limited to 4096×4096 and the payload must contain exactly four bytes per pixel.

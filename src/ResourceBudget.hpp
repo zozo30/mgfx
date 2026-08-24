@@ -6,6 +6,13 @@
 
 namespace gfx {
 
+struct ResourceUsage final {
+    std::size_t resources = 0;
+    std::size_t maximumResources = 0;
+    std::size_t cost = 0;
+    std::size_t maximumCost = 0;
+};
+
 class ResourceBudget final {
 public:
     ResourceBudget(std::size_t maximumResources, std::size_t maximumCost)
@@ -38,6 +45,9 @@ public:
     void clear() { costs_.clear(); totalCost_ = 0; }
     std::size_t resources() const { return costs_.size(); }
     std::size_t cost() const { return totalCost_; }
+    ResourceUsage usage() const {
+        return {costs_.size(), maximumResources_, totalCost_, maximumCost_};
+    }
 
 private:
     std::size_t maximumResources_;

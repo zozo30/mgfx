@@ -56,6 +56,21 @@ int main() {
         std::cerr << "Resource status payload round trip failed\n";
         return 1;
     }
+    const mgfx::ipc::ResourceTrace expectedTrace{
+        mgfx::ipc::ResourceKind::texture, mgfx::ipc::ResourceAction::created,
+        73, 3, 256, 4096, 256ULL * 1024ULL * 1024ULL};
+    mgfx::ipc::ResourceTrace resourceTrace{};
+    if (!mgfx::ipc::decodeResourceTrace(mgfx::ipc::encodeResourceTrace(expectedTrace),
+                                        resourceTrace) ||
+        resourceTrace.kind != expectedTrace.kind ||
+        resourceTrace.action != expectedTrace.action || resourceTrace.id != expectedTrace.id ||
+        resourceTrace.resources != expectedTrace.resources ||
+        resourceTrace.maximumResources != expectedTrace.maximumResources ||
+        resourceTrace.cost != expectedTrace.cost ||
+        resourceTrace.maximumCost != expectedTrace.maximumCost) {
+        std::cerr << "Resource trace payload round trip failed\n";
+        return 1;
+    }
 
     mgfx::ipc::WindowState windowState{};
     if (!mgfx::ipc::decodeWindowState(

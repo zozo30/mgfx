@@ -27,6 +27,12 @@ int main() {
         std::cerr << "Persistent resource budget did not clear on disconnect\n";
         return 1;
     }
+    const gfx::ResourceUsage emptyUsage = resourceBudget.usage();
+    if (emptyUsage.resources != 0 || emptyUsage.maximumResources != 2 ||
+        emptyUsage.cost != 0 || emptyUsage.maximumCost != 10) {
+        std::cerr << "Persistent resource usage snapshot is incorrect\n";
+        return 1;
+    }
     gfx::TextGeometryCache cache(2, 9);
     int factories = 0;
     const auto cachedShape = [&](const char* key, std::size_t points) -> gfx::ShapedText& {

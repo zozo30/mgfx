@@ -62,6 +62,15 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
     return NSCursor.arrowCursor;
 }
 
+mgfx::ipc::ResourceTrace resourceTrace(mgfx::ipc::ResourceKind kind,
+                                       mgfx::ipc::ResourceAction action,
+                                       std::uint32_t id,
+                                       gfx::ResourceUsage usage) {
+    return {kind, action, id, static_cast<std::uint32_t>(usage.resources),
+            static_cast<std::uint32_t>(usage.maximumResources), usage.cost,
+            usage.maximumCost};
+}
+
 } // namespace
 
 @class AppDelegate;
@@ -209,14 +218,26 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
             _renderer->createTexture(texture.id, texture.width, texture.height, texture.rgba);
             _graphicsServer->sendResourceStatus(pending.connectionGeneration,
                 {mgfx::ipc::ResourceKind::texture, mgfx::ipc::ResourceState::ready, texture.id});
+            _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+                resourceTrace(mgfx::ipc::ResourceKind::texture,
+                              mgfx::ipc::ResourceAction::created, texture.id,
+                              _renderer->textureUsage()));
         } catch (const std::exception& error) {
             NSLog(@"MGFX texture %u rejected: %s", texture.id, error.what());
             _graphicsServer->sendResourceStatus(pending.connectionGeneration,
                 {mgfx::ipc::ResourceKind::texture, mgfx::ipc::ResourceState::rejected, texture.id});
+            _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+                resourceTrace(mgfx::ipc::ResourceKind::texture,
+                              mgfx::ipc::ResourceAction::rejected, texture.id,
+                              _renderer->textureUsage()));
         }
     }
-    for (const std::uint32_t id : _graphicsServer->takeTextureDestroys()) {
-        _renderer->destroyTexture(id);
+    for (const PendingResourceDestroy pending : _graphicsServer->takeTextureDestroys()) {
+        _renderer->destroyTexture(pending.id);
+        _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+            resourceTrace(mgfx::ipc::ResourceKind::texture,
+                          mgfx::ipc::ResourceAction::destroyed, pending.id,
+                          _renderer->textureUsage()));
     }
     for (PendingResourceUpload<mgfx::ipc::PathUpload>& pending :
          _graphicsServer->takePathUploads()) {
@@ -225,14 +246,26 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
             _renderer->createPath(path.id, std::move(path.segments));
             _graphicsServer->sendResourceStatus(pending.connectionGeneration,
                 {mgfx::ipc::ResourceKind::path, mgfx::ipc::ResourceState::ready, path.id});
+            _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+                resourceTrace(mgfx::ipc::ResourceKind::path,
+                              mgfx::ipc::ResourceAction::created, path.id,
+                              _renderer->pathUsage()));
         } catch (const std::exception& error) {
             NSLog(@"MGFX path %u rejected: %s", path.id, error.what());
             _graphicsServer->sendResourceStatus(pending.connectionGeneration,
                 {mgfx::ipc::ResourceKind::path, mgfx::ipc::ResourceState::rejected, path.id});
+            _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+                resourceTrace(mgfx::ipc::ResourceKind::path,
+                              mgfx::ipc::ResourceAction::rejected, path.id,
+                              _renderer->pathUsage()));
         }
     }
-    for (const std::uint32_t id : _graphicsServer->takePathDestroys()) {
-        _renderer->destroyPath(id);
+    for (const PendingResourceDestroy pending : _graphicsServer->takePathDestroys()) {
+        _renderer->destroyPath(pending.id);
+        _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+            resourceTrace(mgfx::ipc::ResourceKind::path,
+                          mgfx::ipc::ResourceAction::destroyed, pending.id,
+                          _renderer->pathUsage()));
     }
     for (PendingResourceUpload<mgfx::ipc::MeshUpload>& pending :
          _graphicsServer->takeMeshUploads()) {
@@ -241,14 +274,26 @@ NSCursor* nativeCursor(mgfx::ipc::CursorShape cursor) {
             _renderer->createMesh(mesh.id, mesh.vertices, mesh.indices);
             _graphicsServer->sendResourceStatus(pending.connectionGeneration,
                 {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::ready, mesh.id});
+            _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+                resourceTrace(mgfx::ipc::ResourceKind::mesh,
+                              mgfx::ipc::ResourceAction::created, mesh.id,
+                              _renderer->meshUsage()));
         } catch (const std::exception& error) {
             NSLog(@"MGFX mesh %u rejected: %s", mesh.id, error.what());
             _graphicsServer->sendResourceStatus(pending.connectionGeneration,
                 {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::rejected, mesh.id});
+            _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+                resourceTrace(mgfx::ipc::ResourceKind::mesh,
+                              mgfx::ipc::ResourceAction::rejected, mesh.id,
+                              _renderer->meshUsage()));
         }
     }
-    for (const std::uint32_t id : _graphicsServer->takeMeshDestroys()) {
-        _renderer->destroyMesh(id);
+    for (const PendingResourceDestroy pending : _graphicsServer->takeMeshDestroys()) {
+        _renderer->destroyMesh(pending.id);
+        _graphicsServer->sendResourceTrace(pending.connectionGeneration,
+            resourceTrace(mgfx::ipc::ResourceKind::mesh,
+                          mgfx::ipc::ResourceAction::destroyed, pending.id,
+                          _renderer->meshUsage()));
     }
 
     if (const std::optional<std::string> title = _graphicsServer->takeWindowTitle()) {

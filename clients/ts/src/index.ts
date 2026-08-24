@@ -8,6 +8,7 @@ import {
   decodeKey,
   decodeScroll,
   decodeResourceStatus,
+  decodeResourceTrace,
   decodeText,
   decodeSize,
   decodeServerCapabilities, decodeServerHello,
@@ -19,6 +20,7 @@ import {
   encodeWindowState,
   MessageParser,
   MessageType,
+  ResourceAction,
   ResourceKind,
   ResourceState,
   sendMessage,
@@ -64,6 +66,12 @@ socket.on("data", (chunk) => {
         const status = decodeResourceStatus(message.payload);
         console.log(`MGFX ${ResourceKind[status.kind]?.toLowerCase()} resource ${status.id} ` +
           `${ResourceState[status.state]?.toLowerCase()}`);
+      } else if (message.type === MessageType.ResourceTrace) {
+        const trace = decodeResourceTrace(message.payload);
+        console.log(`MGFX ${ResourceKind[trace.kind]?.toLowerCase()} ${trace.id} ` +
+          `${ResourceAction[trace.action]?.toLowerCase()}: ` +
+          `${trace.resources}/${trace.maximumResources} resources, ` +
+          `${trace.cost}/${trace.maximumCost} cost`);
       } else if (message.type === MessageType.FramePresented) {
         framePacer.presented(message.sequence);
       } else if (message.type === MessageType.AnimationFrame) {

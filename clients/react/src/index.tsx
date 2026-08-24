@@ -7,11 +7,11 @@ import { ReactSurface } from "./renderer.js";
 import { decodeImageFile, type DecodedImage } from "./image-codec.js";
 import { loadLucideIcons } from "./icon-pack.js";
 import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
-  decodeResourceStatus, decodeServerCapabilities, decodeServerHello, decodeSize, decodeText,
+  decodeResourceStatus, decodeResourceTrace, decodeServerCapabilities, decodeServerHello, decodeSize, decodeText,
   decodeTextMetrics, decodeWindowChromeMetrics,
   encodeCursor, encodeFontCreate, encodeMeshCreate, encodePathCreate, encodeResourceId, encodeText,
   encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, FramePacer, GraphicsBackend, MessageParser,
-  MessageType, ResourceKind, ResourceState, sendMessage,
+  MessageType, ResourceAction, ResourceKind, ResourceState, sendMessage,
   TextMetricsClient } from "@mgfx/demo-client/protocol";
 
 const userId = process.geteuid?.() ?? process.getuid?.();
@@ -110,6 +110,15 @@ socket.on("data", (chunk) => {
         const label = ResourceKind[status.kind]?.toLowerCase() ?? "resource";
         const state = ResourceState[status.state]?.toLowerCase() ?? "unknown";
         console.log(`MGFX ${label} resource ${status.id} ${state}`);
+        break;
+      }
+      case MessageType.ResourceTrace: {
+        const trace = decodeResourceTrace(message.payload);
+        const label = ResourceKind[trace.kind]?.toLowerCase() ?? "resource";
+        const action = ResourceAction[trace.action]?.toLowerCase() ?? "changed";
+        console.log(`MGFX ${label} ${trace.id} ${action}: ` +
+          `${trace.resources}/${trace.maximumResources} resources, ` +
+          `${trace.cost}/${trace.maximumCost} cost`);
         break;
       }
       case MessageType.FramePresented: framePacer.presented(message.sequence); break;

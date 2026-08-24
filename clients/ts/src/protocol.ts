@@ -41,6 +41,7 @@ export enum MessageType {
   FontDestroy = 33,
   ServerCapabilities = 34,
   ResourceStatus = 35,
+  ResourceTrace = 36,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -110,13 +111,24 @@ export const ExtendedServerCapability = {
   GradientNativeText: 1n << 60n,
   ShapedTextGradientBounds: 1n << 61n,
   RadialGradientNativeText: 1n << 62n,
+  ResourceTracing: 1n << 63n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
+export enum ResourceAction { Created = 1, Destroyed = 2, Rejected = 3 }
 export interface ResourceStatus {
   readonly kind: ResourceKind;
   readonly state: ResourceState;
   readonly id: number;
+}
+export interface ResourceTrace {
+  readonly kind: ResourceKind;
+  readonly action: ResourceAction;
+  readonly id: number;
+  readonly resources: number;
+  readonly maximumResources: number;
+  readonly cost: bigint;
+  readonly maximumCost: bigint;
 }
 export interface ServerHello {
   readonly version: number;
@@ -675,6 +687,21 @@ export function decodeResourceStatus(payload: Buffer): ResourceStatus {
       state < ResourceState.Ready || state > ResourceState.Rejected || id === 0)
     throw new Error("ResourceStatus payload has invalid fields");
   return { kind: kind as ResourceKind, state: state as ResourceState, id };
+}
+
+export function decodeResourceTrace(payload: Buffer): ResourceTrace {
+  if (payload.length !== 32 || payload.readUInt16LE(2) !== 0)
+    throw new Error("ResourceTrace payload must be 32 bytes with zero reserved fields");
+  const kind = payload.readUInt8(0), action = payload.readUInt8(1);
+  const id = payload.readUInt32LE(4), resources = payload.readUInt32LE(8);
+  const maximumResources = payload.readUInt32LE(12);
+  const cost = payload.readBigUInt64LE(16), maximumCost = payload.readBigUInt64LE(24);
+  if (kind < ResourceKind.Texture || kind > ResourceKind.Font ||
+      action < ResourceAction.Created || action > ResourceAction.Rejected || id === 0 ||
+      resources > maximumResources || cost > maximumCost)
+    throw new Error("ResourceTrace payload has invalid fields");
+  return { kind: kind as ResourceKind, action: action as ResourceAction, id,
+    resources, maximumResources, cost, maximumCost };
 }
 
 export function decodeAnimationTime(payload: Buffer): bigint {
