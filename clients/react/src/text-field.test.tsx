@@ -20,13 +20,17 @@ function textFieldSurface(onValue: (value: string) => void): ReactSurface {
   return surface;
 }
 
-test("repeated backspace clears the complete text field value", () => {
+test("sequential backspace presses advance the caret until the field is empty", async () => {
   let value = "";
   const surface = textFieldSurface((next) => { value = next; });
   surface.textInput("NATIVE");
   assert.equal(value, "NATIVE");
-  for (let index = 0; index < 6; index += 1)
+  for (let index = 0; index < 6; index += 1) {
     surface.keyDown({ key: Key.Backspace, modifiers: 0, repeat: index > 0 });
+    surface.keyUp({ key: Key.Backspace, modifiers: 0, repeat: false });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(value, "NATIVE".slice(0, 5 - index));
+  }
   assert.equal(value, "");
 });
 

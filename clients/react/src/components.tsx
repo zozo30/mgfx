@@ -729,17 +729,23 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
   style = {}, textStyle, onKeyDown }: TextFieldProps) {
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const [caret, setCaret] = useState([...value].length);
-  const [anchor, setAnchor] = useState([...value].length);
+  const [selection, setSelection] = useState(() => {
+    const end = [...value].length;
+    return { caret: end, anchor: end };
+  });
   const [dragging, setDragging] = useState(false);
   const [blinkEpoch, setBlinkEpoch] = useState(0);
   const clipboard = useNativeClipboard();
   const animationTime = useAnimationTime(focused);
   useNativeCursor("text", hovered);
   const characters = [...value];
+  const { caret, anchor } = selection;
   useEffect(() => {
-    setCaret((index) => Math.min(index, characters.length));
-    setAnchor((index) => Math.min(index, characters.length));
+    setSelection((current) => {
+      const next = { caret: Math.min(current.caret, characters.length),
+        anchor: Math.min(current.anchor, characters.length) };
+      return next.caret === current.caret && next.anchor === current.anchor ? current : next;
+    });
   }, [value]);
   const displayed = value || placeholder;
   const color = value ? textStyle?.color ?? rgba(1, 1, 1) : rgba(0.55, 0.60, 0.70);
@@ -781,8 +787,7 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
     const next = selectionStart + accepted.length;
     onChange([...characters.slice(0, selectionStart), ...accepted,
       ...characters.slice(selectionEnd)].join(""));
-    setCaret(next);
-    setAnchor(next);
+    setSelection({ caret: next, anchor: next });
     wakeCaret();
   };
   const caretNode = <Box style={{ preferredSize: { width: 2, height: fontSize },
@@ -794,12 +799,16 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
       borderColor: focused ? rgba(0.38, 0.62, 1) : rgba(0.24, 0.28, 0.38), ...style }}
       onHoverChange={setHovered}
       onFocusChange={(next) => { setFocused(next); if (next) {
-        setCaret(characters.length); setAnchor(characters.length); wakeCaret();
+        setSelection({ caret: characters.length, anchor: characters.length }); wakeCaret();
       } }}
       onPointerDown={(point) => {
-        const index = indexAt(point); setCaret(index); setAnchor(index); setDragging(true); wakeCaret();
+        const index = indexAt(point); setSelection({ caret: index, anchor: index });
+        setDragging(true); wakeCaret();
       }}
-      onPointerMove={(point) => { if (dragging) setCaret(indexAt(point)); }}
+      onPointerMove={(point) => { if (dragging) {
+        const next = indexAt(point);
+        setSelection((current) => ({ ...current, caret: next }));
+      } }}
       onPointerUp={() => setDragging(false)}
       onTextInput={insert}
       onKeyDown={(key, modifiers) => {
@@ -808,18 +817,18 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
         wakeCaret();
         if (key === Key.Backspace && hasSelection) {
           onChange([...characters.slice(0, selectionStart), ...characters.slice(selectionEnd)].join(""));
-          setCaret(selectionStart); setAnchor(selectionStart);
+          setSelection({ caret: selectionStart, anchor: selectionStart });
         } else if (key === Key.Backspace && caret > 0) {
           onChange([...characters.slice(0, caret - 1), ...characters.slice(caret)].join(""));
-          setCaret(caret - 1); setAnchor(caret - 1);
+          setSelection({ caret: caret - 1, anchor: caret - 1 });
         } else if (key === Key.ArrowLeft) {
           const next = !extending && hasSelection ? selectionStart : Math.max(0, caret - 1);
-          setCaret(next); if (!extending) setAnchor(next);
+          setSelection({ caret: next, anchor: extending ? anchor : next });
         } else if (key === Key.ArrowRight) {
           const next = !extending && hasSelection ? selectionEnd : Math.min(characters.length, caret + 1);
-          setCaret(next); if (!extending) setAnchor(next);
+          setSelection({ caret: next, anchor: extending ? anchor : next });
         } else if (key === Key.SelectAll) {
-          setAnchor(0); setCaret(characters.length);
+          setSelection({ caret: characters.length, anchor: 0 });
         } else if (key === Key.Copy) {
           clipboard.writeClipboard(hasSelection
             ? characters.slice(selectionStart, selectionEnd).join("") : value);
@@ -829,9 +838,9 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
           if (hasSelection) {
             onChange([...characters.slice(0, selectionStart),
               ...characters.slice(selectionEnd)].join(""));
-            setCaret(selectionStart); setAnchor(selectionStart);
+            setSelection({ caret: selectionStart, anchor: selectionStart });
           } else {
-            onChange(""); setCaret(0); setAnchor(0);
+            onChange(""); setSelection({ caret: 0, anchor: 0 });
           }
         } else if (key === Key.Paste) {
           void clipboard.readClipboard().then(insert);
