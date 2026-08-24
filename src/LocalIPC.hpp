@@ -279,6 +279,7 @@ enum class Key : std::uint16_t {
     pageDown = 15,
     home = 16,
     end = 17,
+    deleteForward = 18,
 };
 
 enum KeyModifier : std::uint16_t {

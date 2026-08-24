@@ -42,3 +42,13 @@ test("select all followed by backspace clears the complete text field value", ()
   surface.keyDown({ key: Key.Backspace, modifiers: 0, repeat: false });
   assert.equal(value, "");
 });
+
+test("forward delete removes the character after the caret", () => {
+  let value = "";
+  const surface = textFieldSurface((next) => { value = next; });
+  surface.textInput("NATIVE");
+  surface.keyDown({ key: Key.ArrowLeft, modifiers: 0, repeat: false });
+  surface.keyDown({ key: Key.ArrowLeft, modifiers: 0, repeat: false });
+  surface.keyDown({ key: Key.Delete, modifiers: 0, repeat: false });
+  assert.equal(value, "NATIE");
+});

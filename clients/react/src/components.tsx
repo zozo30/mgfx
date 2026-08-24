@@ -851,7 +851,7 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
         const currentEnd = Math.max(currentAnchor, currentCaret);
         const currentHasSelection = currentStart !== currentEnd;
         wakeCaret();
-        if (key === Key.Backspace && currentHasSelection) {
+        if ((key === Key.Backspace || key === Key.Delete) && currentHasSelection) {
           updateValue([...currentCharacters.slice(0, currentStart),
             ...currentCharacters.slice(currentEnd)].join(""));
           updateSelection({ caret: currentStart, anchor: currentStart });
@@ -859,6 +859,10 @@ export function TextField({ value, onChange, placeholder = "", maxLength = 256,
           updateValue([...currentCharacters.slice(0, currentCaret - 1),
             ...currentCharacters.slice(currentCaret)].join(""));
           updateSelection({ caret: currentCaret - 1, anchor: currentCaret - 1 });
+        } else if (key === Key.Delete && currentCaret < currentCharacters.length) {
+          updateValue([...currentCharacters.slice(0, currentCaret),
+            ...currentCharacters.slice(currentCaret + 1)].join(""));
+          updateSelection({ caret: currentCaret, anchor: currentCaret });
         } else if (key === Key.ArrowLeft) {
           const next = !extending && currentHasSelection
             ? currentStart : Math.max(0, currentCaret - 1);

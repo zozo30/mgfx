@@ -27,6 +27,7 @@ mgfx::ipc::Key semanticKey(NSEvent* event) {
     // active input methods are allowed to provide an empty character string.
     switch (event.keyCode) {
     case kVK_Delete: return mgfx::ipc::Key::backspace;
+    case kVK_ForwardDelete: return mgfx::ipc::Key::deleteForward;
     case kVK_LeftArrow: return mgfx::ipc::Key::arrowLeft;
     case kVK_RightArrow: return mgfx::ipc::Key::arrowRight;
     case kVK_UpArrow: return mgfx::ipc::Key::arrowUp;
