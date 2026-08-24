@@ -414,6 +414,9 @@ void GraphicsServer::run() {
                                                    static_cast<std::uint32_t>(capabilities)}));
         active->send(mgfx::ipc::MessageType::serverCapabilities,
                      mgfx::ipc::encodeServerCapabilities(capabilities));
+        active->send(mgfx::ipc::MessageType::serverCapabilityWord,
+                     mgfx::ipc::encodeCapabilityWord({1,
+                         mgfx::ipc::ServerCapabilityWord1::imageColorEffects}));
         {
             const std::lock_guard<std::mutex> lock(sizeMutex_);
             if (width_ > 0 && height_ > 0) {

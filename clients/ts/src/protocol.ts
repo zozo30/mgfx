@@ -42,6 +42,7 @@ export enum MessageType {
   ServerCapabilities = 34,
   ResourceStatus = 35,
   ResourceTrace = 36,
+  ServerCapabilityWord = 37,
 }
 
 export enum GraphicsBackend { Metal = 1, Vulkan = 2, DirectX = 3 }
@@ -113,6 +114,8 @@ export const ExtendedServerCapability = {
   RadialGradientNativeText: 1n << 62n,
   ResourceTracing: 1n << 63n,
 } as const;
+export const ServerCapabilityWord1 = { ImageColorEffects: 1n << 0n } as const;
+export interface CapabilityWord { readonly index: number; readonly capabilities: bigint }
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
 export enum ResourceAction { Created = 1, Destroyed = 2, Rejected = 3 }
@@ -183,6 +186,12 @@ export interface Color {
   readonly green: number;
   readonly blue: number;
   readonly alpha: number;
+}
+export interface ImageEffects {
+  readonly saturation?: number;
+  readonly contrast?: number;
+  readonly brightness?: number;
+  readonly hueRotation?: number;
 }
 
 export interface Vertex {
@@ -679,6 +688,12 @@ export function decodeServerCapabilities(payload: Buffer): bigint {
   return payload.readBigUInt64LE(0);
 }
 
+export function decodeCapabilityWord(payload: Buffer): CapabilityWord {
+  if (payload.length !== 16 || payload.readUInt32LE(0) === 0 || payload.readUInt32LE(4) !== 0)
+    throw new Error("ServerCapabilityWord payload has invalid fields");
+  return { index: payload.readUInt32LE(0), capabilities: payload.readBigUInt64LE(8) };
+}
+
 export function decodeResourceStatus(payload: Buffer): ResourceStatus {
   if (payload.length !== 8 || payload.readUInt16LE(2) !== 0)
     throw new Error("ResourceStatus payload must be 8 bytes with zero reserved fields");
@@ -847,6 +862,29 @@ export class FrameEncoder {
       (repeatX ? 2 : 0) | (repeatY ? 4 : 0), 4);
     values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
     this.command(39, payload);
+  }
+
+  filteredImageSurface(textureId: number, destination: ClipRect, uv: ClipRect,
+    effects: ImageEffects, tint: Color = { red: 1, green: 1, blue: 1, alpha: 1 },
+    cornerRadius = 0, sampling: "linear" | "nearest" = "linear",
+    repeatX = false, repeatY = false): void {
+    const saturation = effects.saturation ?? 1, contrast = effects.contrast ?? 1;
+    const brightness = effects.brightness ?? 0, hueRotation = effects.hueRotation ?? 0;
+    const values = [destination.left, destination.top, destination.right, destination.bottom,
+      uv.left, uv.top, uv.right, uv.bottom, tint.red, tint.green, tint.blue, tint.alpha,
+      cornerRadius, saturation, contrast, brightness, hueRotation, 0];
+    if (!Number.isSafeInteger(textureId) || textureId <= 0 || textureId > 0xffff_ffff ||
+        values.some((value) => !Number.isFinite(value)) || cornerRadius < 0 ||
+        cornerRadius > 8192 || saturation < 0 || saturation > 2 || contrast < 0 ||
+        contrast > 2 || brightness < -1 || brightness > 1 ||
+        hueRotation < -Math.PI * 2 || hueRotation > Math.PI * 2)
+      throw new RangeError("Filtered image values are outside supported bounds");
+    const payload = Buffer.alloc(80);
+    payload.writeUInt32LE(textureId, 0);
+    payload.writeUInt32LE((sampling === "nearest" ? 1 : 0) |
+      (repeatX ? 2 : 0) | (repeatY ? 4 : 0), 4);
+    values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
+    this.command(45, payload);
   }
 
   nineSliceImage(textureId: number, destination: ClipRect, uv: ClipRect,

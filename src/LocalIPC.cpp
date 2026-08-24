@@ -443,6 +443,20 @@ bool decodeServerCapabilities(const std::vector<std::uint8_t>& payload,
     return true;
 }
 
+std::vector<std::uint8_t> encodeCapabilityWord(CapabilityWord word) {
+    std::vector<std::uint8_t> payload(16);
+    writeU32(payload.data(), word.index);
+    writeU64(payload.data() + 8, word.capabilities);
+    return payload;
+}
+
+bool decodeCapabilityWord(const std::vector<std::uint8_t>& payload, CapabilityWord& word) {
+    if (payload.size() != 16 || readU32(payload.data()) == 0 ||
+        readU32(payload.data() + 4) != 0) return false;
+    word = {readU32(payload.data()), readU64(payload.data() + 8)};
+    return true;
+}
+
 std::vector<std::uint8_t> encodeResourceStatus(ResourceStatus status) {
     std::vector<std::uint8_t> payload(8);
     payload[0] = static_cast<std::uint8_t>(status.kind);

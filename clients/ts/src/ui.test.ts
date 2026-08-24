@@ -467,6 +467,24 @@ test("rounded images lower to the server image-surface shader", () => {
   assert.equal(frame.readFloatLE(80), 12);
 });
 
+test("image color effects lower to one filtered server draw", () => {
+  class FilteredImage extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 100, height: 60 }, cornerRadius: 10,
+        backgroundImage: { textureId: 3,
+          effects: { saturation: 1.5, contrast: 1.2, brightness: 0.1, hueRotation: 0.5 } } });
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new FilteredImage()); host.layout({ width: 100, height: 60 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 100, height: 60 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 45);
+  assert.ok(Math.abs(frame.readFloatLE(84) - 1.5) < 0.0001);
+  assert.ok(Math.abs(frame.readFloatLE(96) - 0.5) < 0.0001);
+});
+
 test("image fitting honors edge alignment for letterboxing and cropping", () => {
   const render = (fit: "contain" | "cover") => {
     class AlignedImage extends Component {

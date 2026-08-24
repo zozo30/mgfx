@@ -40,6 +40,10 @@ the validated pixels into a native texture resource.
 UV rectangle, and tint; inherited opacity applies on the server. Repeating image
 patterns do not require resending the underlying pixels.
 
+Filtered image surfaces additionally carry bounded saturation, contrast, brightness,
+and hue rotation. These remain fragment-stage parameters on the persistent texture,
+including for cropped or tiled sources, so animated image treatment is constant-size.
+
 The implemented `DrawImageSurface` extension adds a rounded-corner radius and an
 explicit linear/nearest sampling flag while retaining the same texture, UV, tint,
 transform, opacity, and clip semantics. Metal applies the rounded mask per fragment;

@@ -25,7 +25,8 @@ export const Stack = ({ children, style }: LayoutProps) =>
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
 export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling,
-  sourceRect, tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY, nineSlice }: {
+  sourceRect, tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY, nineSlice,
+  effects }: {
   readonly textureId: number; readonly style?: Style;
   readonly sourceWidth?: number; readonly sourceHeight?: number;
   readonly fit?: "fill" | "contain" | "cover";
@@ -37,6 +38,8 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX
   readonly tileOffsetX?: number; readonly tileOffsetY?: number;
   readonly repeatX?: boolean; readonly repeatY?: boolean;
   readonly nineSlice?: { readonly source: Insets; readonly destination?: Insets };
+  readonly effects?: { readonly saturation?: number; readonly contrast?: number;
+    readonly brightness?: number; readonly hueRotation?: number };
 }) => <mgfx-box style={{ ...style, backgroundImage: {
   textureId,
   ...(sourceWidth !== undefined && sourceHeight !== undefined
@@ -53,6 +56,7 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX
   ...(repeatX !== undefined ? { repeatX } : {}),
   ...(repeatY !== undefined ? { repeatY } : {}),
   ...(nineSlice ? { nineSlice } : {}),
+  ...(effects ? { effects } : {}),
 } }} />;
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;

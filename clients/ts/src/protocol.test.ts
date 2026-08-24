@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeResourceStatus, decodeResourceTrace, decodeServerCapabilities, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, ExtendedServerCapability, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ResourceAction, ResourceKind, ResourceState, ServerCapability, TextDecoration, TextMetricsClient } from "./protocol.js";
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeCapabilityWord, decodeResourceStatus, decodeResourceTrace, decodeServerCapabilities, decodeServerHello, decodeText, decodeTextMetrics, decodeWindowChromeMetrics, encodeCursor, encodeFontCreate, encodeMeshCreate, encodeMessage, encodePathCreate, encodeResourceId, encodeText, encodeTextMeasure, encodeTextureCreate, encodeWindowChrome, encodeWindowConfig, encodeWindowState, ExtendedServerCapability, FrameEncoder, FramePacer, GraphicsBackend, MessageParser, MessageType, ResourceAction, ResourceKind, ResourceState, ServerCapability, ServerCapabilityWord1, TextDecoration, TextMetricsClient } from "./protocol.js";
 
 test("MGIP parser accepts fragmented messages", () => {
   const encoded = encodeMessage(MessageType.Resize, Buffer.from([1, 2, 3, 4]), 42);
@@ -80,6 +80,17 @@ test("resource status identifies native readiness and rejection", () => {
   assert.equal(decodeResourceStatus(payload).state, ResourceState.Rejected);
   payload.writeUInt16LE(1, 2);
   assert.throws(() => decodeResourceStatus(payload));
+});
+
+test("indexed capability words extend features beyond bit 63", () => {
+  const payload = Buffer.alloc(16);
+  payload.writeUInt32LE(1, 0);
+  payload.writeBigUInt64LE(ServerCapabilityWord1.ImageColorEffects, 8);
+  assert.deepEqual(decodeCapabilityWord(payload), {
+    index: 1, capabilities: ServerCapabilityWord1.ImageColorEffects,
+  });
+  payload.writeUInt32LE(1, 4);
+  assert.throws(() => decodeCapabilityWord(payload));
 });
 
 test("resource trace exposes server-side quota accounting", () => {
@@ -416,6 +427,20 @@ test("tiled image surfaces encode repeat axes and phase in one command", () => {
   assert.throws(() => frame.tiledImageSurface(11,
     { left: -1, top: 1, right: 1, bottom: -1 },
     { left: 0, top: 0, right: 1, bottom: 1 }, undefined, 0, "linear", false, false));
+});
+
+test("filtered image surfaces carry animated color treatment in one command", () => {
+  const frame = new FrameEncoder();
+  frame.filteredImageSurface(9, { left: -1, top: 1, right: 1, bottom: -1 },
+    { left: 0, top: 0, right: 1, bottom: 1 },
+    { saturation: 1.4, contrast: 1.2, brightness: 0.1, hueRotation: 2 },
+    { red: 1, green: 1, blue: 1, alpha: 0.9 }, 8);
+  const encoded = frame.finish();
+  assert.equal(encoded.readUInt16LE(16), 45);
+  assert.equal(encoded.readUInt32LE(20), 80);
+  assert.equal(encoded.readUInt32LE(24), 9);
+  assert.ok(Math.abs(encoded.readFloatLE(84) - 1.4) < 0.0001);
+  assert.ok(Math.abs(encoded.readFloatLE(96) - 2) < 0.0001);
 });
 
 test("nine-slice images encode fixed source and destination borders", () => {

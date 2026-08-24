@@ -100,6 +100,8 @@ function ImagePreview({ time, sourceSize }: { readonly time: number;
       <Image textureId={1} sourceWidth={sourceSize.width} sourceHeight={sourceSize.height}
         sourceRect={{ x: frame * sourceSize.width / 4, y: 0,
           width: sourceSize.width / 4, height: sourceSize.height }} fit="cover"
+        effects={{ saturation: 1.35, contrast: 1.12,
+          brightness: 0.04, hueRotation: Math.sin(time / 900) * Math.PI }}
         style={{ preferredSize: { width: 102, height: 102 }, cornerRadius: 16,
           borderWidth: 2, borderColor: rgba(0.34, 0.92, 0.72) }} />
       <Path data="M50 2L62 18L82 18L82 38L98 50L82 62L82 82L62 82L50 98L38 82L18 82L18 62L2 50L18 38L18 18L38 18Z M50 32A18 18 0 1 1 49.9 32Z"

@@ -55,6 +55,7 @@ enum class Opcode : std::uint16_t {
     drawStyledRichText = 42,
     drawGradientText = 43,
     drawRadialGradientText = 44,
+    drawFilteredImageSurface = 45,
 };
 
 enum class Primitive : std::uint8_t {
@@ -118,6 +119,10 @@ struct ImageSurfaceCommand {
     float cornerRadius;
     bool repeatX = false;
     bool repeatY = false;
+    float saturation = 1.0F;
+    float contrast = 1.0F;
+    float brightness = 0.0F;
+    float hueRotation = 0.0F;
 };
 
 struct SliceInsets { float left; float top; float right; float bottom; };
@@ -413,6 +418,7 @@ public:
     void drawImage(const ImageCommand& image);
     void drawImageSurface(const ImageSurfaceCommand& image);
     void drawTiledImageSurface(const ImageSurfaceCommand& image);
+    void drawFilteredImageSurface(const ImageSurfaceCommand& image);
     void drawNineSliceImage(const NineSliceImageCommand& image);
     void drawMesh(const MeshCommand& mesh);
     void drawPath(const PathCommand& path);
@@ -469,6 +475,7 @@ bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
 bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image);
 bool decodeTiledImageSurface(const CommandView& command, ImageSurfaceCommand& image);
+bool decodeFilteredImageSurface(const CommandView& command, ImageSurfaceCommand& image);
 bool decodeNineSliceImage(const CommandView& command, NineSliceImageCommand& image);
 bool decodeMesh(const CommandView& command, MeshCommand& mesh);
 bool decodePath(const CommandView& command, PathCommand& path);

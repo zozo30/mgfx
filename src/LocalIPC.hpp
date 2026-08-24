@@ -50,6 +50,7 @@ enum class MessageType : std::uint16_t {
     serverCapabilities = 34,
     resourceStatus = 35,
     resourceTrace = 36,
+    serverCapabilityWord = 37,
 };
 
 enum class GraphicsBackend : std::uint16_t {
@@ -123,6 +124,15 @@ enum ServerCapability : std::uint64_t {
     shapedTextGradientBounds = 1ULL << 61U,
     radialGradientNativeText = 1ULL << 62U,
     resourceTracing = 1ULL << 63U,
+};
+
+enum ServerCapabilityWord1 : std::uint64_t {
+    imageColorEffects = 1ULL << 0U,
+};
+
+struct CapabilityWord {
+    std::uint32_t index;
+    std::uint64_t capabilities;
 };
 
 enum class ResourceKind : std::uint8_t {
@@ -364,6 +374,8 @@ bool decodeServerHello(const std::vector<std::uint8_t>& payload, ServerHello& he
 std::vector<std::uint8_t> encodeServerCapabilities(std::uint64_t capabilities);
 bool decodeServerCapabilities(const std::vector<std::uint8_t>& payload,
                               std::uint64_t& capabilities);
+std::vector<std::uint8_t> encodeCapabilityWord(CapabilityWord word);
+bool decodeCapabilityWord(const std::vector<std::uint8_t>& payload, CapabilityWord& word);
 std::vector<std::uint8_t> encodeResourceStatus(ResourceStatus status);
 bool decodeResourceStatus(const std::vector<std::uint8_t>& payload, ResourceStatus& status);
 std::vector<std::uint8_t> encodeResourceTrace(ResourceTrace trace);

@@ -51,6 +51,10 @@ export interface ImagePaint {
   readonly tileOffsetX?: number; readonly tileOffsetY?: number;
   readonly repeatX?: boolean; readonly repeatY?: boolean;
   readonly nineSlice?: { readonly source: Insets; readonly destination?: Insets };
+  readonly effects?: {
+    readonly saturation?: number; readonly contrast?: number;
+    readonly brightness?: number; readonly hueRotation?: number;
+  };
 }
 export interface Transform {
   readonly translateX?: number; readonly translateY?: number;
@@ -1218,13 +1222,22 @@ function paintImage(encoder: FrameEncoder, bounds: Rect, image: ImagePaint | und
       top: repeatY ? -offsetY / tile.height : 0,
       right: repeatX ? (bounds.width - offsetX) / tile.width : 1,
       bottom: repeatY ? (bounds.height - offsetY) / tile.height : 1 };
-    encoder.tiledImageSurface(image.textureId, normalizedRect(bounds, viewport), uv,
-      image.tint, cornerRadius, image.sampling ?? "linear", repeatX, repeatY);
+    if (image.effects) {
+      encoder.filteredImageSurface(image.textureId, normalizedRect(bounds, viewport), uv,
+        image.effects, image.tint, cornerRadius, image.sampling ?? "linear", repeatX, repeatY);
+    } else {
+      encoder.tiledImageSurface(image.textureId, normalizedRect(bounds, viewport), uv,
+        image.tint, cornerRadius, image.sampling ?? "linear", repeatX, repeatY);
+    }
     return;
   }
   const geometry = imageGeometry(bounds, image);
   if (geometry.destination.width <= 0 || geometry.destination.height <= 0) return;
-  if (cornerRadius > 0 || image.sampling === "nearest") {
+  if (image.effects) {
+    encoder.filteredImageSurface(image.textureId,
+      normalizedRect(geometry.destination, viewport), geometry.uv, image.effects,
+      image.tint, cornerRadius, image.sampling ?? "linear");
+  } else if (cornerRadius > 0 || image.sampling === "nearest") {
     encoder.imageSurface(image.textureId, normalizedRect(geometry.destination, viewport), geometry.uv,
       image.tint, cornerRadius, image.sampling ?? "linear");
   } else {

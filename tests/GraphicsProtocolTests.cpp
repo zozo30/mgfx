@@ -69,6 +69,11 @@ int main() {
                                    {-0.8F, 0.4F, 0.8F, -0.4F},
                                    {-0.25F, 0.0F, 4.75F, 1.0F},
                                    {1.0F, 0.9F, 0.8F, 1.0F}, 8.0F, true, false});
+    encoder.drawFilteredImageSurface({12, gfx::ImageSampling::linear,
+                                      {-0.5F, 0.5F, 0.5F, -0.5F},
+                                      {0.0F, 0.0F, 1.0F, 1.0F},
+                                      {1.0F, 1.0F, 1.0F, 0.9F}, 6.0F, false, false,
+                                      1.4F, 1.2F, 0.1F, 2.0F});
     encoder.drawNineSliceImage({11, gfx::ImageSampling::nearest,
                                 {-0.9F, 0.7F, 0.9F, -0.7F}, {0.0F, 0.0F, 1.0F, 1.0F},
                                 {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.2F, 0.1F, 0.2F},
@@ -336,6 +341,14 @@ int main() {
         tiledImage.repeatY || !nearlyEqual(tiledImage.uv.left, -0.25F) ||
         !nearlyEqual(tiledImage.uv.right, 4.75F) || !decoder.next(command)) {
         return fail("Tiled image-surface decoding failed");
+    }
+    gfx::ImageSurfaceCommand filteredImage{};
+    if (!gfx::decodeFilteredImageSurface(command, filteredImage) ||
+        filteredImage.textureId != 12 || !nearlyEqual(filteredImage.saturation, 1.4F) ||
+        !nearlyEqual(filteredImage.contrast, 1.2F) ||
+        !nearlyEqual(filteredImage.brightness, 0.1F) ||
+        !nearlyEqual(filteredImage.hueRotation, 2.0F) || !decoder.next(command)) {
+        return fail("Filtered image-surface decoding failed");
     }
     gfx::NineSliceImageCommand nineSlice{};
     if (!gfx::decodeNineSliceImage(command, nineSlice) || nineSlice.textureId != 11 ||

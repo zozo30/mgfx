@@ -6,7 +6,7 @@ import { App } from "./app.js";
 import { ReactSurface } from "./renderer.js";
 import { decodeImageFile, type DecodedImage } from "./image-codec.js";
 import { loadLucideIcons } from "./icon-pack.js";
-import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeKey, decodePoint, decodeScroll,
+import { AnimationClock, ClipboardClient, decodeAnimationTime, decodeCapabilityWord, decodeKey, decodePoint, decodeScroll,
   decodeResourceStatus, decodeResourceTrace, decodeServerCapabilities, decodeServerHello, decodeSize, decodeText,
   decodeTextMetrics, decodeWindowChromeMetrics,
   encodeCursor, encodeFontCreate, encodeMeshCreate, encodePathCreate, encodeResourceId, encodeText,
@@ -105,6 +105,11 @@ socket.on("data", (chunk) => {
       case MessageType.ServerCapabilities:
         console.log(`MGFX extended capabilities 0x${decodeServerCapabilities(message.payload).toString(16)}`);
         break;
+      case MessageType.ServerCapabilityWord: {
+        const word = decodeCapabilityWord(message.payload);
+        console.log(`MGFX capability word ${word.index}: 0x${word.capabilities.toString(16)}`);
+        break;
+      }
       case MessageType.ResourceStatus: {
         const status = decodeResourceStatus(message.payload);
         const label = ResourceKind[status.kind]?.toLowerCase() ?? "resource";

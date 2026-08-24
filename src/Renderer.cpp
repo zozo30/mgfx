@@ -627,14 +627,23 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
         } else if (command.opcode == gfx::Opcode::drawImageSurface ||
-                   command.opcode == gfx::Opcode::drawTiledImageSurface) {
+                   command.opcode == gfx::Opcode::drawTiledImageSurface ||
+                   command.opcode == gfx::Opcode::drawFilteredImageSurface) {
             gfx::ImageSurfaceCommand image{};
             const bool decoded = command.opcode == gfx::Opcode::drawImageSurface
                 ? gfx::decodeImageSurface(command, image)
-                : gfx::decodeTiledImageSurface(command, image);
+                : command.opcode == gfx::Opcode::drawTiledImageSurface
+                    ? gfx::decodeTiledImageSurface(command, image)
+                    : gfx::decodeFilteredImageSurface(command, image);
             if (!decoded ||
                 !std::isfinite(image.cornerRadius) || image.cornerRadius < 0.0F ||
-                image.cornerRadius > 8192.0F) {
+                image.cornerRadius > 8192.0F || !std::isfinite(image.saturation) ||
+                image.saturation < 0.0F || image.saturation > 2.0F ||
+                !std::isfinite(image.contrast) || image.contrast < 0.0F ||
+                image.contrast > 2.0F || !std::isfinite(image.brightness) ||
+                image.brightness < -1.0F || image.brightness > 1.0F ||
+                !std::isfinite(image.hueRotation) || image.hueRotation < -6.283186F ||
+                image.hueRotation > 6.283186F) {
                 throw std::runtime_error("Malformed image-surface command");
             }
             const auto found = textures_.find(image.textureId);
@@ -683,6 +692,9 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->setRenderPipelineState(imageSurfacePipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            const std::array<float, 4> effects = {
+                image.saturation, image.contrast, image.brightness, image.hueRotation};
+            encoder->setFragmentBytes(&effects, sizeof(effects), 0);
             encoder->setFragmentTexture(found->second.texture.get(), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),

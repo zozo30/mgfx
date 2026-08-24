@@ -4,6 +4,7 @@ import { TypeScriptDemo, type Size } from "./demo.js";
 import {
   AnimationClock,
   decodeAnimationTime,
+  decodeCapabilityWord,
   decodePoint,
   decodeKey,
   decodeScroll,
@@ -62,6 +63,9 @@ socket.on("data", (chunk) => {
         console.log(`MGFX server ready: protocol ${hello.version}, ${backend}, capabilities 0x${hello.capabilities.toString(16)}`);
       } else if (message.type === MessageType.ServerCapabilities) {
         console.log(`MGFX extended capabilities 0x${decodeServerCapabilities(message.payload).toString(16)}`);
+      } else if (message.type === MessageType.ServerCapabilityWord) {
+        const word = decodeCapabilityWord(message.payload);
+        console.log(`MGFX capability word ${word.index}: 0x${word.capabilities.toString(16)}`);
       } else if (message.type === MessageType.ResourceStatus) {
         const status = decodeResourceStatus(message.payload);
         console.log(`MGFX ${ResourceKind[status.kind]?.toLowerCase()} resource ${status.id} ` +

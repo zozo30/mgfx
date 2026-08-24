@@ -189,6 +189,7 @@ vertex ImageSurfaceVertexOut imageSurfaceVertexMain(
 }
 
 fragment float4 imageSurfaceFragmentMain(ImageSurfaceVertexOut in [[stage_in]],
+                                         constant packed_float4& effects [[buffer(0)]],
                                          texture2d<float> image [[texture(0)]]) {
     constexpr sampler linearClamp(coord::normalized, address::clamp_to_edge, filter::linear);
     constexpr sampler nearestClamp(coord::normalized, address::clamp_to_edge, filter::nearest);
@@ -209,8 +210,17 @@ fragment float4 imageSurfaceFragmentMain(ImageSurfaceVertexOut in [[stage_in]],
     const float2 q = abs(in.local - halfSize) - halfSize + radius;
     const float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
     const float coverage = 1.0 - smoothstep(0.0, max(fwidth(edge), 0.75), edge);
+    float3 rgb = sampled.rgb;
+    const float luminance = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    rgb = mix(float3(luminance), rgb, effects.x);
+    rgb = (rgb - 0.5) * effects.y + 0.5 + effects.z;
+    const float hue = effects.w;
+    const float3 axis = normalize(float3(1.0));
+    rgb = rgb * cos(hue) + cross(axis, rgb) * sin(hue) +
+          axis * dot(axis, rgb) * (1.0 - cos(hue));
+    rgb = clamp(rgb, 0.0, 1.0);
     const float alpha = sampled.a * in.tint.a * coverage;
-    return float4(sampled.rgb * in.tint.rgb * in.tint.a * coverage, alpha);
+    return float4(rgb * in.tint.rgb * in.tint.a * coverage, alpha);
 }
 
 struct ShadowVertex {

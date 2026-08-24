@@ -339,6 +339,21 @@ void CommandEncoder::drawTiledImageSurface(const ImageSurfaceCommand& image) {
     }
 }
 
+void CommandEncoder::drawFilteredImageSurface(const ImageSurfaceCommand& image) {
+    beginCommand(Opcode::drawFilteredImageSurface, 80);
+    appendU32(bytes_, image.textureId);
+    appendU32(bytes_, (image.sampling == ImageSampling::nearest ? 1U : 0U) |
+                          (image.repeatX ? 2U : 0U) | (image.repeatY ? 4U : 0U));
+    for (float value : {image.destination.left, image.destination.top,
+                        image.destination.right, image.destination.bottom,
+                        image.uv.left, image.uv.top, image.uv.right, image.uv.bottom,
+                        image.tint.red, image.tint.green, image.tint.blue, image.tint.alpha,
+                        image.cornerRadius, image.saturation, image.contrast, image.brightness,
+                        image.hueRotation, 0.0F}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawNineSliceImage(const NineSliceImageCommand& image) {
     beginCommand(Opcode::drawNineSliceImage, 96);
     appendU32(bytes_, image.textureId);
@@ -1131,6 +1146,29 @@ bool decodeTiledImageSurface(const CommandView& command, ImageSurfaceCommand& im
                   readFloat(command.payload + 48), readFloat(command.payload + 52)};
     image.cornerRadius = readFloat(command.payload + 56);
     return image.textureId != 0 && (image.repeatX || image.repeatY);
+}
+
+bool decodeFilteredImageSurface(const CommandView& command, ImageSurfaceCommand& image) {
+    if (command.opcode != Opcode::drawFilteredImageSurface || command.payloadSize != 80)
+        return false;
+    const std::uint32_t flags = readU32(command.payload + 4);
+    if (flags > 7U || readFloat(command.payload + 76) != 0.0F) return false;
+    image.textureId = readU32(command.payload);
+    image.sampling = (flags & 1U) != 0U ? ImageSampling::nearest : ImageSampling::linear;
+    image.repeatX = (flags & 2U) != 0U;
+    image.repeatY = (flags & 4U) != 0U;
+    image.destination = {readFloat(command.payload + 8), readFloat(command.payload + 12),
+                         readFloat(command.payload + 16), readFloat(command.payload + 20)};
+    image.uv = {readFloat(command.payload + 24), readFloat(command.payload + 28),
+                readFloat(command.payload + 32), readFloat(command.payload + 36)};
+    image.tint = {readFloat(command.payload + 40), readFloat(command.payload + 44),
+                  readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    image.cornerRadius = readFloat(command.payload + 56);
+    image.saturation = readFloat(command.payload + 60);
+    image.contrast = readFloat(command.payload + 64);
+    image.brightness = readFloat(command.payload + 68);
+    image.hueRotation = readFloat(command.payload + 72);
+    return image.textureId != 0;
 }
 
 bool decodeNineSliceImage(const CommandView& command, NineSliceImageCommand& image) {

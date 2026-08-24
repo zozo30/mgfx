@@ -48,6 +48,14 @@ int main() {
         std::cerr << "Extended server capabilities round trip failed\n";
         return 1;
     }
+    mgfx::ipc::CapabilityWord capabilityWord{};
+    if (!mgfx::ipc::decodeCapabilityWord(mgfx::ipc::encodeCapabilityWord(
+            {1, mgfx::ipc::ServerCapabilityWord1::imageColorEffects}), capabilityWord) ||
+        capabilityWord.index != 1 ||
+        capabilityWord.capabilities != mgfx::ipc::ServerCapabilityWord1::imageColorEffects) {
+        std::cerr << "Indexed capability word round trip failed\n";
+        return 1;
+    }
     mgfx::ipc::ResourceStatus resourceStatus{};
     if (!mgfx::ipc::decodeResourceStatus(mgfx::ipc::encodeResourceStatus(
             {mgfx::ipc::ResourceKind::mesh, mgfx::ipc::ResourceState::ready, 73}),
