@@ -653,7 +653,8 @@ function TreeRow({ entry, selected, expanded, onSelect, onToggle, onNavigate }: 
       borderWidth: focused ? 1.5 : 0,
       borderColor: focused ? rgba(0.42, 0.80, 1) : rgba(0, 0, 0, 0) }}>
     {entry.depth > 0 ? <Box style={{ position: "absolute", inset: {
-      top: 0, bottom: 0, left: 18 + (entry.depth - 1) * 24 }, preferredSize: { width: 1 },
+      top: 21, left: 18 + (entry.depth - 1) * 24 },
+      preferredSize: { width: 16, height: 1 },
       background: rgba(0.18, 0.28, 0.42) }} /> : null}
     <mgfx-stack onClick={() => { if (branch) onToggle(); }}
       style={{ preferredSize: { width: 24, height: 24 }, cornerRadius: 5,
@@ -696,14 +697,16 @@ export function TreeView({ items, expandedIds, selectedId, onToggle, onSelect,
       else if (current.parentId) onSelect(current.parentId);
     }
   };
-  return <Scroll style={{ preferredSize: { width, height }, padding: all(7), cornerRadius: 13,
+  return <Stack style={{ preferredSize: { width, height }, cornerRadius: 13, clip: true,
     background: rgba(0.022, 0.034, 0.058), borderWidth: 1,
     borderColor: rgba(0.18, 0.29, 0.45) }}>
+    <Scroll style={{ position: "absolute", inset: all(1), padding: all(6), cornerRadius: 12 }}>
     <Column style={{ gap: 3, crossAxisAlignment: "stretch" }}>{visible.map((entry) =>
       <TreeRow key={entry.item.id} entry={entry} selected={entry.item.id === selectedId}
         expanded={expandedIds.has(entry.item.id)} onSelect={() => onSelect(entry.item.id)}
         onToggle={() => onToggle(entry.item.id)} onNavigate={navigate} />)}</Column>
-  </Scroll>;
+    </Scroll>
+  </Stack>;
 }
 
 export interface TextFieldProps {
