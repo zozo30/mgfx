@@ -758,7 +758,8 @@ class Node {
   }
   hitTarget(point: Point): Node | undefined {
     const transformedPoint = this.inverseTransform(point);
-    if (!contains(this.bounds, transformedPoint)) return undefined;
+    const inside = contains(this.bounds, transformedPoint);
+    if (this.style.clip && !inside) return undefined;
     const modal = this.modalChild();
     if (modal) return modal.hitTarget(transformedPoint);
     const ordered = this.paintOrder();
@@ -766,7 +767,7 @@ class Node {
       const target = ordered[i]!.hitTarget(transformedPoint);
       if (target) return target;
     }
-    return this.isFocusable() ? this : undefined;
+    return inside && this.isFocusable() ? this : undefined;
   }
   collectTargets(targets: Node[]): void {
     if (this.isFocusable()) targets.push(this);

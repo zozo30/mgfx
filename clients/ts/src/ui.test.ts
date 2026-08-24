@@ -62,6 +62,26 @@ test("single-sided absolute insets position preferred sizes without stretching",
   assert.equal(host.pointerDown({ x: 100, y: 70 }), false);
 });
 
+test("visible overflow remains interactive while clipped overflow does not", () => {
+  let visibleClicks = 0;
+  class OverflowComponent extends Component {
+    build(): Element {
+      const overflow = (clip: boolean, key: string) => stack([
+        { ...box({ position: "absolute", inset: { top: 40, left: 0 },
+          preferredSize: { width: 80, height: 30 } }),
+          onClick: () => { visibleClicks += 1; } },
+      ], { preferredSize: { width: 80, height: 30 }, clip }, key);
+      return row([overflow(false, "visible"), overflow(true, "clipped")]);
+    }
+  }
+  const host = new ComponentHost();
+  host.rebuild(new OverflowComponent()); host.layout({ width: 160, height: 80 });
+  assert.equal(host.pointerDown({ x: 20, y: 50 }), true);
+  host.pointerUp({ x: 20, y: 50 });
+  assert.equal(visibleClicks, 1);
+  assert.equal(host.pointerDown({ x: 100, y: 50 }), false);
+});
+
 test("pointer capture reports element-local drag coordinates", () => {
   const points: string[] = [];
   class DragComponent extends Component {

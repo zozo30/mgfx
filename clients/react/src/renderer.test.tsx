@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Slider, Stepper, Svg, Text, TextField } from "./components.js";
+import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, Stepper, Svg, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -104,6 +104,22 @@ test("React Stepper clamps pointer changes and accepts focused arrow keys", () =
   assert.equal(value, 3);
   surface.pointerDown({ x: 255, y: 25 }); surface.pointerUp({ x: 255, y: 25 });
   assert.equal(value, 3);
+});
+
+test("React Select hits overflow options and supports keyboard selection", () => {
+  let value = 0;
+  function Harness() {
+    const [local, setLocal] = useState(0);
+    return <Column><Select options={["ONE", "TWO", "THREE"]} value={local} width={200}
+      onChange={(next) => { value = next; setLocal(next); }} /></Column>;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Harness />); surface.resize({ width: 240, height: 220 });
+  surface.pointerDown({ x: 30, y: 24 }); surface.pointerUp({ x: 30, y: 24 });
+  surface.pointerDown({ x: 30, y: 126 }); surface.pointerUp({ x: 30, y: 126 });
+  assert.equal(value, 1);
+  surface.keyDown({ key: Key.ArrowDown, modifiers: 0, repeat: false });
+  assert.equal(value, 2);
 });
 
 test("React Text defaults to native server shaping", () => {

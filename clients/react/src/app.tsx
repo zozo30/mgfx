@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Circle, Column, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Slider, Stack, Stepper, Svg, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Checkbox, Circle, Column, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -535,6 +535,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [telemetry, setTelemetry] = useState(false);
   const [quantity, setQuantity] = useState(4);
+  const [theme, setTheme] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const time = useAnimationTime();
   const router = useRouter();
@@ -609,7 +610,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
         </Column>
         <Column style={{ padding: all(18), gap: 14, cornerRadius: 14,
           background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
-          borderColor: rgba(0.18, 0.27, 0.43) }}>
+          borderColor: rgba(0.18, 0.27, 0.43), zIndex: 50 }}>
           <Text value="SELECTION CONTROLS" style={{ fontSize: 21, fontWeight: "bold",
             color: rgba(0.68, 0.88, 1) }} />
           <RadioGroup options={densities} value={density} onChange={setDensity} />
@@ -617,6 +618,16 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
             <Checkbox checked={snapToGrid} onChange={setSnapToGrid} label="SNAP TO GRID" />
             <Checkbox checked={telemetry} onChange={setTelemetry} label="SHOW TELEMETRY" />
             <Checkbox checked={false} onChange={() => {}} label="LOCKED OPTION" disabled />
+          </Row>
+          <Row style={{ gap: 24, mainAxisAlignment: "spaceBetween",
+            crossAxisAlignment: "center" }}>
+            <Column style={{ gap: 4, flexGrow: 1 }}>
+              <Text value="NATIVE SELECT" style={{ fontSize: 20, fontWeight: "semibold" }} />
+              <Text value="OVERFLOW + Z-INDEX MENU" style={{ fontSize: 17,
+                color: rgba(0.54, 0.64, 0.78) }} />
+            </Column>
+            <Select options={["MIDNIGHT", "AURORA", "SOLARIZED"]}
+              value={theme} onChange={setTheme} width={300} />
           </Row>
         </Column>
         <Row style={{ gap: 12, mainAxisAlignment: "end" }}>

@@ -389,6 +389,67 @@ export function Stepper({ value, onChange, minimum = 0, maximum = 100, step = 1 
   </mgfx-row>;
 }
 
+function SelectOption({ label, selected, onSelect, onDismiss }: { readonly label: string;
+  readonly selected: boolean; readonly onSelect: () => void; readonly onDismiss: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  useNativeCursor("pointer", hovered);
+  return <mgfx-row onClick={onSelect} onHoverChange={setHovered} onPressChange={setPressed}
+    onKeyDown={(key) => { if (key === Key.Escape) onDismiss(); }} style={{
+      preferredSize: { height: 44 }, padding: { top: 9, right: 12, bottom: 9, left: 12 },
+      cornerRadius: 8, crossAxisAlignment: "center",
+      background: pressed ? rgba(0.10, 0.22, 0.34)
+        : selected ? rgba(0.14, 0.34, 0.52) : hovered ? rgba(0.10, 0.16, 0.25)
+          : rgba(0.045, 0.065, 0.105) }}>
+    <Text value={label} style={{ fontSize: 19, fontWeight: selected ? "semibold" : "regular",
+      color: selected ? rgba(0.72, 0.94, 1) : rgba(0.72, 0.78, 0.88) }} />
+  </mgfx-row>;
+}
+
+export function Select({ options, value, onChange, width = 300 }: {
+  readonly options: readonly string[]; readonly value: number;
+  readonly onChange: (index: number) => void; readonly width?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useNativeCursor("pointer", hovered);
+  const selected = Math.max(0, Math.min(options.length - 1, value));
+  const select = (index: number) => { onChange(index); setOpen(false); };
+  return <mgfx-stack onClick={() => setOpen((current) => !current)}
+    onHoverChange={setHovered} onPressChange={setPressed} onFocusChange={setFocused}
+    onKeyDown={(key) => {
+      if (key === Key.Escape) setOpen(false);
+      if (key === Key.ArrowDown && options.length > 0)
+        onChange(Math.min(options.length - 1, selected + 1));
+      if (key === Key.ArrowUp && options.length > 0) onChange(Math.max(0, selected - 1));
+    }} style={{ preferredSize: { width, height: 48 }, zIndex: open ? 200 : 0 }}>
+    <Row style={{ position: "absolute", inset: all(0), padding: all(12), gap: 12,
+      cornerRadius: 10, mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center",
+      background: pressed ? rgba(0.07, 0.11, 0.18)
+        : hovered || open ? rgba(0.10, 0.16, 0.25) : rgba(0.065, 0.09, 0.145),
+      borderWidth: focused || open ? 2 : 1,
+      borderColor: focused || open ? rgba(0.38, 0.72, 1) : rgba(0.22, 0.30, 0.44) }}>
+      <Text value={options[selected] ?? "SELECT"} style={{ fontSize: 20,
+        fontWeight: "semibold", color: rgba(0.80, 0.88, 0.96) }} />
+      <Path data={open ? "M6 15L12 9L18 15" : "M6 9L12 15L18 9"}
+        viewBox={{ x: 0, y: 0, width: 24, height: 24 }} strokeWidth={2.2}
+        strokeColor={rgba(0.56, 0.82, 1)}
+        style={{ preferredSize: { width: 24, height: 24 } }} />
+    </Row>
+    {open ? <Column style={{ position: "absolute", inset: { top: 54, right: 0, left: 0 },
+      zIndex: 201, padding: all(6), gap: 4, cornerRadius: 12,
+      crossAxisAlignment: "stretch", background: rgba(0.025, 0.04, 0.07, 0.99),
+      borderWidth: 1.5, borderColor: rgba(0.28, 0.46, 0.70),
+      shadow: { color: rgba(0, 0, 0, 0.55), blur: 16, spread: 1, offsetY: 6 } }}>
+      {options.map((label, index) => <SelectOption key={label} label={label}
+        selected={selected === index} onSelect={() => select(index)}
+        onDismiss={() => setOpen(false)} />)}
+    </Column> : null}
+  </mgfx-stack>;
+}
+
 export interface TextFieldProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
