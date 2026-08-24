@@ -255,8 +255,11 @@ runs. Capability bit 59 advertises styled rich-text runs.
 MGFX opcode `43` (`DrawGradientText`) carries the semantic text style, placement,
 font resource, and UTF-8 plus normalized linear-gradient endpoints and 2–8 ordered
 straight-alpha stops. Byte 44 is the stop count, byte 45 selects pad/repeat/reflect,
-and bytes 46–47 are zero; 20-byte stop records begin at byte 48 and the UTF-8 follows.
+byte 46 selects user or object-bounds coordinates, and byte 47 is zero; 20-byte stop
+records begin at byte 48 and the UTF-8 follows.
 Capability bit 60 advertises native gradient text.
+Byte 46 may be `1` to interpret endpoints in the shaped contour's object-bounding-box
+space; byte 47 remains zero. Capability bit 61 advertises server-shaped gradient bounds.
 
 MGFX opcode `25` (`DrawLinearGradientCircle`) carries a destination rectangle,
 horizontal/vertical/diagonal direction, and two straight-alpha colors. Backends

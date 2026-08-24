@@ -391,6 +391,7 @@ struct RichTextCommand {
 struct GradientTextCommand {
     TextCommand text;
     PathGradient gradient;
+    bool objectBoundingBox = false;
 };
 
 class CommandEncoder final {

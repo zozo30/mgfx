@@ -108,6 +108,7 @@ export const ExtendedServerCapability = {
   StyledNativeText: 1n << 58n,
   StyledRichTextRuns: 1n << 59n,
   GradientNativeText: 1n << 60n,
+  ShapedTextGradientBounds: 1n << 61n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -258,6 +259,7 @@ export interface PathGradientPaint {
   readonly endColor: Color;
   readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   readonly spread?: "pad" | "repeat" | "reflect";
+  readonly coordinateSpace?: "objectBoundingBox";
 }
 
 export interface PathRadialGradientPaint {
@@ -1294,6 +1296,7 @@ export class FrameEncoder {
       .forEach((value, index) => payload.writeFloatLE(value, 28 + index * 4));
     payload.writeUInt8(stops.length, 44);
     payload.writeUInt8(gradient.spread === "repeat" ? 1 : gradient.spread === "reflect" ? 2 : 0, 45);
+    payload.writeUInt8(gradient.coordinateSpace === "objectBoundingBox" ? 1 : 0, 46);
     stops.forEach((stop, index) => [stop.offset, stop.color.red, stop.color.green,
       stop.color.blue, stop.color.alpha].forEach((value, component) =>
         payload.writeFloatLE(value, 48 + index * 20 + component * 4)));

@@ -191,8 +191,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
     </linearGradient>
     <linearGradient id="signal" href="#signalPalette" gradientUnits="userSpaceOnUse"
       x1="78" y1="24" x2="131" y2="42"/>
-    <linearGradient id="textGlow" gradientUnits="userSpaceOnUse" x1="68" y1="0" x2="112" y2="0"
-      spreadMethod="reflect"><stop offset="0" stop-color="#ff8a1e"/>
+    <linearGradient id="textGlow" gradientTransform="rotate(8 .5 .5)" spreadMethod="reflect">
+      <stop offset="0" stop-color="#ff8a1e"/>
       <stop offset="0.5" stop-color="#58e6b5"/><stop offset="1" stop-color="#4cc9ff"/></linearGradient>
     <symbol id="signalGlyph" viewBox="0 0 53 24">
       <polyline points="0,21 11,3 21,21 32,3 43,21 53,3"/>

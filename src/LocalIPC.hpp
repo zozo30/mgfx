@@ -119,6 +119,7 @@ enum ServerCapability : std::uint64_t {
     styledNativeText = 1ULL << 58U,
     styledRichTextRuns = 1ULL << 59U,
     gradientNativeText = 1ULL << 60U,
+    shapedTextGradientBounds = 1ULL << 61U,
 };
 
 enum class ResourceKind : std::uint8_t {

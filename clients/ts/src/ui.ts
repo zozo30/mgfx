@@ -977,8 +977,10 @@ function paintVectorText(encoder: FrameEncoder, bounds: Rect, text: VectorTextDa
       y: 1 - (destination.y + (point.y - text.viewBox.y) / text.viewBox.height *
         destination.height) / viewport.height * 2,
     });
+    const objectBoundingBox = text.fillGradient.coordinateSpace === "objectBoundingBox";
     encoder.gradientSystemText(...args, { ...text.fillGradient,
-      start: mapPoint(text.fillGradient.start), end: mapPoint(text.fillGradient.end) },
+      start: objectBoundingBox ? text.fillGradient.start : mapPoint(text.fillGradient.start),
+      end: objectBoundingBox ? text.fillGradient.end : mapPoint(text.fillGradient.end) },
       text.family, text.weight, text.fontStyle, text.letterSpacing ?? 0,
       text.decoration ?? TextDecoration.None, 0, text.anchor ?? "start", "alphabetic");
   } else if (text.strokeColor && (text.strokeWidth ?? 0) > 0) {

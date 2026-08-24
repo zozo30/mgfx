@@ -301,9 +301,12 @@ test("SVG user-space linear-gradient text remains server-shaped", () => {
   assert.deepEqual(text?.fillGradient?.start, { x: 20, y: 0 });
   assert.equal(text?.fillGradient?.stops?.length, 3);
   assert.equal(text?.color.alpha, 0);
-  assert.throws(() => parseSvgVectorDocument(`<svg viewBox="0 0 100 40"><defs>
+  const bounded = parseSvgVectorDocument(`<svg viewBox="0 0 100 40"><defs>
     <linearGradient id="g"><stop/><stop offset="1"/></linearGradient></defs>
-    <text fill="url(#g)">bounds</text></svg>`), /server-shaped bounds/);
+    <text fill="url(#g)">bounds</text></svg>`);
+  assert.equal(bounded.layers[0]?.text?.fillGradient?.coordinateSpace, "objectBoundingBox");
+  assert.deepEqual(bounded.layers[0]?.text?.fillGradient?.start, { x: 0, y: 0 });
+  assert.deepEqual(bounded.layers[0]?.text?.fillGradient?.end, { x: 1, y: 0 });
 });
 
 test("SVG tspans lower independent solid outlines to styled rich-text runs", () => {

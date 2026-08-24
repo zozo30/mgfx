@@ -58,7 +58,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.NineSliceImages |
     ExtendedServerCapability.StyledNativeText |
     ExtendedServerCapability.StyledRichTextRuns |
-    ExtendedServerCapability.GradientNativeText;
+    ExtendedServerCapability.GradientNativeText |
+    ExtendedServerCapability.ShapedTextGradientBounds;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -758,7 +759,21 @@ test("gradient native text carries stops without client glyph geometry", () => {
   assert.ok(Math.abs(bytes.readFloatLE(52) + 0.8) < 0.00001);
   assert.equal(bytes.readUInt8(68), 2);
   assert.equal(bytes.readUInt8(69), 2);
+  assert.equal(bytes.readUInt8(70), 0);
   assert.equal(bytes.subarray(112, 120).toString(), "GRADIENT");
+});
+
+test("gradient text can defer object bounds to native shaping", () => {
+  const frame = new FrameEncoder();
+  frame.gradientSystemText("BOUNDS", 0, 0, 0.1, {
+    start: { x: 0, y: 0 }, end: { x: 1, y: 0 }, coordinateSpace: "objectBoundingBox",
+    startColor: { red: 1, green: 0, blue: 0, alpha: 1 },
+    endColor: { red: 0, green: 0, blue: 1, alpha: 1 },
+  });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 43);
+  assert.equal(bytes.readUInt8(70), 1);
 });
 
 test("font files upload once as bounded persistent resources", () => {

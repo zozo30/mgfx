@@ -1827,6 +1827,29 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             }
             const float textTop = text.baseline == gfx::TextBaseline::alphabetic
                 ? text.top + shaped.ascent * text.fontSize : text.top;
+            gfx::PathGradient resolvedGradient = gradientText.gradient;
+            if (gradientFill && gradientText.objectBoundingBox) {
+                float minimumX = std::numeric_limits<float>::infinity();
+                float minimumY = std::numeric_limits<float>::infinity();
+                float maximumX = -std::numeric_limits<float>::infinity();
+                float maximumY = -std::numeric_limits<float>::infinity();
+                for (const gfx::PathPoint& point : shaped.triangles) {
+                    const float x = textLeft + point[0] * text.fontSize * aspect;
+                    const float y = textTop - point[1] * text.fontSize;
+                    minimumX = std::min(minimumX, x); maximumX = std::max(maximumX, x);
+                    minimumY = std::min(minimumY, y); maximumY = std::max(maximumY, y);
+                }
+                const float width = maximumX - minimumX, height = maximumY - minimumY;
+                const auto resolvePoint = [&](float x, float y) {
+                    return gfx::PathPoint{minimumX + x * width, minimumY + y * height};
+                };
+                const gfx::PathPoint start = resolvePoint(
+                    resolvedGradient.startX, resolvedGradient.startY);
+                const gfx::PathPoint end = resolvePoint(
+                    resolvedGradient.endX, resolvedGradient.endY);
+                resolvedGradient.startX = start[0]; resolvedGradient.startY = start[1];
+                resolvedGradient.endX = end[0]; resolvedGradient.endY = end[1];
+            }
             const auto drawTextTriangles = [&](const std::vector<gfx::PathPoint>& points,
                                                 const gfx::Color& paint) {
                 for (std::size_t first = 0; first < points.size();) {
@@ -1839,7 +1862,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                             textTop - point[1] * text.fontSize};
                         gfx::Color color = paint;
                         if (gradientFill) {
-                            const gfx::PathGradient& gradient = gradientText.gradient;
+                            const gfx::PathGradient& gradient = resolvedGradient;
                             const float dx = gradient.endX - gradient.startX;
                             const float dy = gradient.endY - gradient.startY;
                             const float lengthSquared = dx * dx + dy * dy;

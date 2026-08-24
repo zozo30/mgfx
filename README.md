@@ -101,8 +101,8 @@ UTF-8 plus semantic font data. Numeric, percentage, `super`, and `sub` baseline 
 remain semantic run metrics. Plain SVG text also lowers 2–8 stop
 `userSpaceOnUse` linear gradients to `DrawGradientText`; gradient coordinates,
 stops, spread mode, and UTF-8 cross the socket while CoreText still owns all glyph
-geometry. Object-bounding-box text gradients remain explicit until the server
-exposes shaped bounds.
+geometry. Default SVG object-bounding-box gradients are resolved against the actual
+server-shaped contour bounds rather than guessed client text metrics.
 Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
 data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
 decode and upload once as canonical persistent textures; frames retain only

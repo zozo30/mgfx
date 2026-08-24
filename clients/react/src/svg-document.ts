@@ -50,6 +50,7 @@ export interface LinearGradientPaint {
   readonly endColor: Color;
   readonly stops?: readonly { readonly offset: number; readonly color: Color }[];
   readonly spread?: "pad" | "repeat" | "reflect";
+  readonly coordinateSpace?: "objectBoundingBox";
 }
 
 export interface RadialGradientPaint {
@@ -998,19 +999,21 @@ function resolveTextGradient(definitions: ReadonlyMap<string, GradientDefinition
   state: PaintState, viewBox: Rect, paintOpacity: number): LinearGradientPaint {
   const definition = definitions.get(id);
   if (!definition) throw new Error(`SVG linear gradient #${id} is not defined or has unsupported stops`);
-  if (definition.units !== "userSpaceOnUse")
-    throw new Error("SVG text object-bounding-box gradients require server-shaped bounds");
-  const start = transformPoint(definition.transform,
-    { x: coordinate(definition.x1, viewBox.x, viewBox.width),
-      y: coordinate(definition.y1, viewBox.y, viewBox.height) });
-  const end = transformPoint(definition.transform,
-    { x: coordinate(definition.x2, viewBox.x, viewBox.width),
-      y: coordinate(definition.y2, viewBox.y, viewBox.height) });
+  const objectBoundingBox = definition.units === "objectBoundingBox";
+  const start = transformPoint(definition.transform, objectBoundingBox
+    ? { x: unitCoordinate(definition.x1), y: unitCoordinate(definition.y1) }
+    : { x: coordinate(definition.x1, viewBox.x, viewBox.width),
+        y: coordinate(definition.y1, viewBox.y, viewBox.height) });
+  const end = transformPoint(definition.transform, objectBoundingBox
+    ? { x: unitCoordinate(definition.x2), y: unitCoordinate(definition.y2) }
+    : { x: coordinate(definition.x2, viewBox.x, viewBox.width),
+        y: coordinate(definition.y2, viewBox.y, viewBox.height) });
   const stops = definition.stops.map((stop) => ({ offset: stop.offset,
     color: multiplyAlpha(stop.color, state.opacity * paintOpacity) }));
   return { start, end, startColor: stops[0]!.color, endColor: stops[stops.length - 1]!.color,
     ...(stops.length > 2 ? { stops } : {}),
-    ...(definition.spread !== "pad" ? { spread: definition.spread } : {}) };
+    ...(definition.spread !== "pad" ? { spread: definition.spread } : {}),
+    ...(objectBoundingBox ? { coordinateSpace: "objectBoundingBox" as const } : {}) };
 }
 
 function transformPoint(matrix: Matrix, point: { readonly x: number; readonly y: number }) {

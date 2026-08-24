@@ -248,6 +248,19 @@ test("React Svg emits gradient text as one native semantic command", () => {
   assert.equal(frame.readUInt16LE(40), 43);
 });
 
+test("React Svg defers default text-gradient bounds to native shaping", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Svg source={`<svg viewBox="0 0 100 40"><defs><linearGradient id="g">
+    <stop stop-color="#ff8a1e"/><stop offset="1" stop-color="#4cc9ff"/>
+    </linearGradient></defs><text x="50" y="28" font-size="20"
+    fill="url(#g)">BOUNDS</text></svg>`} style={{ preferredSize: { width: 200, height: 80 } }} />);
+  surface.resize({ width: 200, height: 80 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 43);
+  assert.equal(frame.readUInt8(40 + 8 + 46), 1);
+});
+
 test("React Svg emits independently outlined tspans as styled rich text", () => {
   let frame: Buffer | undefined;
   const surface = new ReactSurface((value) => { frame = value; });

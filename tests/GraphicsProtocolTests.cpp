@@ -205,6 +205,7 @@ int main() {
         {1.0F, 0.2F, 0.1F, 1.0F}, {0.1F, 0.8F, 1.0F, 1.0F},
         {{0.0F, {1.0F, 0.2F, 0.1F, 1.0F}}, {0.5F, {0.3F, 1.0F, 0.5F, 1.0F}},
          {1.0F, {0.1F, 0.8F, 1.0F, 1.0F}}}, gfx::PathGradient::Spread::reflect};
+    gradientText.objectBoundingBox = true;
     encoder.drawGradientText(gradientText);
     gfx::RichTextCommand richSource{-0.7F, 0.5F, 0.07F, {
         {gfx::FontFamily::systemSans, gfx::FontWeight::bold, gfx::FontStyle::regular,
@@ -480,6 +481,7 @@ int main() {
     if (!gfx::decodeGradientText(command, gradientDecoded) ||
         gradientDecoded.text.text != "GRADIENT" || gradientDecoded.gradient.stops.size() != 3 ||
         gradientDecoded.gradient.spread != gfx::PathGradient::Spread::reflect ||
+        !gradientDecoded.objectBoundingBox ||
         !nearlyEqual(gradientDecoded.gradient.stops[1].offset, 0.5F) || !decoder.next(command)) {
         return fail("Gradient text decoding failed");
     }

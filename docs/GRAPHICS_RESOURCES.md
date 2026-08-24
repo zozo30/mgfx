@@ -199,6 +199,8 @@ stroke-only spans; the client never sends glyph meshes.
 `DrawGradientText` applies 2–8 stop user-space linear paint to the same cached
 CoreText contours. Stops and pad/repeat/reflect semantics remain compact protocol
 data; Metal interpolates color over the server-generated glyph triangles.
+For SVG's default object-bounding-box units, normalized endpoints remain semantic
+until shaping completes; the server resolves them against the actual contour bounds.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is

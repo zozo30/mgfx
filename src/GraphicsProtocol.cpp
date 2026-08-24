@@ -690,7 +690,8 @@ void CommandEncoder::drawGradientText(const GradientTextCommand& value) {
                          value.gradient.endX, value.gradient.endY}) appendFloat(bytes_, number);
     bytes_.push_back(static_cast<std::uint8_t>(stops.size()));
     bytes_.push_back(static_cast<std::uint8_t>(value.gradient.spread));
-    appendU16(bytes_, 0);
+    bytes_.push_back(value.objectBoundingBox ? 1U : 0U);
+    bytes_.push_back(0);
     for (const PathGradient::Stop& stop : stops) {
         for (float number : {stop.offset, stop.color.red, stop.color.green,
                              stop.color.blue, stop.color.alpha}) appendFloat(bytes_, number);
@@ -1562,7 +1563,7 @@ bool decodeGradientText(const CommandView& command, GradientTextCommand& value) 
         command.payload[26] != 0 || command.payload[27] != 0 ||
         command.payload[44] < 2 || command.payload[44] > 8 ||
         command.payload[45] > static_cast<std::uint8_t>(PathGradient::Spread::reflect) ||
-        command.payload[46] != 0 || command.payload[47] != 0) return false;
+        command.payload[46] > 1 || command.payload[47] != 0) return false;
     const std::size_t stopCount = command.payload[44];
     const std::size_t headerSize = baseHeaderSize + stopCount * 20;
     if (command.payloadSize <= headerSize || command.payloadSize > headerSize + 65536) return false;
@@ -1582,6 +1583,7 @@ bool decodeGradientText(const CommandView& command, GradientTextCommand& value) 
     value.gradient.endX = readFloat(command.payload + 36);
     value.gradient.endY = readFloat(command.payload + 40);
     value.gradient.spread = static_cast<PathGradient::Spread>(command.payload[45]);
+    value.objectBoundingBox = command.payload[46] == 1;
     value.gradient.stops.clear(); value.gradient.stops.reserve(stopCount);
     float previousOffset = -1.0F;
     for (std::size_t index = 0; index < stopCount; ++index) {
