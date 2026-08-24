@@ -581,7 +581,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
             <NativeSwitch enabled={enabled} onChange={setEnabled} />
           </Row>
           <Column style={{ gap: 9 }}>
-            <Row style={{ mainAxisAlignment: "spaceBetween" }}>
+            <Row style={{ gap: 14, mainAxisAlignment: "spaceBetween" }}>
               <Text value="ANIMATED PROGRESS" style={{ fontSize: 20, fontWeight: "semibold" }} />
               <Text value={`${Math.round(progress * 100)}%`} style={{ fontSize: 20,
                 color: rgba(0.42, 0.88, 1) }} />
