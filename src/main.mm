@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#import <Carbon/Carbon.h>
 #import <MetalKit/MetalKit.h>
 
 #include "GraphicsProtocol.hpp"
@@ -22,6 +23,20 @@ std::atomic<bool> rendererErrorRecoveryRequested{false};
 void requestRendererRecovery(int) { rendererRecoverySignal = 1; }
 
 mgfx::ipc::Key semanticKey(NSEvent* event) {
+    // Control keys must not depend on character production: repeat events and
+    // active input methods are allowed to provide an empty character string.
+    switch (event.keyCode) {
+    case kVK_Delete: return mgfx::ipc::Key::backspace;
+    case kVK_LeftArrow: return mgfx::ipc::Key::arrowLeft;
+    case kVK_RightArrow: return mgfx::ipc::Key::arrowRight;
+    case kVK_UpArrow: return mgfx::ipc::Key::arrowUp;
+    case kVK_DownArrow: return mgfx::ipc::Key::arrowDown;
+    case kVK_PageUp: return mgfx::ipc::Key::pageUp;
+    case kVK_PageDown: return mgfx::ipc::Key::pageDown;
+    case kVK_Home: return mgfx::ipc::Key::home;
+    case kVK_End: return mgfx::ipc::Key::end;
+    default: break;
+    }
     NSString* characters = event.charactersIgnoringModifiers;
     if (characters.length == 0) return mgfx::ipc::Key::unknown;
     if ((event.modifierFlags & NSEventModifierFlagCommand) != 0) {
