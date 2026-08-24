@@ -103,6 +103,8 @@ remain semantic run metrics. Plain SVG text also lowers 2–8 stop
 stops, spread mode, and UTF-8 cross the socket while CoreText still owns all glyph
 geometry. Default SVG object-bounding-box gradients are resolved against the actual
 server-shaped contour bounds rather than guessed client text metrics.
+Metal evaluates stop selection and repeat/reflect mapping per fragment, so a glyph
+triangle crossing a stop boundary cannot smear colors across that boundary.
 Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
 data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
 decode and upload once as canonical persistent textures; frames retain only

@@ -59,6 +59,9 @@ fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]],
     float rawAmount;
     if (gradient.mode == 1) {
         rawAmount = fract((atan2(delta.y, delta.x) + gradient.radiusOrRotation) / tau + 1.0);
+    } else if (gradient.mode == 2) {
+        const float lengthSquared = dot(gradient.axisX, gradient.axisX);
+        rawAmount = lengthSquared > 0.000001 ? dot(delta, gradient.axisX) / lengthSquared : 0.0;
     } else {
         const float determinant = gradient.axisX.x * gradient.axisY.y -
                                   gradient.axisX.y * gradient.axisY.x;
@@ -80,7 +83,7 @@ fragment float4 radialPathFragmentMain(RadialPathVertexOut in [[stage_in]],
         rawAmount = c <= 0.0 ? 0.0 : max(solvedAmount, 0.0);
     }
     const float repeated = rawAmount - floor(rawAmount);
-    const float reflectedCycle = fmod(rawAmount, 2.0);
+    const float reflectedCycle = rawAmount - floor(rawAmount * 0.5) * 2.0;
     const float amount = gradient.spread == 1 ? repeated : gradient.spread == 2 ?
         (reflectedCycle <= 1.0 ? reflectedCycle : 2.0 - reflectedCycle) :
         clamp(rawAmount, 0.0, 1.0);

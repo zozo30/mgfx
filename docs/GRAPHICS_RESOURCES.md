@@ -201,6 +201,8 @@ CoreText contours. Stops and pad/repeat/reflect semantics remain compact protoco
 data; Metal interpolates color over the server-generated glyph triangles.
 For SVG's default object-bounding-box units, normalized endpoints remain semantic
 until shaping completes; the server resolves them against the actual contour bounds.
+The shared native path-paint fragment shader evaluates linear projection, spread,
+and all stops per pixel; glyph tessellation density therefore does not affect paint.
 
 Optional letter spacing is transported in em units and applied by the native
 shaper, not by splitting a string into client-side glyph commands. Its value is
