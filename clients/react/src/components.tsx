@@ -652,10 +652,6 @@ function TreeRow({ entry, selected, expanded, onSelect, onToggle, onNavigate }: 
           : rgba(0.03, 0.045, 0.075),
       borderWidth: focused ? 1.5 : 0,
       borderColor: focused ? rgba(0.42, 0.80, 1) : rgba(0, 0, 0, 0) }}>
-    {entry.depth > 0 ? <Box style={{ position: "absolute", inset: {
-      top: 21, left: 18 + (entry.depth - 1) * 24 },
-      preferredSize: { width: 16, height: 1 },
-      background: rgba(0.18, 0.28, 0.42) }} /> : null}
     <mgfx-stack onClick={() => { if (branch) onToggle(); }}
       style={{ preferredSize: { width: 24, height: 24 }, cornerRadius: 5,
         background: branch && hovered ? rgba(0.12, 0.22, 0.34) : rgba(0, 0, 0, 0) }}>
