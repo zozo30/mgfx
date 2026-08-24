@@ -700,10 +700,10 @@ export function TreeView({ items, expandedIds, selectedId, onToggle, onSelect,
       else if (current.parentId) onSelect(current.parentId);
     }
   };
-  return <Stack style={{ preferredSize: { width, height }, cornerRadius: 13, clip: true,
+  return <Stack style={{ preferredSize: { width, height }, cornerRadius: 14, clip: true,
     background: rgba(0.022, 0.034, 0.058), borderWidth: 1,
     borderColor: rgba(0.18, 0.29, 0.45) }}>
-    <Scroll style={{ position: "absolute", inset: all(1), padding: all(6), cornerRadius: 12 }}>
+    <Scroll style={{ position: "absolute", inset: all(1), padding: all(6), cornerRadius: 13 }}>
     <Column style={{ gap: 3, crossAxisAlignment: "stretch" }}>{visible.map((entry) =>
       <TreeRow key={entry.item.id} entry={entry} selected={entry.item.id === selectedId}
         expanded={expandedIds.has(entry.item.id)} onSelect={() => onSelect(entry.item.id)}
