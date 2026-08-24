@@ -313,8 +313,8 @@ test("vertical scroll content stretches across the viewport cross axis", () => {
   host.rebuild(new WideScrollComponent());
   host.layout({ width: 120, height: 50 });
   assert.equal(host.pointerDown({ x: 110, y: 20 }), false);
-  assert.equal(host.pointerDown({ x: 90, y: 20 }), true);
-  host.pointerUp({ x: 90, y: 20 });
+  assert.equal(host.pointerDown({ x: 80, y: 20 }), true);
+  host.pointerUp({ x: 80, y: 20 });
   assert.equal(clicked, true);
 });
 

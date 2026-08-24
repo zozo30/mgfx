@@ -395,7 +395,7 @@ export abstract class Component {
 
 const scrollIndicatorWidth = 10;
 const scrollIndicatorRightInset = 8;
-const scrollContentGap = 10;
+const scrollContentGap = 18;
 const scrollIndicatorGutter = scrollContentGap + scrollIndicatorWidth +
   scrollIndicatorRightInset;
 const scrollIndicatorVerticalInset = 10;
