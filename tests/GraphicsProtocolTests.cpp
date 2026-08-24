@@ -186,7 +186,7 @@ int main() {
         {gfx::FontFamily::systemSans, gfx::FontWeight::bold, gfx::FontStyle::regular,
          0.0F, gfx::noTextDecoration, 0, {1.0F, 0.4F, 0.2F, 1.0F}, "Rich "},
         {gfx::FontFamily::systemSerif, gfx::FontWeight::regular, gfx::FontStyle::italic,
-         0.04F, gfx::underlineText, 77, {0.3F, 0.9F, 1.0F, 1.0F}, "text"},
+         0.04F, gfx::underlineText, 77, {0.3F, 0.9F, 1.0F, 1.0F}, "text", 1.5F},
     }, gfx::TextAnchor::middle, gfx::TextBaseline::alphabetic});
     encoder.endFrame();
     const std::vector<std::uint8_t> bytes = encoder.finish();
@@ -432,6 +432,7 @@ int main() {
         rich.runs[0].text != "Rich " || rich.runs[0].weight != gfx::FontWeight::bold ||
         rich.runs[1].text != "text" || rich.runs[1].family != gfx::FontFamily::systemSerif ||
         rich.runs[1].decoration != gfx::underlineText || rich.runs[1].fontResourceId != 77 ||
+        !nearlyEqual(rich.runs[1].fontScale, 1.5F) ||
         rich.anchor != gfx::TextAnchor::middle || rich.baseline != gfx::TextBaseline::alphabetic ||
         !decoder.next(command) || command.opcode != gfx::Opcode::endFrame ||
         decoder.next(command) || !decoder.valid()) {

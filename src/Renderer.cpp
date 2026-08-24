@@ -1791,7 +1791,7 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
                         decorate(shaped.strikeThroughPosition, shaped.strikeThroughThickness);
                 }
                 shapedRuns.push_back(&shaped);
-                totalAdvance += shaped.advance;
+                totalAdvance += shaped.advance * run.fontScale;
             }
             std::vector<gfx::Vertex> vertices;
             float cursor = 0.0F;
@@ -1803,17 +1803,18 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             for (std::size_t runIndex = 0; runIndex < rich.runs.size(); ++runIndex) {
                 const gfx::RichTextRun& run = rich.runs[runIndex];
                 const gfx::ShapedText& shaped = *shapedRuns[runIndex];
+                const float runFontSize = rich.fontSize * run.fontScale;
                 const float richTop = rich.baseline == gfx::TextBaseline::alphabetic
-                    ? rich.top + shaped.ascent * rich.fontSize : rich.top;
+                    ? rich.top + shaped.ascent * runFontSize : rich.top;
                 const std::array<float, 4> color = {run.color.red, run.color.green, run.color.blue,
                                                      run.color.alpha * opacityStack.back()};
                 vertices.reserve(vertices.size() + shaped.triangles.size());
                 for (const gfx::PathPoint& point : shaped.triangles) {
                     vertices.push_back({transformPoint(currentTransform(),
-                        {richLeft + (cursor + point[0]) * rich.fontSize * aspect,
-                         richTop - point[1] * rich.fontSize}), color});
+                        {richLeft + (cursor + point[0] * run.fontScale) * rich.fontSize * aspect,
+                         richTop - point[1] * runFontSize}), color});
                 }
-                cursor += shaped.advance;
+                cursor += shaped.advance * run.fontScale;
             }
             if (vertices.empty()) continue;
             if (encoder == nullptr) { encoder = commandBuffer->renderCommandEncoder(renderPass); applyClip(); }

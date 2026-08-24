@@ -346,9 +346,8 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
         if (positioned && spanAttributes.x === undefined)
           throw new Error("Positioned SVG tspans require an explicit x coordinate");
         const spanState = inherit(spanStates[spanStates.length - 1]!, spanAttributes, clipPaths);
-        if (Math.abs(spanState.fontSize - state.fontSize) > 1e-6 ||
-            spanState.textAnchor !== state.textAnchor)
-          throw new Error("SVG tspan font-size and text-anchor changes require run metrics");
+        if (spanState.fontSize / state.fontSize > 16 || spanState.textAnchor !== state.textAnchor)
+          throw new Error("SVG tspan font-size scale must not exceed 16 and text-anchor must be inherited");
         if (spanAttributes.y !== undefined) currentY = coordinate(spanAttributes, "y", currentY);
         currentY += coordinate(spanAttributes, "dy", 0);
         if (positioned) pieces.push({ value: "", state: spanState,
@@ -415,8 +414,10 @@ export function parseSvgVectorDocument(source: string, defaultColor: Color = whi
           family: piece.state.fontFamily, weight: piece.state.fontWeight, style: piece.state.fontStyle,
           ...(piece.state.textDecoration !== TextDecoration.None
             ? { decoration: piece.state.textDecoration } : {}),
+          ...(piece.state.fontSize !== state.fontSize
+            ? { fontScale: piece.state.fontSize / state.fontSize } : {}),
           ...(piece.state.letterSpacing !== 0
-            ? { letterSpacing: piece.state.letterSpacing / state.fontSize } : {}) });
+            ? { letterSpacing: piece.state.letterSpacing / piece.state.fontSize } : {}) });
       }
       for (const group of groups) {
         if (group.runs.length === 0) continue;

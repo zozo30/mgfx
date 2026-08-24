@@ -161,7 +161,8 @@ const vectorDocument = `<svg viewBox="0 0 160 72" fill="none">
       stroke-miterlimit: 6; }
     .native-label { fill: #d8fff0; font-family: rounded; font-size: 7;
       font-weight: 600; letter-spacing: 0.45; text-anchor: middle; }
-    .native-accent { fill: #ff8a1e; font-family: serif; font-style: italic; font-weight: 700; }
+    .native-accent { fill: #ff8a1e; font-family: serif; font-size: 9;
+      font-style: italic; font-weight: 700; }
     .native-decoration { text-decoration: underline; }
   </style>
   <defs>

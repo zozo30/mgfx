@@ -227,18 +227,23 @@ test("SVG positioned tspans restart compact native run groups without glyph geom
 
 test("SVG nested tspans inherit native styles and font-metric decorations", () => {
   const document = parseSvgVectorDocument(`<svg viewBox="0 0 100 30"><style>
-    .marked { fill: #ff8a1e; text-decoration: underline; }
-    .removed { font-family: serif; font-style: italic; text-decoration: underline line-through; }
+    .marked { fill: #ff8a1e; font-size: 15; text-decoration: underline; }
+    .removed { font-family: serif; font-size: 9; font-style: italic;
+      text-decoration: underline line-through; }
   </style><text x="8" y="20" font-size="12">outer <tspan class="marked">nested
     <tspan class="removed">deep</tspan></tspan> tail</text></svg>`);
   const runs = document.layers[0]?.richText?.runs;
   assert.deepEqual(runs?.map((run) => ({ text: run.text, family: run.family,
-    style: run.style, decoration: run.decoration ?? TextDecoration.None })), [
-    { text: "outer ", family: "system", style: "regular", decoration: TextDecoration.None },
-    { text: "nested ", family: "system", style: "regular", decoration: TextDecoration.Underline },
+    style: run.style, scale: run.fontScale ?? 1,
+    decoration: run.decoration ?? TextDecoration.None })), [
+    { text: "outer ", family: "system", style: "regular", scale: 1,
+      decoration: TextDecoration.None },
+    { text: "nested ", family: "system", style: "regular", scale: 1.25,
+      decoration: TextDecoration.Underline },
     { text: "deep", family: "serif", style: "italic",
-      decoration: TextDecoration.Underline | TextDecoration.LineThrough },
-    { text: " tail", family: "system", style: "regular", decoration: TextDecoration.None },
+      scale: 0.75, decoration: TextDecoration.Underline | TextDecoration.LineThrough },
+    { text: " tail", family: "system", style: "regular", scale: 1,
+      decoration: TextDecoration.None },
   ]);
 });
 

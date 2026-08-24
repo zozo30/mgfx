@@ -51,7 +51,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.ConicPathGradients |
     ExtendedServerCapability.TexturePathPaint |
     ExtendedServerCapability.NativeTextPlacement |
-    ExtendedServerCapability.NativeRichTextPlacement;
+    ExtendedServerCapability.NativeRichTextPlacement |
+    ExtendedServerCapability.RichTextRunMetrics;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -729,6 +730,20 @@ test("native rich-text placement anchors one server-shaped run list", () => {
   assert.equal(bytes.readUInt8(41), 1);
   assert.equal(bytes.readUInt16LE(42), 0);
   assert.equal(bytes.readUInt8(44), 0);
+});
+
+test("rich-text run metrics carry mixed native font sizes without glyph geometry", () => {
+  const frame = new FrameEncoder();
+  frame.richText([
+    { text: "small ", color: { red: 1, green: 1, blue: 1, alpha: 1 }, fontScale: 0.75 },
+    { text: "BIG", color: { red: 1, green: 0.5, blue: 0.1, alpha: 1 }, fontScale: 1.5 },
+  ], -0.5, 0.2, 0.1);
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt32LE(36), 0x4000_0002);
+  assert.equal(bytes.readFloatLE(40 + 32), 0.75);
+  const second = 40 + 36 + Buffer.byteLength("small ");
+  assert.equal(bytes.readFloatLE(second + 32), 1.5);
 });
 
 test("native text metrics correlate asynchronous measurement replies", async () => {

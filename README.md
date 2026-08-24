@@ -76,7 +76,7 @@ with inherited/CSS font family, size, weight, style, tracking, solid fill,
 CoreText applies the alphabetic baseline from its native ascent metric; clients
 never generate glyph triangles. SVG rotation, skew, and nonuniform scale conjugate
 into the normalized display-list transform stack around the text command. Direct
-`<tspan>` children with independent solid color, family, weight, style, and tracking
+`<tspan>` children with independent solid color, family, size, weight, style, and tracking
 lower to anchored `DrawRichText` run lists. A span with an explicit numeric `x`
 can restart the native pen and apply `y/dx/dy`, covering multiline SVG labels
 without client glyph metrics. Nested spans inherit styles normally, and underline

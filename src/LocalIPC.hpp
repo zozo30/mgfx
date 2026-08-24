@@ -112,6 +112,7 @@ enum ServerCapability : std::uint64_t {
     texturePathPaint = 1ULL << 51U,
     nativeTextPlacement = 1ULL << 52U,
     nativeRichTextPlacement = 1ULL << 53U,
+    richTextRunMetrics = 1ULL << 54U,
 };
 
 enum class ResourceKind : std::uint8_t {

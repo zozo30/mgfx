@@ -234,6 +234,10 @@ anchoring, byte 17 selects top/alphabetic placement, and bytes 18–19 are zero.
 The server anchors from the total shaped advance and aligns every run to the
 shared alphabetic baseline using that run's native ascent. Capability bit 53
 advertises this rich-text placement extension.
+Bit 30 of the encoded run count extends every run header from 32 to 36 bytes;
+the added `f32` at byte 32 is a positive font-size scale in `(0, 16]`. The backend
+uses scaled native advances for anchoring and aligns each scaled ascent to the
+same baseline. Capability bit 54 advertises this run-metrics extension.
 
 MGFX opcode `25` (`DrawLinearGradientCircle`) carries a destination rectangle,
 horizontal/vertical/diagonal direction, and two straight-alpha colors. Backends

@@ -352,6 +352,7 @@ struct RichTextRun {
     std::uint32_t fontResourceId;
     Color color;
     std::string text;
+    float fontScale = 1.0F;
 };
 
 struct RichTextCommand {

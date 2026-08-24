@@ -383,7 +383,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::conicPathGradients |
             mgfx::ipc::ServerCapability::texturePathPaint |
             mgfx::ipc::ServerCapability::nativeTextPlacement |
-            mgfx::ipc::ServerCapability::nativeRichTextPlacement;
+            mgfx::ipc::ServerCapability::nativeRichTextPlacement |
+            mgfx::ipc::ServerCapability::richTextRunMetrics;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,
