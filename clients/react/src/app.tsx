@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Circle, Column, Image, Path, RichText, Row, Scroll, Slider, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Checkbox, Circle, Column, Image, Path, RadioGroup, RichText, Row, Scroll, Slider, Stack, Svg, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, useRouter } from "./navigation.js";
@@ -531,6 +531,8 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [enabled, setEnabled] = useState(true);
   const [density, setDensity] = useState(1);
   const [level, setLevel] = useState(0.62);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [telemetry, setTelemetry] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const time = useAnimationTime();
   const router = useRouter();
@@ -564,7 +566,10 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
         <Column style={{ padding: all(20), gap: 18, cornerRadius: 16,
           background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
           borderColor: rgba(0.20, 0.30, 0.48) }}>
-          <Row style={{ mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
+          <Row style={{ preferredSize: { height: 76 }, padding: all(14), cornerRadius: 12,
+            background: rgba(0.065, 0.085, 0.135), borderWidth: 1,
+            borderColor: rgba(0.18, 0.27, 0.42),
+            mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center" }}>
             <Column style={{ gap: 5 }}>
               <Text value="NATIVE SWITCH" style={{ fontSize: 23, fontWeight: "bold" }} />
               <Text value={enabled ? "FEATURE ENABLED" : "FEATURE DISABLED"}
@@ -598,12 +603,18 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
             <Slider value={level} onChange={setLevel} width={360} step={0.05} />
           </Row>
         </Column>
-        <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>
-          {densities.map((label, index) => <Button key={label} label={label}
-            active={density === index} activeBackground={rgba(0.18, 0.62, 0.52)}
-            onPress={() => setDensity(index)} background={rgba(0.12, 0.18, 0.28)}
-            style={{ flexGrow: 1, preferredSize: { height: 52 } }} />)}
-        </Row>
+        <Column style={{ padding: all(18), gap: 14, cornerRadius: 14,
+          background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
+          borderColor: rgba(0.18, 0.27, 0.43) }}>
+          <Text value="SELECTION CONTROLS" style={{ fontSize: 21, fontWeight: "bold",
+            color: rgba(0.68, 0.88, 1) }} />
+          <RadioGroup options={densities} value={density} onChange={setDensity} />
+          <Row style={{ gap: 18, crossAxisAlignment: "stretch" }}>
+            <Checkbox checked={snapToGrid} onChange={setSnapToGrid} label="SNAP TO GRID" />
+            <Checkbox checked={telemetry} onChange={setTelemetry} label="SHOW TELEMETRY" />
+            <Checkbox checked={false} onChange={() => {}} label="LOCKED OPTION" disabled />
+          </Row>
+        </Column>
         <Row style={{ gap: 12, mainAxisAlignment: "end" }}>
           <Button label="SHOW DIALOG" onPress={() => setDialogOpen(true)}
             background={rgba(0.48, 0.24, 0.72)} style={{ preferredSize: { width: 180 } }} />

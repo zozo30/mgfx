@@ -260,6 +260,67 @@ export function Slider({ value, onChange, width = 360, step = 0.05 }: {
   </mgfx-stack>;
 }
 
+export function Checkbox({ checked, onChange, label, disabled = false }: {
+  readonly checked: boolean; readonly onChange: (checked: boolean) => void;
+  readonly label: string; readonly disabled?: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useNativeCursor("pointer", hovered && !disabled);
+  const handlers = disabled ? {} : { onClick: () => onChange(!checked),
+    onHoverChange: setHovered, onPressChange: setPressed, onFocusChange: setFocused };
+  return <mgfx-row {...handlers} style={{ preferredSize: { height: 44 }, padding: all(6),
+    gap: 12, cornerRadius: 9, crossAxisAlignment: "center",
+    background: pressed ? rgba(0.06, 0.09, 0.15)
+      : hovered ? rgba(0.09, 0.13, 0.21) : rgba(0.04, 0.055, 0.09),
+    opacity: disabled ? 0.45 : 1 }}>
+    <Stack style={{ preferredSize: { width: 30, height: 30 }, cornerRadius: 7,
+      background: checked ? rgba(0.16, 0.68, 0.52) : rgba(0.08, 0.11, 0.17),
+      borderWidth: focused ? 2.5 : 1.5,
+      borderColor: focused ? rgba(0.48, 0.86, 1)
+        : checked ? rgba(0.42, 1, 0.74) : rgba(0.30, 0.38, 0.52) }}>
+      {checked ? <Path data="M5 15L11 21L25 7" viewBox={{ x: 0, y: 0, width: 30, height: 30 }}
+        strokeColor={rgba(0.94, 1, 0.98)} strokeWidth={3} lineCap="round" lineJoin="round"
+        style={{ position: "absolute", inset: all(3) }} /> : null}
+    </Stack>
+    <Text value={label} style={{ fontSize: 20, fontWeight: checked ? "semibold" : "regular",
+      color: disabled ? rgba(0.46, 0.50, 0.58) : rgba(0.78, 0.84, 0.92) }} />
+  </mgfx-row>;
+}
+
+function RadioOption({ selected, label, onSelect }: { readonly selected: boolean;
+  readonly label: string; readonly onSelect: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  useNativeCursor("pointer", hovered);
+  return <mgfx-row onClick={onSelect} onHoverChange={setHovered} onPressChange={setPressed}
+    onFocusChange={setFocused} style={{ preferredSize: { height: 44 }, padding: all(7),
+      gap: 11, cornerRadius: 9, crossAxisAlignment: "center",
+      background: pressed ? rgba(0.06, 0.09, 0.15)
+        : hovered ? rgba(0.09, 0.13, 0.21) : rgba(0.04, 0.055, 0.09) }}>
+    <Stack style={{ preferredSize: { width: 28, height: 28 }, cornerRadius: 14,
+      borderWidth: focused ? 2.5 : 1.5,
+      borderColor: focused ? rgba(0.48, 0.86, 1)
+        : selected ? rgba(0.46, 0.96, 0.76) : rgba(0.30, 0.38, 0.52) }}>
+      {selected ? <Circle style={{ position: "absolute", inset: all(7),
+        background: rgba(0.30, 0.88, 0.64) }} /> : null}
+    </Stack>
+    <Text value={label} style={{ fontSize: 20, fontWeight: selected ? "semibold" : "regular",
+      color: selected ? rgba(0.82, 1, 0.92) : rgba(0.70, 0.76, 0.86) }} />
+  </mgfx-row>;
+}
+
+export function RadioGroup({ options, value, onChange }: {
+  readonly options: readonly string[]; readonly value: number;
+  readonly onChange: (index: number) => void;
+}) {
+  return <Row style={{ gap: 10, crossAxisAlignment: "stretch" }}>{options.map((label, index) =>
+    <RadioOption key={label} label={label} selected={value === index}
+      onSelect={() => onChange(index)} />)}</Row>;
+}
+
 export interface TextFieldProps {
   readonly value: string;
   readonly onChange: (value: string) => void;

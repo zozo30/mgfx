@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Box, Button, Column, Image, Mesh, Path, RichText, Scroll, Slider, Svg, Text, TextField } from "./components.js";
+import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Slider, Svg, Text, TextField } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Router, useRouter } from "./navigation.js";
@@ -59,6 +59,29 @@ test("React Slider reports pointer dragging and keyboard steps", () => {
   assert.ok(values[2]! > 0.96);
   surface.keyDown({ key: Key.ArrowRight, modifiers: 0, repeat: false });
   assert.ok(Math.abs(values.at(-1)! - 0.25) < 0.001);
+});
+
+test("React selection controls support controlled pointer and keyboard activation", () => {
+  let checked = false;
+  let radio = 0;
+  function Harness() {
+    const [localChecked, setLocalChecked] = useState(false);
+    const [localRadio, setLocalRadio] = useState(0);
+    return <Column><Checkbox label="OPTION" checked={localChecked} onChange={(value) => {
+      checked = value; setLocalChecked(value);
+    }} /><RadioGroup options={["ONE", "TWO", "THREE"]} value={localRadio}
+      onChange={(value) => { radio = value; setLocalRadio(value); }} /></Column>;
+  }
+  const surface = new ReactSurface(() => {});
+  surface.render(<Harness />);
+  surface.resize({ width: 360, height: 100 });
+  surface.pointerDown({ x: 20, y: 20 }); surface.pointerUp({ x: 20, y: 20 });
+  assert.equal(checked, true);
+  surface.keyDown({ key: Key.Space, modifiers: 0, repeat: false });
+  surface.keyUp({ key: Key.Space, modifiers: 0, repeat: false });
+  assert.equal(checked, false);
+  surface.pointerDown({ x: 120, y: 66 }); surface.pointerUp({ x: 120, y: 66 });
+  assert.equal(radio, 1);
 });
 
 test("React Text defaults to native server shaping", () => {
