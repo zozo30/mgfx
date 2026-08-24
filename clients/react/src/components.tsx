@@ -30,6 +30,11 @@ export function Scroll({ children, style }: LayoutProps) {
 }
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
+export const Arc = ({ startAngle, sweepAngle, thickness, color, roundCaps = true, style }: {
+  readonly startAngle: number; readonly sweepAngle: number; readonly thickness: number;
+  readonly color: Color; readonly roundCaps?: boolean; readonly style?: Style;
+}) => <mgfx-box style={{ ...style,
+  backgroundArc: { startAngle, sweepAngle, thickness, color, roundCaps } }} />;
 export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling,
   sourceRect, tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY, nineSlice,
   effects }: {

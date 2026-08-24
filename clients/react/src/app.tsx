@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, SplitPane, Stack, Stepper, Svg, Tabs, Text, TextField, TreeView, all, rgba, type TreeItem } from "./components.js";
+import { Arc, Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, SplitPane, Stack, Stepper, Svg, Tabs, Text, TextField, TreeView, all, rgba, type TreeItem } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { CommandPalette, Dialog, Menu, Router, Toast, useRouter,
@@ -805,6 +805,38 @@ function GraphicsRoute({ vectorIcons, customFontResourceId, contentLeft, content
               fontFamily: "rounded", color: rgba(0.9, 1, 0.97) }} />
             <Button label="BACK" onPress={router.back} background={rgba(0.08, 0.12, 0.20)}
               style={{ preferredSize: { width: 120, height: 42 } }} />
+          </Row>
+          <Row style={{ preferredSize: { height: 190 }, padding: all(18), gap: 28,
+            cornerRadius: 16, background: rgba(0.025, 0.04, 0.07),
+            borderWidth: 1, borderColor: rgba(0.16, 0.28, 0.44),
+            crossAxisAlignment: "center" }}>
+            <Column style={{ gap: 5, preferredSize: { width: 260 } }}>
+              <Text value="NATIVE ARC / RING" style={{ fontSize: 22, fontWeight: "bold",
+                color: rgba(0.58, 0.88, 1) }} />
+              <Text value="ONE SEMANTIC COMMAND" style={{ fontSize: 16,
+                color: rgba(0.48, 0.60, 0.74) }} />
+              <Text value="METAL SDF + ROUND CAPS" style={{ fontSize: 16,
+                color: rgba(0.42, 0.86, 0.68) }} />
+            </Column>
+            <Stack style={{ preferredSize: { width: 140, height: 140 } }}>
+              <Arc startAngle={0} sweepAngle={360} thickness={13} roundCaps={false}
+                color={rgba(0.11, 0.18, 0.28)} style={{ position: "absolute", inset: all(0) }} />
+              <Arc startAngle={-90} sweepAngle={210 + Math.sin(animationTime / 700) * 55}
+                thickness={13} color={rgba(0.20, 0.84, 1)}
+                style={{ position: "absolute", inset: all(0) }} />
+            </Stack>
+            <Stack style={{ preferredSize: { width: 140, height: 140 } }}>
+              <Arc startAngle={animationTime / 8} sweepAngle={82} thickness={18}
+                color={rgba(0.54, 0.30, 1)} style={{ position: "absolute", inset: all(0) }} />
+              <Arc startAngle={animationTime / 8 + 145} sweepAngle={54} thickness={8}
+                color={rgba(0.26, 1, 0.68)} style={{ position: "absolute", inset: all(12) }} />
+            </Stack>
+            <Column style={{ flexGrow: 1, gap: 8 }}>
+              <Text value="GAUGES · LOADERS · RADIAL CHARTS" style={{ fontSize: 24,
+                fontWeight: "semibold", color: rgba(0.82, 0.90, 0.98) }} />
+              <Text value="THE CLIENT SENDS ANGLES, THICKNESS, CAP STYLE, AND COLOR."
+                style={{ fontSize: 17, color: rgba(0.54, 0.66, 0.80), wrap: true }} />
+            </Column>
           </Row>
           <ServerVectorPath time={animationTime} />
           <IconGallery icons={vectorIcons} time={animationTime} />

@@ -99,6 +99,8 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         library->newFunction(MTLSTR("roundedRectFragmentMain")));
     auto circleVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleVertexMain")));
     auto circleFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("circleFragmentMain")));
+    auto arcVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("arcVertexMain")));
+    auto arcFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("arcFragmentMain")));
     auto patternVertexFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternVertexMain")));
     auto patternFragmentFunction = NS::TransferPtr(library->newFunction(MTLSTR("patternFragmentMain")));
     auto gridPatternVertexFunction = NS::TransferPtr(
@@ -127,6 +129,7 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         !radialVertexFunction || !radialFragmentFunction ||
         !roundedRectVertexFunction || !roundedRectFragmentFunction ||
         !circleVertexFunction || !circleFragmentFunction ||
+        !arcVertexFunction || !arcFragmentFunction ||
         !patternVertexFunction || !patternFragmentFunction ||
         !gridPatternVertexFunction || !gridPatternFragmentFunction ||
         !linearGradientVertexFunction || !linearGradientFragmentFunction ||
@@ -287,6 +290,23 @@ Renderer::Renderer(MTL::Device* device, std::uint32_t sampleCount)
         device_->newRenderPipelineState(circleDescriptor.get(), &error));
     if (!circlePipelineState_) {
         throw std::runtime_error(errorMessage("Could not create the circle pipeline", error));
+    }
+
+    auto arcDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+    arcDescriptor->setVertexFunction(arcVertexFunction.get());
+    arcDescriptor->setFragmentFunction(arcFragmentFunction.get());
+    arcDescriptor->setRasterSampleCount(sampleCount);
+    auto* arcColor = arcDescriptor->colorAttachments()->object(0);
+    arcColor->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+    arcColor->setBlendingEnabled(true);
+    arcColor->setSourceRGBBlendFactor(MTL::BlendFactorOne);
+    arcColor->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    arcColor->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
+    arcColor->setDestinationAlphaBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
+    arcPipelineState_ = NS::TransferPtr(
+        device_->newRenderPipelineState(arcDescriptor.get(), &error));
+    if (!arcPipelineState_) {
+        throw std::runtime_error(errorMessage("Could not create the arc pipeline", error));
     }
 
     auto patternDescriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -978,6 +998,55 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             };
             if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
             encoder->setRenderPipelineState(circlePipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices, sizeof(vertices), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                                    static_cast<NS::UInteger>(0),
+                                    static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawArc) {
+            gfx::ArcCommand arc{};
+            constexpr float twoPi = 6.28318530717958647692F;
+            if (!gfx::decodeArc(command, arc) || !std::isfinite(arc.startAngle) ||
+                !std::isfinite(arc.sweepAngle) || !std::isfinite(arc.thickness) ||
+                arc.startAngle < -twoPi || arc.startAngle > twoPi ||
+                arc.sweepAngle <= 0.0F || arc.sweepAngle > twoPi ||
+                arc.thickness <= 0.0F || arc.thickness > 8192.0F) {
+                throw std::runtime_error("Malformed arc command");
+            }
+            if (clipEmpty() || arc.color.alpha <= 0.0F) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const std::array<float, 2> size = {
+                (arc.destination.right - arc.destination.left) * drawableWidth * 0.5F,
+                (arc.destination.top - arc.destination.bottom) * drawableHeight * 0.5F};
+            if (size[0] <= 0.0F || size[1] <= 0.0F) continue;
+            struct ArcVertex {
+                std::array<float, 2> position;
+                std::array<float, 2> local;
+                std::array<float, 2> size;
+                float startAngle;
+                float sweepAngle;
+                float thickness;
+                float roundCaps;
+                std::array<float, 4> color;
+            };
+            const std::array<float, 4> color = {arc.color.red, arc.color.green, arc.color.blue,
+                arc.color.alpha * opacityStack.back()};
+            const auto vertex = [&](float x, float y, float localX, float localY) {
+                return ArcVertex{transformPoint(currentTransform(), {x, y}), {localX, localY},
+                    size, arc.startAngle, arc.sweepAngle, arc.thickness,
+                    arc.roundCaps ? 1.0F : 0.0F, color};
+            };
+            const ArcVertex vertices[] = {
+                vertex(arc.destination.left, arc.destination.top, 0.0F, 0.0F),
+                vertex(arc.destination.left, arc.destination.bottom, 0.0F, size[1]),
+                vertex(arc.destination.right, arc.destination.bottom, size[0], size[1]),
+                vertex(arc.destination.left, arc.destination.top, 0.0F, 0.0F),
+                vertex(arc.destination.right, arc.destination.bottom, size[0], size[1]),
+                vertex(arc.destination.right, arc.destination.top, size[0], 0.0F),
+            };
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(arcPipelineState_.get());
             applyClip();
             encoder->setVertexBytes(vertices, sizeof(vertices), 0);
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,

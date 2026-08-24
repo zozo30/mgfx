@@ -196,6 +196,17 @@ void CommandEncoder::drawCircle(const CircleCommand& circle) {
     }
 }
 
+void CommandEncoder::drawArc(const ArcCommand& arc) {
+    beginCommand(Opcode::drawArc, 12 * sizeof(float));
+    for (float value : {arc.destination.left, arc.destination.top,
+                        arc.destination.right, arc.destination.bottom,
+                        arc.startAngle, arc.sweepAngle, arc.thickness,
+                        arc.roundCaps ? 1.0F : 0.0F,
+                        arc.color.red, arc.color.green, arc.color.blue, arc.color.alpha}) {
+        appendFloat(bytes_, value);
+    }
+}
+
 void CommandEncoder::drawDiagonalPattern(const DiagonalPatternCommand& pattern) {
     beginCommand(Opcode::drawDiagonalPattern, 12 * sizeof(float));
     for (float value : {pattern.destination.left, pattern.destination.top,
@@ -968,6 +979,21 @@ bool decodeCircle(const CommandView& command, CircleCommand& circle) {
                         readFloat(command.payload + 28), readFloat(command.payload + 32)};
     circle.borderColor = {readFloat(command.payload + 36), readFloat(command.payload + 40),
                           readFloat(command.payload + 44), readFloat(command.payload + 48)};
+    return true;
+}
+
+bool decodeArc(const CommandView& command, ArcCommand& arc) {
+    if (command.opcode != Opcode::drawArc || command.payloadSize != 48) return false;
+    arc.destination = {readFloat(command.payload), readFloat(command.payload + 4),
+                       readFloat(command.payload + 8), readFloat(command.payload + 12)};
+    arc.startAngle = readFloat(command.payload + 16);
+    arc.sweepAngle = readFloat(command.payload + 20);
+    arc.thickness = readFloat(command.payload + 24);
+    const float caps = readFloat(command.payload + 28);
+    if (caps != 0.0F && caps != 1.0F) return false;
+    arc.roundCaps = caps == 1.0F;
+    arc.color = {readFloat(command.payload + 32), readFloat(command.payload + 36),
+                 readFloat(command.payload + 40), readFloat(command.payload + 44)};
     return true;
 }
 

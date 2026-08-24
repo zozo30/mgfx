@@ -327,6 +327,23 @@ test("MGFX circle combines fill and ring in one command", () => {
     borderColor: { red: 0, green: 0, blue: 0, alpha: 0 } }));
 });
 
+test("MGFX arc carries semantic angles, thickness, and cap style", () => {
+  const frame = new FrameEncoder();
+  frame.arc({ destination: { left: -0.5, top: 0.5, right: 0.5, bottom: -0.5 },
+    startAngle: -Math.PI / 2, sweepAngle: Math.PI * 1.5, thickness: 12, roundCaps: true,
+    color: { red: 0.2, green: 0.8, blue: 1, alpha: 0.9 } });
+  frame.endFrame();
+  const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 46);
+  assert.equal(bytes.readUInt32LE(20), 48);
+  assert.ok(Math.abs(bytes.readFloatLE(40) + Math.PI / 2) < 0.00001);
+  assert.equal(bytes.readFloatLE(48), 12);
+  assert.equal(bytes.readFloatLE(52), 1);
+  assert.throws(() => frame.arc({ destination: { left: -1, top: 1, right: 1, bottom: -1 },
+    startAngle: 0, sweepAngle: 0, thickness: 2, roundCaps: false,
+    color: { red: 1, green: 1, blue: 1, alpha: 1 } }));
+});
+
 test("MGFX diagonal pattern is constant-size regardless of area", () => {
   const frame = new FrameEncoder();
   frame.diagonalPattern({ destination: { left: -1, top: 1, right: 1, bottom: -1 },

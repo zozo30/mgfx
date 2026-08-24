@@ -44,6 +44,8 @@ int main() {
     encoder.drawCircle({{-0.4F, 0.4F, 0.4F, -0.4F}, 2.5F,
                         {0.1F, 0.8F, 0.4F, 1.0F},
                         {0.7F, 1.0F, 0.8F, 0.9F}});
+    encoder.drawArc({{-0.5F, 0.5F, 0.5F, -0.5F}, -1.5707963F, 4.712389F, 12.0F, true,
+                     {0.2F, 0.8F, 1.0F, 0.9F}});
     encoder.drawDiagonalPattern({{-0.9F, 0.3F, 0.9F, -0.3F}, 8.0F, 10.0F, 3.5F, true,
                                  {1.0F, 0.5F, 0.1F, 0.8F}});
     encoder.drawLinearGradient({{-0.8F, 0.2F, 0.8F, -0.2F}, 12.0F,
@@ -291,6 +293,12 @@ int main() {
         !nearlyEqual(circle.fillColor.green, 0.8F) ||
         !nearlyEqual(circle.borderColor.alpha, 0.9F) || !decoder.next(command)) {
         return fail("Circle decoding failed");
+    }
+    gfx::ArcCommand arc{};
+    if (!gfx::decodeArc(command, arc) || !nearlyEqual(arc.startAngle, -1.5707963F) ||
+        !nearlyEqual(arc.sweepAngle, 4.712389F) || !nearlyEqual(arc.thickness, 12.0F) ||
+        !arc.roundCaps || !nearlyEqual(arc.color.alpha, 0.9F) || !decoder.next(command)) {
+        return fail("Arc decoding failed");
     }
     gfx::DiagonalPatternCommand pattern{};
     if (!gfx::decodeDiagonalPattern(command, pattern) ||

@@ -38,6 +38,13 @@ export interface WaveDotPattern {
   readonly troughStartColor: Color; readonly troughEndColor: Color;
   readonly crestStartColor: Color; readonly crestEndColor: Color; readonly borderColor: Color;
 }
+export interface ArcStyle {
+  readonly startAngle: number;
+  readonly sweepAngle: number;
+  readonly thickness: number;
+  readonly color: Color;
+  readonly roundCaps?: boolean;
+}
 export interface ImagePaint {
   readonly textureId: number;
   readonly tint?: Color;
@@ -84,6 +91,7 @@ export interface Style {
   backgroundGrid?: GridPattern;
   backgroundDotGrid?: DotGridPattern;
   backgroundWaveDots?: WaveDotPattern;
+  backgroundArc?: ArcStyle;
   backgroundImage?: ImagePaint;
   mainAxisAlignment?: "start" | "center" | "end" | "spaceBetween";
   crossAxisAlignment?: "start" | "center" | "end" | "stretch";
@@ -744,6 +752,7 @@ class Node {
       if (!combinedBorder) paintServerRoundedRect(encoder, this.bounds, 0, undefined,
         this.style.borderWidth ?? 0, this.style.borderColor, viewport);
     }
+    paintArc(encoder, this.bounds, this.style.backgroundArc, viewport);
     if (this.type === "text") paintText(encoder, this.bounds, this.value, this.textStyle, viewport);
     if (this.type === "richText")
       paintRichText(encoder, this.bounds, this.richTextSpans, this.textStyle, viewport);
@@ -1296,6 +1305,16 @@ function paintWaveDots(encoder: FrameEncoder, bounds: Rect, pattern: WaveDotPatt
     troughStartColor: pattern.troughStartColor, troughEndColor: pattern.troughEndColor,
     crestStartColor: pattern.crestStartColor, crestEndColor: pattern.crestEndColor,
     borderColor: pattern.borderColor });
+}
+
+function paintArc(encoder: FrameEncoder, bounds: Rect, arc: ArcStyle | undefined,
+  viewport: Size): void {
+  if (!arc || bounds.width <= 0 || bounds.height <= 0 || arc.color.alpha <= 0 ||
+      arc.sweepAngle <= 0 || arc.thickness <= 0) return;
+  encoder.arc({ destination: normalizedRect(bounds, viewport),
+    startAngle: arc.startAngle * Math.PI / 180,
+    sweepAngle: Math.min(360, arc.sweepAngle) * Math.PI / 180,
+    thickness: arc.thickness, roundCaps: arc.roundCaps ?? true, color: arc.color });
 }
 
 export function constrain(size: Size, c: Constraints): Size {

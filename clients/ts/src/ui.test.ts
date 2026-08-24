@@ -403,6 +403,26 @@ test("filled and bordered circles emit one server SDF command", () => {
   assert.equal(frame.readUInt16LE(16), 16);
 });
 
+test("semantic arcs emit one server SDF command without client tessellation", () => {
+  class ArcComponent extends Component {
+    build(): Element {
+      return box({ preferredSize: { width: 120, height: 120 }, backgroundArc: {
+        startAngle: -90, sweepAngle: 270, thickness: 14, roundCaps: true,
+        color: { red: 0.2, green: 0.8, blue: 1, alpha: 1 },
+      } });
+    }
+  }
+  const host = new ComponentHost(); host.rebuild(new ArcComponent());
+  host.layout({ width: 120, height: 120 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 120, height: 120 });
+  encoder.endFrame();
+  const frame = encoder.finish();
+  assert.equal(frame.readUInt32LE(12), 2);
+  assert.equal(frame.readUInt16LE(16), 46);
+  assert.equal(frame.readUInt32LE(20), 48);
+  assert.ok(Math.abs(frame.readFloatLE(40) + Math.PI / 2) < 0.00001);
+});
+
 test("gradient circles emit one server SDF command instead of a triangle fan", () => {
   class GradientCircle extends Component {
     build(): Element {

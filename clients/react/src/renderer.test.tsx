@@ -3,7 +3,7 @@ import test from "node:test";
 import { ReactSurface } from "./renderer.js";
 import { useState } from "react";
 import { AnimationClock, Key, KeyModifier, type WindowConfig } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, SplitPane, Stepper, Svg, Tabs, Text, TextField, TreeView, type TreeItem } from "./components.js";
+import { Arc, Box, Button, Checkbox, Column, Image, Mesh, Path, RadioGroup, RichText, Scroll, Select, Slider, SplitPane, Stepper, Svg, Tabs, Text, TextField, TreeView, type TreeItem } from "./components.js";
 import { Window } from "./native-window.js";
 import { ConicBadge, DiagonalPattern, DotGrid, WavePattern } from "./app.js";
 import { Menu, Router, useRouter } from "./navigation.js";
@@ -206,6 +206,18 @@ test("React Text defaults to native server shaping", () => {
   surface.resize({ width: 240, height: 40 });
   assert.ok(frame);
   assert.equal(frame.readUInt16LE(40), 8);
+});
+
+test("React Arc lowers to one semantic native SDF draw", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Arc startAngle={-90} sweepAngle={270} thickness={14}
+    color={{ red: 0.2, green: 0.8, blue: 1, alpha: 1 }}
+    style={{ preferredSize: { width: 120, height: 120 } }} />);
+  surface.resize({ width: 120, height: 120 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 46);
+  assert.equal(frame.readUInt32LE(44), 48);
 });
 
 test("React RichText lowers styled spans to one native command", () => {
