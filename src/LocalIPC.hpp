@@ -115,6 +115,7 @@ enum ServerCapability : std::uint64_t {
     richTextRunMetrics = 1ULL << 54U,
     richTextBaselineShift = 1ULL << 55U,
     tiledImageSurfaces = 1ULL << 56U,
+    nineSliceImages = 1ULL << 57U,
 };
 
 enum class ResourceKind : std::uint8_t {

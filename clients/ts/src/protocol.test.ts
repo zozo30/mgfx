@@ -54,7 +54,8 @@ test("extended capabilities preserve bits beyond the legacy hello word", () => {
     ExtendedServerCapability.NativeRichTextPlacement |
     ExtendedServerCapability.RichTextRunMetrics |
     ExtendedServerCapability.RichTextBaselineShift |
-    ExtendedServerCapability.TiledImageSurfaces;
+    ExtendedServerCapability.TiledImageSurfaces |
+    ExtendedServerCapability.NineSliceImages;
   payload.writeBigUInt64LE(completeCapabilities);
   assert.equal(decodeServerCapabilities(payload), completeCapabilities);
   assert.throws(() => decodeServerCapabilities(Buffer.alloc(4)));
@@ -390,6 +391,22 @@ test("tiled image surfaces encode repeat axes and phase in one command", () => {
   assert.throws(() => frame.tiledImageSurface(11,
     { left: -1, top: 1, right: 1, bottom: -1 },
     { left: 0, top: 0, right: 1, bottom: 1 }, undefined, 0, "linear", false, false));
+});
+
+test("nine-slice images encode fixed source and destination borders", () => {
+  const frame = new FrameEncoder();
+  frame.nineSliceImage(12, { left: -1, top: 1, right: 1, bottom: -1 },
+    { left: 0, top: 0, right: 1, bottom: 1 },
+    { left: 0.1, top: 0.2, right: 0.1, bottom: 0.2 },
+    { left: 16, top: 12, right: 16, bottom: 12 }, undefined, 8, "nearest");
+  frame.endFrame(); const bytes = frame.finish();
+  assert.equal(bytes.readUInt16LE(16), 40);
+  assert.equal(bytes.readUInt32LE(20), 96);
+  assert.equal(bytes.readUInt32LE(24), 12);
+  assert.equal(bytes.readUInt32LE(28), 1);
+  assert.ok(Math.abs(bytes.readFloatLE(80) - 0.1) < 0.00001);
+  assert.equal(bytes.readFloatLE(96), 16);
+  assert.equal(bytes.readFloatLE(112), 8);
 });
 
 test("dot grids encode all cells as one fixed pattern command", () => {

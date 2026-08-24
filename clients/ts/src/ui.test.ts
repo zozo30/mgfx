@@ -512,6 +512,22 @@ test("image tiles lower size and animated phase to one server draw", () => {
   assert.equal(frame.readFloatLE(80), 10);
 });
 
+test("nine-slice backgrounds preserve source and layout insets", () => {
+  class Panel extends Component { build(): Element { return box({
+    preferredSize: { width: 200, height: 80 }, cornerRadius: 9,
+    backgroundImage: { textureId: 6, sourceSize: { width: 100, height: 50 },
+      nineSlice: { source: { left: 10, top: 5, right: 20, bottom: 10 },
+        destination: { left: 16, top: 8, right: 24, bottom: 12 } } } }); } }
+  const host = new ComponentHost(); host.rebuild(new Panel()); host.layout({ width: 200, height: 80 });
+  const encoder = new FrameEncoder(); host.paint(encoder, { width: 200, height: 80 });
+  encoder.endFrame(); const frame = encoder.finish();
+  assert.equal(frame.readUInt16LE(16), 40);
+  assert.ok(Math.abs(frame.readFloatLE(80) - 0.1) < 0.00001);
+  assert.ok(Math.abs(frame.readFloatLE(88) - 0.2) < 0.00001);
+  assert.equal(frame.readFloatLE(96), 16);
+  assert.equal(frame.readFloatLE(112), 9);
+});
+
 test("diagonal patterns lower to one constant-size server command", () => {
   class PatternComponent extends Component {
     build(): Element {

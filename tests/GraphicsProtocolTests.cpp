@@ -69,6 +69,10 @@ int main() {
                                    {-0.8F, 0.4F, 0.8F, -0.4F},
                                    {-0.25F, 0.0F, 4.75F, 1.0F},
                                    {1.0F, 0.9F, 0.8F, 1.0F}, 8.0F, true, false});
+    encoder.drawNineSliceImage({11, gfx::ImageSampling::nearest,
+                                {-0.9F, 0.7F, 0.9F, -0.7F}, {0.0F, 0.0F, 1.0F, 1.0F},
+                                {1.0F, 1.0F, 1.0F, 1.0F}, {0.1F, 0.2F, 0.1F, 0.2F},
+                                {16.0F, 12.0F, 16.0F, 12.0F}, 10.0F});
     encoder.drawDotGrid({{-0.3F, 0.3F, 0.3F, -0.3F}, 4, 4, 0xA142U, 7,
                          6.0F, 4.0F, 2.0F,
                          {0.4F, 0.9F, 0.6F, 1.0F}, {0.4F, 0.9F, 0.6F, 0.8F},
@@ -304,6 +308,14 @@ int main() {
         tiledImage.repeatY || !nearlyEqual(tiledImage.uv.left, -0.25F) ||
         !nearlyEqual(tiledImage.uv.right, 4.75F) || !decoder.next(command)) {
         return fail("Tiled image-surface decoding failed");
+    }
+    gfx::NineSliceImageCommand nineSlice{};
+    if (!gfx::decodeNineSliceImage(command, nineSlice) || nineSlice.textureId != 11 ||
+        nineSlice.sampling != gfx::ImageSampling::nearest ||
+        !nearlyEqual(nineSlice.sourceInsets.top, 0.2F) ||
+        !nearlyEqual(nineSlice.destinationInsets.left, 16.0F) ||
+        !nearlyEqual(nineSlice.cornerRadius, 10.0F) || !decoder.next(command)) {
+        return fail("Nine-slice image decoding failed");
     }
     gfx::DotGridCommand grid{};
     if (!gfx::decodeDotGrid(command, grid) || grid.rows != 4 || grid.columns != 4 ||

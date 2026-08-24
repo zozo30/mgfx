@@ -43,6 +43,10 @@ client-generated clipping geometry.
 and Y. Tile size and phase remain frontend layout values, while Metal samples the
 entire rounded area in one draw, making image and rasterized-SVG patterns cheap to animate.
 
+`DrawNineSliceImage` keeps four textured corners and border thicknesses stable
+while stretching only the center regions. Scalable panels therefore remain one
+fixed display-list command and one Metal draw instead of nine client quads.
+
 The React client includes bounded PNG, JPEG, and SVG decoders. Raster files are converted to
 premultiplied RGBA8, uploaded once, and displayed with `fill`, `contain`, or
 `cover` geometry computed by the backend-neutral UI runtime.

@@ -339,6 +339,21 @@ void CommandEncoder::drawTiledImageSurface(const ImageSurfaceCommand& image) {
     }
 }
 
+void CommandEncoder::drawNineSliceImage(const NineSliceImageCommand& image) {
+    beginCommand(Opcode::drawNineSliceImage, 96);
+    appendU32(bytes_, image.textureId);
+    appendU32(bytes_, image.sampling == ImageSampling::nearest ? 1U : 0U);
+    for (float value : {image.destination.left, image.destination.top,
+                        image.destination.right, image.destination.bottom,
+                        image.uv.left, image.uv.top, image.uv.right, image.uv.bottom,
+                        image.tint.red, image.tint.green, image.tint.blue, image.tint.alpha,
+                        image.sourceInsets.left, image.sourceInsets.top,
+                        image.sourceInsets.right, image.sourceInsets.bottom,
+                        image.destinationInsets.left, image.destinationInsets.top,
+                        image.destinationInsets.right, image.destinationInsets.bottom,
+                        image.cornerRadius, 0.0F}) appendFloat(bytes_, value);
+}
+
 void CommandEncoder::drawMesh(const MeshCommand& mesh) {
     beginCommand(Opcode::drawMesh, 40);
     appendU32(bytes_, mesh.meshId);
@@ -1021,6 +1036,26 @@ bool decodeTiledImageSurface(const CommandView& command, ImageSurfaceCommand& im
                   readFloat(command.payload + 48), readFloat(command.payload + 52)};
     image.cornerRadius = readFloat(command.payload + 56);
     return image.textureId != 0 && (image.repeatX || image.repeatY);
+}
+
+bool decodeNineSliceImage(const CommandView& command, NineSliceImageCommand& image) {
+    if (command.opcode != Opcode::drawNineSliceImage || command.payloadSize != 96 ||
+        readU32(command.payload + 4) > 1U || readFloat(command.payload + 92) != 0.0F) return false;
+    image.textureId = readU32(command.payload);
+    image.sampling = readU32(command.payload + 4) == 1U
+        ? ImageSampling::nearest : ImageSampling::linear;
+    image.destination = {readFloat(command.payload + 8), readFloat(command.payload + 12),
+        readFloat(command.payload + 16), readFloat(command.payload + 20)};
+    image.uv = {readFloat(command.payload + 24), readFloat(command.payload + 28),
+        readFloat(command.payload + 32), readFloat(command.payload + 36)};
+    image.tint = {readFloat(command.payload + 40), readFloat(command.payload + 44),
+        readFloat(command.payload + 48), readFloat(command.payload + 52)};
+    image.sourceInsets = {readFloat(command.payload + 56), readFloat(command.payload + 60),
+        readFloat(command.payload + 64), readFloat(command.payload + 68)};
+    image.destinationInsets = {readFloat(command.payload + 72), readFloat(command.payload + 76),
+        readFloat(command.payload + 80), readFloat(command.payload + 84)};
+    image.cornerRadius = readFloat(command.payload + 88);
+    return image.textureId != 0;
 }
 
 bool decodeMesh(const CommandView& command, MeshCommand& mesh) {

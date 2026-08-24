@@ -50,6 +50,7 @@ enum class Opcode : std::uint16_t {
     drawConicPath = 37,
     drawTexturePath = 38,
     drawTiledImageSurface = 39,
+    drawNineSliceImage = 40,
 };
 
 enum class Primitive : std::uint8_t {
@@ -113,6 +114,18 @@ struct ImageSurfaceCommand {
     float cornerRadius;
     bool repeatX = false;
     bool repeatY = false;
+};
+
+struct SliceInsets { float left; float top; float right; float bottom; };
+struct NineSliceImageCommand {
+    std::uint32_t textureId;
+    ImageSampling sampling;
+    ClipRect destination;
+    ClipRect uv;
+    Color tint;
+    SliceInsets sourceInsets;
+    SliceInsets destinationInsets;
+    float cornerRadius;
 };
 
 struct ShadowCommand {
@@ -380,6 +393,7 @@ public:
     void drawImage(const ImageCommand& image);
     void drawImageSurface(const ImageSurfaceCommand& image);
     void drawTiledImageSurface(const ImageSurfaceCommand& image);
+    void drawNineSliceImage(const NineSliceImageCommand& image);
     void drawMesh(const MeshCommand& mesh);
     void drawPath(const PathCommand& path);
     void drawText(const TextCommand& text);
@@ -432,6 +446,7 @@ bool decodePushClip(const CommandView& command, ClipRect& clip);
 bool decodeImage(const CommandView& command, ImageCommand& image);
 bool decodeImageSurface(const CommandView& command, ImageSurfaceCommand& image);
 bool decodeTiledImageSurface(const CommandView& command, ImageSurfaceCommand& image);
+bool decodeNineSliceImage(const CommandView& command, NineSliceImageCommand& image);
 bool decodeMesh(const CommandView& command, MeshCommand& mesh);
 bool decodePath(const CommandView& command, PathCommand& path);
 bool decodeText(const CommandView& command, TextCommand& text);

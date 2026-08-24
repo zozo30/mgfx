@@ -124,6 +124,7 @@ Texture paint on persistent path fills and strokes is advertised by `1 << 51`.
 Native anchored text and rich-text placement are advertised by `1 << 52` and
 `1 << 53`; per-run font scaling and baseline shift use `1 << 54` and `1 << 55`.
 One-command tiled image surfaces are advertised by `1 << 56`.
+One-command nine-slice images are advertised by `1 << 57`.
 
 Resource kind is texture (`1`), path (`2`), mesh (`3`), or font (`4`). State is
 ready (`1`) after the resource reaches its native owning subsystem, or rejected
@@ -355,3 +356,9 @@ sampling, bit 1 repeats X, and bit 2 repeats Y; all other bits are zero. UV
 coordinates may extend outside `[0, 1]` to encode tile count and phase. The
 backend repeats only selected axes, retains the rounded mask, and requires at
 least one repeat bit. Capability bit 56 is required.
+
+MGFX opcode `40` (`DrawNineSliceImage`) has a fixed 96-byte payload: texture ID,
+sampling, destination, UV rectangle, tint, four normalized source insets, four
+logical destination insets, corner radius, and one reserved zero `f32`. The
+backend preserves corners, stretches edges and center, and proportionally
+collapses borders when the destination is too small. Capability bit 57 is required.

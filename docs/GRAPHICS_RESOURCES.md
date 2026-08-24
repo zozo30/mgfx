@@ -44,6 +44,11 @@ support is advertised by `imageSurfaces`.
 X/Y repeat flags. UV extents encode tile count and phase, so a large or animated
 area remains one fixed-size command. Support is advertised by `tiledImageSurfaces`.
 
+`DrawNineSliceImage` carries normalized source border insets and logical
+destination border insets. The backend collapses opposing borders proportionally
+for undersized destinations and submits all nine patches in one draw. Support is
+advertised by `nineSliceImages`.
+
 ## SVG and vector paths
 
 SVG remains a frontend document format. The TypeScript or VM runtime parses it

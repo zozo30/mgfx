@@ -646,6 +646,82 @@ MTL::CommandBuffer* Renderer::encode(const std::vector<std::uint8_t>& commandStr
             encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
                                     static_cast<NS::UInteger>(0),
                                     static_cast<NS::UInteger>(6));
+        } else if (command.opcode == gfx::Opcode::drawNineSliceImage) {
+            gfx::NineSliceImageCommand image{};
+            if (!gfx::decodeNineSliceImage(command, image) ||
+                !std::isfinite(image.cornerRadius) || image.cornerRadius < 0.0F ||
+                image.cornerRadius > 8192.0F ||
+                !std::isfinite(image.sourceInsets.left) || image.sourceInsets.left < 0.0F ||
+                !std::isfinite(image.sourceInsets.top) || image.sourceInsets.top < 0.0F ||
+                !std::isfinite(image.sourceInsets.right) || image.sourceInsets.right < 0.0F ||
+                !std::isfinite(image.sourceInsets.bottom) || image.sourceInsets.bottom < 0.0F ||
+                !std::isfinite(image.destinationInsets.left) || image.destinationInsets.left < 0.0F ||
+                !std::isfinite(image.destinationInsets.top) || image.destinationInsets.top < 0.0F ||
+                !std::isfinite(image.destinationInsets.right) || image.destinationInsets.right < 0.0F ||
+                !std::isfinite(image.destinationInsets.bottom) || image.destinationInsets.bottom < 0.0F ||
+                image.sourceInsets.left + image.sourceInsets.right > image.uv.right - image.uv.left ||
+                image.sourceInsets.top + image.sourceInsets.bottom > image.uv.bottom - image.uv.top) {
+                throw std::runtime_error("Malformed nine-slice image command");
+            }
+            const auto found = textures_.find(image.textureId);
+            if (found == textures_.end() || clipEmpty()) continue;
+            const float drawableWidth = static_cast<float>(drawable->texture()->width());
+            const float drawableHeight = static_cast<float>(drawable->texture()->height());
+            const float width = (image.destination.right - image.destination.left) *
+                drawableWidth * 0.5F;
+            const float height = (image.destination.top - image.destination.bottom) *
+                drawableHeight * 0.5F;
+            if (width <= 0.0F || height <= 0.0F) continue;
+            const float horizontalScale = std::min(1.0F, width /
+                std::max(0.0001F, image.destinationInsets.left + image.destinationInsets.right));
+            const float verticalScale = std::min(1.0F, height /
+                std::max(0.0001F, image.destinationInsets.top + image.destinationInsets.bottom));
+            const float leftInset = image.destinationInsets.left * horizontalScale;
+            const float rightInset = image.destinationInsets.right * horizontalScale;
+            const float topInset = image.destinationInsets.top * verticalScale;
+            const float bottomInset = image.destinationInsets.bottom * verticalScale;
+            const float xs[] = {image.destination.left,
+                image.destination.left + leftInset / drawableWidth * 2.0F,
+                image.destination.right - rightInset / drawableWidth * 2.0F,
+                image.destination.right};
+            const float ys[] = {image.destination.top,
+                image.destination.top - topInset / drawableHeight * 2.0F,
+                image.destination.bottom + bottomInset / drawableHeight * 2.0F,
+                image.destination.bottom};
+            const float us[] = {image.uv.left, image.uv.left + image.sourceInsets.left,
+                image.uv.right - image.sourceInsets.right, image.uv.right};
+            const float vs[] = {image.uv.top, image.uv.top + image.sourceInsets.top,
+                image.uv.bottom - image.sourceInsets.bottom, image.uv.bottom};
+            const float localX[] = {0.0F, leftInset, width - rightInset, width};
+            const float localY[] = {0.0F, topInset, height - bottomInset, height};
+            struct ImageSurfaceVertex {
+                std::array<float, 2> position, uv, local, size;
+                float cornerRadius, sampling, repeatX, repeatY;
+                std::array<float, 4> tint;
+            };
+            const std::array<float, 2> size = {width, height};
+            const std::array<float, 4> tint = {image.tint.red, image.tint.green,
+                image.tint.blue, image.tint.alpha * opacityStack.back()};
+            std::vector<ImageSurfaceVertex> vertices;
+            vertices.reserve(54);
+            const auto append = [&](int x, int y) {
+                vertices.push_back({transformPoint(currentTransform(), {xs[x], ys[y]}),
+                    {us[x], vs[y]}, {localX[x], localY[y]}, size, image.cornerRadius,
+                    image.sampling == gfx::ImageSampling::nearest ? 1.0F : 0.0F,
+                    0.0F, 0.0F, tint});
+            };
+            for (int y = 0; y < 3; ++y) for (int x = 0; x < 3; ++x) {
+                append(x, y); append(x, y + 1); append(x + 1, y + 1);
+                append(x, y); append(x + 1, y + 1); append(x + 1, y);
+            }
+            if (encoder == nullptr) encoder = commandBuffer->renderCommandEncoder(renderPass);
+            encoder->setRenderPipelineState(imageSurfacePipelineState_.get());
+            applyClip();
+            encoder->setVertexBytes(vertices.data(), vertices.size() * sizeof(ImageSurfaceVertex), 0);
+            encoder->setFragmentTexture(found->second.get(), 0);
+            encoder->drawPrimitives(MTL::PrimitiveTypeTriangle,
+                static_cast<NS::UInteger>(0),
+                static_cast<NS::UInteger>(vertices.size()));
         } else if (command.opcode == gfx::Opcode::drawShadow) {
             gfx::ShadowCommand shadow{};
             if (!gfx::decodeShadow(command, shadow) || !std::isfinite(shadow.cornerRadius) ||

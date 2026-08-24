@@ -386,7 +386,8 @@ void GraphicsServer::run() {
             mgfx::ipc::ServerCapability::nativeRichTextPlacement |
             mgfx::ipc::ServerCapability::richTextRunMetrics |
             mgfx::ipc::ServerCapability::richTextBaselineShift |
-            mgfx::ipc::ServerCapability::tiledImageSurfaces;
+            mgfx::ipc::ServerCapability::tiledImageSurfaces |
+            mgfx::ipc::ServerCapability::nineSliceImages;
         active->send(mgfx::ipc::MessageType::serverHello,
                      mgfx::ipc::encodeServerHello({mgfx::ipc::protocolVersion,
                                                    mgfx::ipc::GraphicsBackend::metal,

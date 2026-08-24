@@ -104,6 +104,7 @@ export const ExtendedServerCapability = {
   RichTextRunMetrics: 1n << 54n,
   RichTextBaselineShift: 1n << 55n,
   TiledImageSurfaces: 1n << 56n,
+  NineSliceImages: 1n << 57n,
 } as const;
 export enum ResourceKind { Texture = 1, Path = 2, Mesh = 3, Font = 4 }
 export enum ResourceState { Ready = 1, Rejected = 2 }
@@ -810,6 +811,31 @@ export class FrameEncoder {
       (repeatX ? 2 : 0) | (repeatY ? 4 : 0), 4);
     values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
     this.command(39, payload);
+  }
+
+  nineSliceImage(textureId: number, destination: ClipRect, uv: ClipRect,
+    sourceInsets: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number },
+    destinationInsets: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number },
+    tint: Color = { red: 1, green: 1, blue: 1, alpha: 1 }, cornerRadius = 0,
+    sampling: "linear" | "nearest" = "linear"): void {
+    const values = [destination.left, destination.top, destination.right, destination.bottom,
+      uv.left, uv.top, uv.right, uv.bottom, tint.red, tint.green, tint.blue, tint.alpha,
+      sourceInsets.left, sourceInsets.top, sourceInsets.right, sourceInsets.bottom,
+      destinationInsets.left, destinationInsets.top, destinationInsets.right, destinationInsets.bottom,
+      cornerRadius, 0];
+    if (!Number.isSafeInteger(textureId) || textureId <= 0 || textureId > 0xffff_ffff ||
+        values.some((value) => !Number.isFinite(value)) ||
+        Object.values(sourceInsets).some((value) => value < 0) ||
+        Object.values(destinationInsets).some((value) => value < 0) ||
+        sourceInsets.left + sourceInsets.right > uv.right - uv.left ||
+        sourceInsets.top + sourceInsets.bottom > uv.bottom - uv.top ||
+        cornerRadius < 0 || cornerRadius > 8192)
+      throw new RangeError("Nine-slice image values are outside supported bounds");
+    const payload = Buffer.alloc(96);
+    payload.writeUInt32LE(textureId, 0);
+    payload.writeUInt32LE(sampling === "nearest" ? 1 : 0, 4);
+    values.forEach((value, index) => payload.writeFloatLE(value, 8 + index * 4));
+    this.command(40, payload);
   }
 
   path(pathId: number, destination: ClipRect,

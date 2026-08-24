@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Key, KeyModifier, type Color,
   type PathConicGradientPaint, type PathRadialGradientPaint,
   type PathTexturePaint } from "@mgfx/demo-client/protocol";
-import { nativeTextAdvance, type MeshData, type PathData, type Point, type Style,
+import { nativeTextAdvance, type Insets, type MeshData, type PathData, type Point, type Style,
   type RichTextSpan, type TextStyle } from "@mgfx/demo-client/ui";
 import { useNativeClipboard, useNativeCursor } from "./native-window.js";
 import { canonicalPath } from "./vector-path.js";
@@ -25,7 +25,7 @@ export const Stack = ({ children, style }: LayoutProps) =>
 export const Circle = ({ style }: { readonly style?: Style }) =>
   <mgfx-circle style={style ?? {}} />;
 export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX, alignY, sampling,
-  tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY }: {
+  tileWidth, tileHeight, tileOffsetX, tileOffsetY, repeatX, repeatY, nineSlice }: {
   readonly textureId: number; readonly style?: Style;
   readonly sourceWidth?: number; readonly sourceHeight?: number;
   readonly fit?: "fill" | "contain" | "cover";
@@ -35,6 +35,7 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX
   readonly tileWidth?: number; readonly tileHeight?: number;
   readonly tileOffsetX?: number; readonly tileOffsetY?: number;
   readonly repeatX?: boolean; readonly repeatY?: boolean;
+  readonly nineSlice?: { readonly source: Insets; readonly destination?: Insets };
 }) => <mgfx-box style={{ ...style, backgroundImage: {
   textureId,
   ...(sourceWidth !== undefined && sourceHeight !== undefined
@@ -49,6 +50,7 @@ export const Image = ({ textureId, style, sourceWidth, sourceHeight, fit, alignX
   ...(tileOffsetY !== undefined ? { tileOffsetY } : {}),
   ...(repeatX !== undefined ? { repeatX } : {}),
   ...(repeatY !== undefined ? { repeatY } : {}),
+  ...(nineSlice ? { nineSlice } : {}),
 } }} />;
 export const Mesh = ({ data, style }: { readonly data: MeshData; readonly style?: Style }) =>
   <mgfx-mesh mesh={data} style={style ?? {}} />;

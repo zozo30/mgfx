@@ -67,6 +67,20 @@ test("React Image exposes one native tiled-surface draw", () => {
   assert.equal(frame.readFloatLE(80), 3.75);
 });
 
+test("React Image exposes a native nine-slice draw", () => {
+  let frame: Buffer | undefined;
+  const surface = new ReactSurface((value) => { frame = value; });
+  surface.render(<Image textureId={8} sourceWidth={200} sourceHeight={100}
+    nineSlice={{ source: { left: 20, top: 10, right: 20, bottom: 10 },
+      destination: { left: 12, top: 8, right: 12, bottom: 8 } }}
+    style={{ preferredSize: { width: 300, height: 80 } }} />);
+  surface.resize({ width: 300, height: 80 });
+  assert.ok(frame);
+  assert.equal(frame.readUInt16LE(40), 40);
+  assert.ok(Math.abs(frame.readFloatLE(104) - 0.1) < 0.00001);
+  assert.equal(frame.readFloatLE(120), 12);
+});
+
 test("React Path uploads canonical curves once and emits DrawPath instead of triangles", () => {
   let uploads = 0;
   let frame: Buffer | undefined;

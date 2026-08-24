@@ -78,7 +78,8 @@ export function DiagonalPattern({ time }: { readonly time: number }) {
   );
 }
 
-function ImagePreview({ time }: { readonly time: number }) {
+function ImagePreview({ time, sourceSize }: { readonly time: number;
+  readonly sourceSize: { readonly width: number; readonly height: number } }) {
   return (
     <Row style={{ preferredSize: { height: 126 }, padding: all(12), gap: 18,
       background: rgba(0.035, 0.045, 0.07), crossAxisAlignment: "center" }}>
@@ -91,6 +92,10 @@ function ImagePreview({ time }: { readonly time: number }) {
         style={{ preferredSize: { height: 102 }, flexGrow: 1,
           background: rgba(0.015, 0.02, 0.03), cornerRadius: 16,
           borderWidth: 2, borderColor: rgba(0.2, 0.3, 0.45) }} />
+      <Image textureId={1} sourceWidth={sourceSize.width} sourceHeight={sourceSize.height}
+        nineSlice={{ source: { left: 40, top: 32, right: 40, bottom: 32 },
+          destination: { left: 24, top: 20, right: 24, bottom: 20 } }}
+        style={{ preferredSize: { width: 180, height: 102 }, cornerRadius: 12 }} />
       <Path data="M50 2L62 18L82 18L82 38L98 50L82 62L82 82L62 82L50 98L38 82L18 82L18 62L2 50L18 38L18 18L38 18Z M50 32A18 18 0 1 1 49.9 32Z"
         viewBox={{ x: 0, y: 0, width: 100, height: 100 }} fillRule="evenodd"
         texture={{ textureId: 1, sourceRect: { x: 0, y: 0, width: 34, height: 34 },
@@ -297,7 +302,7 @@ function Dashboard({ chromeMetrics, headerImageSize, vectorIcons, customFontReso
         textStyle={{ fontSize: 22 }} />
       <WavePattern time={animationTime} />
       <DiagonalPattern time={animationTime} />
-      <ImagePreview time={animationTime} />
+      <ImagePreview time={animationTime} sourceSize={headerImageSize} />
       <ServerVectorPath time={animationTime} />
       <SvgDocumentPreview time={animationTime} />
       <Row style={{ gap: 12, crossAxisAlignment: "stretch" }}>

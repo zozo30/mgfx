@@ -49,6 +49,7 @@ export interface ImagePaint {
   readonly tileSize?: Size;
   readonly tileOffsetX?: number; readonly tileOffsetY?: number;
   readonly repeatX?: boolean; readonly repeatY?: boolean;
+  readonly nineSlice?: { readonly source: Insets; readonly destination?: Insets };
 }
 export interface Transform {
   readonly translateX?: number; readonly translateY?: number;
@@ -1139,6 +1140,17 @@ function imageGeometry(bounds: Rect, image: ImagePaint): {
 function paintImage(encoder: FrameEncoder, bounds: Rect, image: ImagePaint | undefined,
   cornerRadius: number, viewport: Size): void {
   if (!image || bounds.width <= 0 || bounds.height <= 0) return;
+  if (image.nineSlice && image.sourceSize && image.sourceSize.width > 0 &&
+      image.sourceSize.height > 0) {
+    const source = image.nineSlice.source;
+    const destination = image.nineSlice.destination ?? source;
+    encoder.nineSliceImage(image.textureId, normalizedRect(bounds, viewport),
+      { left: 0, top: 0, right: 1, bottom: 1 },
+      { left: source.left / image.sourceSize.width, top: source.top / image.sourceSize.height,
+        right: source.right / image.sourceSize.width, bottom: source.bottom / image.sourceSize.height },
+      destination, image.tint, cornerRadius, image.sampling ?? "linear");
+    return;
+  }
   if (image.tileSize) {
     const tile = image.tileSize;
     if (tile.width <= 0 || tile.height <= 0) return;
