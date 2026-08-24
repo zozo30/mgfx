@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Key, KeyModifier, type Color,
   type PathConicGradientPaint, type PathRadialGradientPaint,
   type PathTexturePaint } from "@mgfx/demo-client/protocol";
@@ -496,6 +496,56 @@ export function Tabs({ options, value, onChange, width = 640 }: {
     <TabOption key={label} label={label} active={selected === index}
       onSelect={() => onChange(index)} onPrevious={() => selectRelative(-1)}
       onNext={() => selectRelative(1)} />)}</Row>;
+}
+
+export function disclosureProgress(from: number, to: number, startedAt: number,
+  now: number, duration = 260): number {
+  const progress = Math.max(0, Math.min(1, (now - startedAt) / duration));
+  const eased = progress * progress * (3 - 2 * progress);
+  return from + (to - from) * eased;
+}
+
+export function Disclosure({ title, open, onChange, children, contentHeight = 96 }: {
+  readonly title: string; readonly open: boolean; readonly onChange: (open: boolean) => void;
+  readonly children?: ReactNode; readonly contentHeight?: number;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const time = useAnimationTime();
+  const previousOpen = useRef(open);
+  const transition = useRef({ from: open ? 1 : 0, to: open ? 1 : 0, startedAt: time });
+  if (previousOpen.current !== open) {
+    const current = disclosureProgress(transition.current.from, transition.current.to,
+      transition.current.startedAt, time);
+    transition.current = { from: current, to: open ? 1 : 0, startedAt: time };
+    previousOpen.current = open;
+  }
+  const progress = disclosureProgress(transition.current.from, transition.current.to,
+    transition.current.startedAt, time);
+  useNativeCursor("pointer", hovered);
+  return <Column style={{ preferredSize: { height: 52 + contentHeight * progress },
+    cornerRadius: 12, clip: true, background: rgba(0.035, 0.052, 0.085),
+    borderWidth: 1, borderColor: focused ? rgba(0.44, 0.80, 1) : rgba(0.20, 0.29, 0.44) }}>
+    <mgfx-row onClick={() => onChange(!open)} onHoverChange={setHovered}
+      onPressChange={setPressed} onFocusChange={setFocused}
+      style={{ preferredSize: { height: 52 }, padding: all(13),
+        mainAxisAlignment: "spaceBetween", crossAxisAlignment: "center",
+        background: pressed ? rgba(0.07, 0.12, 0.20)
+          : hovered ? rgba(0.09, 0.15, 0.24) : rgba(0.055, 0.08, 0.13) }}>
+      <Text value={title} style={{ fontSize: 20, fontWeight: "semibold",
+        color: rgba(0.76, 0.86, 0.96) }} />
+      <Path data="M6 9L12 15L18 9" viewBox={{ x: 0, y: 0, width: 24, height: 24 }}
+        strokeWidth={2.2} strokeColor={rgba(0.48, 0.82, 1)}
+        style={{ preferredSize: { width: 24, height: 24 },
+          transform: { rotation: progress * 180 } }} />
+    </mgfx-row>
+    <Column style={{ position: "absolute", inset: { top: 52, right: 0, left: 0 },
+      preferredSize: { height: contentHeight }, padding: all(16), gap: 8,
+      opacity: progress, transform: { translateY: (1 - progress) * -8 } }}>
+      {children}
+    </Column>
+  </Column>;
 }
 
 export interface TextFieldProps {

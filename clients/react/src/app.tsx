@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AnimationClock, WindowChromeMetrics, WindowMode } from "@mgfx/demo-client/protocol";
-import { Box, Button, Checkbox, Circle, Column, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
+import { Box, Button, Checkbox, Circle, Column, Disclosure, Image, Path, ProgressBar, RadioGroup, RichText, Row, Scroll, Select, Slider, Stack, Stepper, Svg, Tabs, Text, TextField, all, rgba } from "./components.js";
 import { Window, useNativeClipboard, useNativeCursor } from "./native-window.js";
 import type { VectorIcon } from "./icon-pack.js";
 import { Dialog, Router, Toast, useRouter } from "./navigation.js";
@@ -565,6 +565,7 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
   const [quantity, setQuantity] = useState(4);
   const [theme, setTheme] = useState(0);
   const [section, setSection] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [toastOpen, setToastOpen] = useState(false);
   const time = useAnimationTime();
@@ -607,6 +608,14 @@ function ComponentsRoute({ contentLeft, contentTop }: { readonly contentLeft: nu
                 color: rgba(0.62, 0.82, 0.96) }} />
           </Stack>
         </Row>
+        <Disclosure title="PROTOCOL DETAILS" open={detailsOpen} onChange={setDetailsOpen}
+          contentHeight={108}>
+          <Text value="THE HEADER STAYS IN FLOW WHILE THE BODY IS A CLIPPED ABSOLUTE LAYER."
+            style={{ fontSize: 18, color: rgba(0.66, 0.76, 0.88), wrap: true }} />
+          <Text value="HEIGHT, OPACITY, TRANSLATION, AND CHEVRON ROTATION SHARE ONE CLOCK."
+            style={{ fontSize: 18, fontWeight: "semibold", color: rgba(0.42, 0.90, 0.70),
+              wrap: true }} />
+        </Disclosure>
         <Column style={{ padding: all(20), gap: 18, cornerRadius: 16,
           background: rgba(0.04, 0.055, 0.09), borderWidth: 1,
           borderColor: rgba(0.20, 0.30, 0.48) }}>
