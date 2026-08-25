@@ -52,6 +52,15 @@ canvas.Circle(mgfx.Rect{X: 270, Y: 32, Width: 72, Height: 72},
     mgfx.ShapeStyle{Fill: mgfx.RGB(0.2, 0.85, 0.55)})
 ```
 
+Nested canvas state uses scoped callbacks, so clips and opacity cannot leak into
+later component draws:
+
+```go
+canvas.Clip(contentBounds, func(canvas *mgfx.Canvas) {
+    canvas.Opacity(0.7, drawOverlay)
+})
+```
+
 Start `MGFXServer`, then run:
 
 ```sh

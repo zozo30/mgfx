@@ -59,9 +59,10 @@ type TextStyle struct {
 // Canvas records one backend-neutral MGFX display list. Public coordinates are
 // logical pixels; normalization for the graphics protocol remains internal.
 type Canvas struct {
-	Size     Size
-	commands [][]byte
-	err      error
+	Size                    Size
+	commands                [][]byte
+	err                     error
+	clipDepth, opacityDepth uint32
 }
 
 func newCanvas(size Size) *Canvas { return &Canvas{Size: size} }
@@ -127,6 +128,47 @@ func (canvas *Canvas) Clear(color Color) {
 		putFloat32(payload[index*4:], value)
 	}
 	canvas.command(1, payload)
+}
+
+// Clip applies a nested rectangular clip only while draw records its commands.
+func (canvas *Canvas) Clip(bounds Rect, draw DrawFunc) {
+	if draw == nil {
+		canvas.err = errors.New("clip draw callback is required")
+		return
+	}
+	destination, ok := canvas.normalizedRect(bounds)
+	if !ok {
+		return
+	}
+	payload := make([]byte, 16)
+	for index, value := range destination {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(4, payload)
+	canvas.clipDepth++
+	draw(canvas)
+	canvas.clipDepth--
+	if canvas.err == nil {
+		canvas.command(5, nil)
+	}
+}
+
+// Opacity multiplies every nested draw by alpha while preserving each draw's color.
+func (canvas *Canvas) Opacity(alpha float32, draw DrawFunc) {
+	if draw == nil || math.IsNaN(float64(alpha)) || math.IsInf(float64(alpha), 0) ||
+		alpha < 0 || alpha > 1 {
+		canvas.err = errors.New("opacity requires a draw callback and alpha from zero through one")
+		return
+	}
+	payload := make([]byte, 4)
+	putFloat32(payload, alpha)
+	canvas.command(11, payload)
+	canvas.opacityDepth++
+	draw(canvas)
+	canvas.opacityDepth--
+	if canvas.err == nil {
+		canvas.command(12, nil)
+	}
 }
 
 // RoundedRect draws a filled and/or bordered rectangle. A zero CornerRadius is
@@ -200,6 +242,9 @@ func (canvas *Canvas) Text(value string, style TextStyle) {
 func (canvas *Canvas) finish() ([]byte, error) {
 	if canvas.err != nil {
 		return nil, canvas.err
+	}
+	if canvas.clipDepth != 0 || canvas.opacityDepth != 0 {
+		return nil, errors.New("unbalanced canvas state")
 	}
 	canvas.command(3, nil)
 	total := frameHeaderSize

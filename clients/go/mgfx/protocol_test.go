@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"math"
+	"slices"
 	"testing"
 )
 
@@ -71,5 +72,36 @@ func TestCanvasShapesUseLogicalPixelGeometry(t *testing.T) {
 	circleOffset := frameHeaderSize + commandHeaderSize + 56
 	if opcode := binary.LittleEndian.Uint16(frame[circleOffset : circleOffset+2]); opcode != 16 {
 		t.Fatalf("second opcode = %d, want DrawCircle", opcode)
+	}
+}
+
+func TestCanvasScopesClipAndOpacity(t *testing.T) {
+	canvas := newCanvas(Size{Width: 200, Height: 100})
+	canvas.Clip(Rect{X: 20, Y: 10, Width: 100, Height: 50}, func(canvas *Canvas) {
+		canvas.Opacity(0.5, func(canvas *Canvas) {
+			canvas.Circle(Rect{X: 30, Y: 20, Width: 24, Height: 24}, ShapeStyle{
+				Fill: RGB(0.2, 0.8, 0.5),
+			})
+		})
+	})
+	frame, err := canvas.finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opcodes := make([]uint16, 0, 6)
+	for offset := frameHeaderSize; offset < len(frame); {
+		opcodes = append(opcodes, binary.LittleEndian.Uint16(frame[offset:offset+2]))
+		offset += commandHeaderSize + int(binary.LittleEndian.Uint32(frame[offset+4:offset+8]))
+	}
+	want := []uint16{4, 11, 16, 12, 5, 3}
+	if !slices.Equal(opcodes, want) {
+		t.Fatalf("scoped opcodes = %v, want %v", opcodes, want)
+	}
+	clip := frame[frameHeaderSize+commandHeaderSize:]
+	for index, want := range []float32{-0.8, 0.8, 0.2, -0.2} {
+		got := math.Float32frombits(binary.LittleEndian.Uint32(clip[index*4:]))
+		if math.Abs(float64(got-want)) > 0.00001 {
+			t.Fatalf("clip value %d = %f, want %f", index, got, want)
+		}
 	}
 }
