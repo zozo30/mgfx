@@ -70,6 +70,27 @@ canvas.Clip(contentBounds, func(canvas *mgfx.Canvas) {
 })
 ```
 
+Exact native text measurement is available during `Application.Prepare`; the
+result is returned in logical pixels at the requested font size:
+
+```go
+app.Prepare = func(ctx context.Context, client *mgfx.Client) error {
+    width, err = client.MeasureText(ctx, "Native label", mgfx.TextMeasureStyle{
+        Size: 22, Family: mgfx.RoundedFont, Weight: mgfx.SemiBold})
+    return err
+}
+```
+
+Rows and columns mix fixed minimums with flexible tracks. Padding, gaps, and
+centering remain independent of the rendering backend:
+
+```go
+columns, err := (mgfx.StackLayout{Axis: mgfx.Horizontal, Gap: 12,
+    Padding: mgfx.UniformInsets(16)}).Arrange(
+    card, mgfx.Fixed(48), mgfx.Flex(1), mgfx.Fixed(48))
+labelBounds := columns[1].Centered(mgfx.Size{Width: width + 24, Height: 40})
+```
+
 Affine transforms also stay in logical pixels and are scoped. Scale defaults to
 one when omitted, and rotation is expressed as clockwise degrees:
 
