@@ -125,6 +125,9 @@ The same host supports keyboard access. Assign `host.KeyDown` and `host.KeyUp`
 to the application to get Tab/Shift-Tab focus traversal and Enter/Space button
 activation without a separate focus framework.
 
+Assigning `host.CursorAt` to `Application.Cursor` also changes the native cursor
+to a pointing hand over interactive components and restores the arrow outside.
+
 Affine transforms also stay in logical pixels and are scoped. Scale defaults to
 one when omitted, and rotation is expressed as clockwise degrees:
 

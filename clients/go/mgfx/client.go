@@ -24,6 +24,17 @@ type DrawFunc func(canvas *Canvas)
 
 type Point struct{ X, Y float32 }
 
+type Cursor uint8
+
+const (
+	CursorArrow Cursor = iota
+	CursorPointingHand
+	CursorText
+	CursorCrosshair
+	CursorResizeHorizontal
+	CursorResizeVertical
+)
+
 type Key uint16
 
 const (
@@ -79,6 +90,7 @@ type Application struct {
 	PointerDown func(Point)
 	PointerMove func(Point)
 	PointerUp   func(Point)
+	Cursor      func(Point) Cursor
 	KeyDown     func(KeyEvent)
 	KeyUp       func(KeyEvent)
 	Scroll      func(ScrollEvent)
@@ -216,7 +228,7 @@ func (client *Client) OpenWindow(window Window) error {
 		{messageWindowTitle, []byte(window.Title)},
 		{messageWindowConfig, config},
 		{messageWindowState, []byte{0, resizable, 0, 0}},
-		{messageWindowCursor, []byte{0, 0, 0, 0}},
+		{messageWindowCursor, encodeCursor(CursorArrow)},
 	} {
 		if err := writeMessage(client.connection, outgoing.typeID, outgoing.payload, 0); err != nil {
 			return err
@@ -224,6 +236,8 @@ func (client *Client) OpenWindow(window Window) error {
 	}
 	return nil
 }
+
+func encodeCursor(cursor Cursor) []byte { return []byte{byte(cursor), 0, 0, 0} }
 
 func (client *Client) Serve(ctx context.Context, draw DrawFunc) error {
 	return client.ServeApplication(ctx, Application{Draw: draw})
@@ -271,6 +285,7 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 	pending := false
 	var animationSequence uint32 = 1
 	var pendingAnimation uint32
+	currentCursor := CursorArrow
 	submit := func() error {
 		if size.Width <= 0 || size.Height <= 0 {
 			return nil
@@ -349,6 +364,19 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 			}
 			if incoming.typeID == messagePointerUp {
 				callback = application.PointerUp
+			}
+			if incoming.typeID == messagePointerMove && application.Cursor != nil {
+				cursor := application.Cursor(point)
+				if cursor > CursorResizeVertical {
+					return errors.New("cursor callback returned an unsupported shape")
+				}
+				if cursor != currentCursor {
+					if err := writeMessage(client.connection, messageWindowCursor,
+						encodeCursor(cursor), 0); err != nil {
+						return err
+					}
+					currentCursor = cursor
+				}
 			}
 			if callback != nil {
 				callback(point)

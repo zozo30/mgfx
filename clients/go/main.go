@@ -116,6 +116,7 @@ func main() {
 	app.PointerMove = host.PointerMove
 	app.PointerDown = host.PointerDown
 	app.PointerUp = host.PointerUp
+	app.Cursor = host.CursorAt
 	app.KeyDown = host.KeyDown
 	app.KeyUp = host.KeyUp
 	app.Animation = func(now time.Duration) {

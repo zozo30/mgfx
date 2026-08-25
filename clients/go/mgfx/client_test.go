@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math"
 	"net"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -177,5 +178,52 @@ func TestMeasureTextReturnsLogicalPixelAdvance(t *testing.T) {
 	}
 	if err := <-serverDone; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestApplicationLowersComponentCursorChanges(t *testing.T) {
+	clientConnection, serverConnection := net.Pipe()
+	client := &Client{connection: clientConnection, sequence: 1}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer serverConnection.Close()
+	done := make(chan error, 1)
+	go func() {
+		done <- client.ServeApplication(ctx, Application{
+			Draw: func(canvas *Canvas) { canvas.Clear(RGB(0, 0, 0)) },
+			Cursor: func(point Point) Cursor {
+				if point.X >= 100 {
+					return CursorPointingHand
+				}
+				return CursorArrow
+			},
+		})
+	}()
+
+	resize := make([]byte, 8)
+	binary.LittleEndian.PutUint32(resize[0:4], 200)
+	binary.LittleEndian.PutUint32(resize[4:8], 100)
+	if err := writeMessage(serverConnection, messageResize, resize, 0); err != nil {
+		t.Fatal(err)
+	}
+	if frame, err := readMessage(serverConnection); err != nil || frame.typeID != messageFrame {
+		t.Fatalf("initial frame = %#v, %v", frame, err)
+	}
+	if err := writeMessage(serverConnection, messagePointerMove, testFloats(140, 20), 0); err != nil {
+		t.Fatal(err)
+	}
+	cursor, err := readMessage(serverConnection)
+	if err != nil || cursor.typeID != messageWindowCursor ||
+		!slices.Equal(cursor.payload, []byte{byte(CursorPointingHand), 0, 0, 0}) {
+		t.Fatalf("cursor message = %#v, %v", cursor, err)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cursor application did not stop")
 	}
 }

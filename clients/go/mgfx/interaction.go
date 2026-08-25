@@ -170,6 +170,14 @@ func (host *ComponentHost) Paint(canvas *Canvas, bounds Rect, root Component) {
 func (host *ComponentHost) target(point Point) *Button {
 	return hitComponent(host.root, host.bounds, point)
 }
+
+// CursorAt maps interactive component geometry to a portable native cursor.
+func (host *ComponentHost) CursorAt(point Point) Cursor {
+	if host.target(point) != nil {
+		return CursorPointingHand
+	}
+	return CursorArrow
+}
 func (host *ComponentHost) updateHover(target *Button) {
 	if target == host.hovered {
 		return
