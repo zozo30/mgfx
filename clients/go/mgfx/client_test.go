@@ -83,3 +83,57 @@ func TestInteractiveApplicationCoalescesInputRedraws(t *testing.T) {
 		t.Fatal("application did not stop after context cancellation")
 	}
 }
+
+func TestApplicationAnimationUsesServerClock(t *testing.T) {
+	clientConnection, serverConnection := net.Pipe()
+	client := &Client{connection: clientConnection, sequence: 1}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer serverConnection.Close()
+
+	var animationNanos atomic.Int64
+	done := make(chan error, 1)
+	go func() {
+		done <- client.ServeApplication(ctx, Application{
+			Draw:      func(canvas *Canvas) { canvas.Clear(RGB(0, 0, 0)) },
+			Animation: func(now time.Duration) { animationNanos.Store(int64(now)) },
+		})
+	}()
+
+	resize := make([]byte, 8)
+	binary.LittleEndian.PutUint32(resize[0:4], 320)
+	binary.LittleEndian.PutUint32(resize[4:8], 200)
+	if err := writeMessage(serverConnection, messageResize, resize, 0); err != nil {
+		t.Fatal(err)
+	}
+	if frame, err := readMessage(serverConnection); err != nil || frame.typeID != messageFrame {
+		t.Fatalf("initial frame = %#v, %v", frame, err)
+	}
+	request, err := readMessage(serverConnection)
+	if err != nil || request.typeID != messageRequestAnimationFrame || request.sequence != 1 {
+		t.Fatalf("animation request = %#v, %v", request, err)
+	}
+
+	clock := make([]byte, 8)
+	binary.LittleEndian.PutUint64(clock, 1_234_567_890)
+	if err := writeMessage(serverConnection, messageAnimationFrame, clock, request.sequence); err != nil {
+		t.Fatal(err)
+	}
+	nextRequest, err := readMessage(serverConnection)
+	if err != nil || nextRequest.typeID != messageRequestAnimationFrame || nextRequest.sequence != 2 {
+		t.Fatalf("next animation request = %#v, %v", nextRequest, err)
+	}
+	if got := animationNanos.Load(); got != 1_234_567_890 {
+		t.Fatalf("animation time = %d, want server nanoseconds", got)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("animated application did not stop")
+	}
+}

@@ -80,6 +80,7 @@ type Application struct {
 	KeyUp       func(KeyEvent)
 	Scroll      func(ScrollEvent)
 	TextInput   func(string)
+	Animation   func(time.Duration)
 }
 
 type Client struct {
@@ -192,6 +193,8 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 	var size Size
 	var inFlight uint32
 	pending := false
+	var animationSequence uint32 = 1
+	var pendingAnimation uint32
 	submit := func() error {
 		if size.Width <= 0 || size.Height <= 0 {
 			return nil
@@ -215,6 +218,18 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 		pending = false
 		return nil
 	}
+	requestAnimation := func() error {
+		if application.Animation == nil || pendingAnimation != 0 {
+			return nil
+		}
+		sequence := animationSequence
+		if err := writeMessage(client.connection, messageRequestAnimationFrame, nil, sequence); err != nil {
+			return err
+		}
+		animationSequence++
+		pendingAnimation = sequence
+		return nil
+	}
 	for {
 		incoming, err := readMessage(client.connection)
 		if err != nil {
@@ -233,6 +248,9 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 				Height: float32(binary.LittleEndian.Uint32(incoming.payload[4:8])),
 			}
 			if err := submit(); err != nil {
+				return err
+			}
+			if err := requestAnimation(); err != nil {
 				return err
 			}
 		case messageFramePresented:
@@ -295,6 +313,20 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 			if application.TextInput != nil {
 				application.TextInput(string(incoming.payload))
 				if err := submit(); err != nil {
+					return err
+				}
+			}
+		case messageAnimationFrame:
+			if len(incoming.payload) != 8 {
+				return errors.New("invalid AnimationFrame payload")
+			}
+			if application.Animation != nil && incoming.sequence == pendingAnimation {
+				pendingAnimation = 0
+				application.Animation(time.Duration(binary.LittleEndian.Uint64(incoming.payload)))
+				if err := submit(); err != nil {
+					return err
+				}
+				if err := requestAnimation(); err != nil {
 					return err
 				}
 			}

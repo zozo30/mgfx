@@ -31,6 +31,16 @@ app.TextInput = func(text string) { value += text }
 err := app.Run(ctx)
 ```
 
+Animation uses the graphics server's native display-link clock rather than a
+client timer. Setting `Animation` opts into ticks; the package requests and
+correlates each frame automatically:
+
+```go
+app.Animation = func(now time.Duration) {
+    phase = float32(now.Seconds())
+}
+```
+
 Shapes use the same logical-pixel coordinate system. Both fill and border are
 lowered to one semantic server command:
 

@@ -16,22 +16,24 @@ const (
 type messageType uint16
 
 const (
-	messageFrame          messageType = 1
-	messageResize         messageType = 2
-	messagePointerDown    messageType = 3
-	messageClose          messageType = 4
-	messagePointerMove    messageType = 5
-	messagePointerUp      messageType = 6
-	messageKeyDown        messageType = 7
-	messageKeyUp          messageType = 8
-	messageScroll         messageType = 9
-	messageTextInput      messageType = 10
-	messageWindowTitle    messageType = 11
-	messageWindowConfig   messageType = 12
-	messageWindowState    messageType = 13
-	messageServerHello    messageType = 14
-	messageFramePresented messageType = 15
-	messageWindowCursor   messageType = 18
+	messageFrame                 messageType = 1
+	messageResize                messageType = 2
+	messagePointerDown           messageType = 3
+	messageClose                 messageType = 4
+	messagePointerMove           messageType = 5
+	messagePointerUp             messageType = 6
+	messageKeyDown               messageType = 7
+	messageKeyUp                 messageType = 8
+	messageScroll                messageType = 9
+	messageTextInput             messageType = 10
+	messageWindowTitle           messageType = 11
+	messageWindowConfig          messageType = 12
+	messageWindowState           messageType = 13
+	messageServerHello           messageType = 14
+	messageFramePresented        messageType = 15
+	messageRequestAnimationFrame messageType = 16
+	messageAnimationFrame        messageType = 17
+	messageWindowCursor          messageType = 18
 )
 
 type message struct {
