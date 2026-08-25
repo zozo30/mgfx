@@ -71,7 +71,10 @@ type ScrollEvent struct {
 // Application adds typed input callbacks to a client-owned window. When a
 // callback runs, MGFX automatically redraws with the latest application state.
 type Application struct {
-	Window      Window
+	Window Window
+	// Prepare runs after connecting but before the window opens. It is the safe
+	// place to synchronously load resources or ask the server for text metrics.
+	Prepare     func(context.Context, *Client) error
 	Draw        DrawFunc
 	PointerDown func(Point)
 	PointerMove func(Point)
@@ -86,6 +89,79 @@ type Application struct {
 type Client struct {
 	connection net.Conn
 	sequence   uint32
+}
+
+// TextMeasureStyle describes the native font used to shape a measured run.
+// LetterSpacing and the returned advance are expressed in logical pixels.
+type TextMeasureStyle struct {
+	Size          float32
+	Family        FontFamily
+	Weight        FontWeight
+	Italic        bool
+	LetterSpacing float32
+}
+
+// MeasureText asks the graphics server's native text shaper for the exact
+// horizontal advance of text. Call it from Application.Prepare, before Serve.
+func (client *Client) MeasureText(ctx context.Context, text string, style TextMeasureStyle) (float32, error) {
+	if text == "" || len(text) > 65536 || !utf8.ValidString(text) {
+		return 0, errors.New("text measurement requires 1 through 65536 valid UTF-8 bytes")
+	}
+	if style.Size <= 0 || !finite(style.Size, style.LetterSpacing) ||
+		style.Family > RoundedFont || style.Weight > SemiBold {
+		return 0, errors.New("text measurement style is outside supported bounds")
+	}
+	spacing := style.LetterSpacing / style.Size
+	if spacing < -10 || spacing > 10 {
+		return 0, errors.New("text letter spacing must be within -10 through 10 em")
+	}
+	headerSize := 4
+	if spacing != 0 {
+		headerSize = 8
+	}
+	payload := make([]byte, headerSize+len(text))
+	payload[0] = byte(style.Family)
+	payload[1] = byte(style.Weight)
+	if style.Italic {
+		payload[2] = 1
+	}
+	if spacing != 0 {
+		payload[3] = 1
+		binary.LittleEndian.PutUint32(payload[4:8], math.Float32bits(spacing))
+	}
+	copy(payload[headerSize:], text)
+	sequence := client.sequence
+	client.sequence++
+	if err := writeMessage(client.connection, messageTextMeasure, payload, sequence); err != nil {
+		return 0, err
+	}
+	stopContextDeadline := context.AfterFunc(ctx, func() { _ = client.connection.SetReadDeadline(time.Now()) })
+	defer func() {
+		stopContextDeadline()
+		_ = client.connection.SetReadDeadline(time.Time{})
+	}()
+	for {
+		incoming, err := readMessage(client.connection)
+		if err != nil {
+			if ctx.Err() != nil {
+				return 0, ctx.Err()
+			}
+			return 0, err
+		}
+		if incoming.typeID == messageServerHello || incoming.typeID == messageServerCapabilities ||
+			incoming.typeID == messageServerCapabilityWord {
+			continue
+		}
+		if incoming.typeID != messageTextMetrics || incoming.sequence != sequence || len(incoming.payload) != 4 {
+			return 0, fmt.Errorf("unexpected response while measuring native text: type=%d sequence=%d bytes=%d",
+				incoming.typeID, incoming.sequence, len(incoming.payload))
+		}
+		advance := math.Float32frombits(binary.LittleEndian.Uint32(incoming.payload))
+		if !finite(advance) || advance < 0 {
+			return 0, errors.New("server returned an invalid text advance")
+		}
+		return advance * style.Size, nil
+	}
 }
 
 func DefaultSocketPath() string { return fmt.Sprintf("/tmp/mgfx-%d.sock", os.Geteuid()) }
@@ -356,6 +432,11 @@ func (application Application) RunAt(ctx context.Context, socketPath string) err
 		return err
 	}
 	defer client.Close()
+	if application.Prepare != nil {
+		if err := application.Prepare(ctx, client); err != nil {
+			return err
+		}
+	}
 	if err := client.OpenWindow(application.Window); err != nil {
 		return err
 	}

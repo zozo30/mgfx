@@ -137,3 +137,45 @@ func TestApplicationAnimationUsesServerClock(t *testing.T) {
 		t.Fatal("animated application did not stop")
 	}
 }
+
+func TestMeasureTextReturnsLogicalPixelAdvance(t *testing.T) {
+	clientConnection, serverConnection := net.Pipe()
+	client := &Client{connection: clientConnection, sequence: 7}
+	defer clientConnection.Close()
+	defer serverConnection.Close()
+
+	serverDone := make(chan error, 1)
+	go func() {
+		request, err := readMessage(serverConnection)
+		if err != nil {
+			serverDone <- err
+			return
+		}
+		if request.typeID != messageTextMeasure || request.sequence != 7 {
+			t.Errorf("text request = %#v", request)
+		}
+		if len(request.payload) != 13 || request.payload[0] != byte(RoundedFont) ||
+			request.payload[1] != byte(SemiBold) || request.payload[2] != 1 ||
+			request.payload[3] != 1 || string(request.payload[8:]) != "MGFX!" {
+			t.Errorf("text measurement payload = %v", request.payload)
+		}
+		spacing := math.Float32frombits(binary.LittleEndian.Uint32(request.payload[4:8]))
+		if math.Abs(float64(spacing-0.05)) > 0.00001 {
+			t.Errorf("encoded letter spacing = %f", spacing)
+		}
+		serverDone <- writeMessage(serverConnection, messageTextMetrics, testFloats(2.75), 7)
+	}()
+
+	advance, err := client.MeasureText(context.Background(), "MGFX!", TextMeasureStyle{
+		Size: 20, Family: RoundedFont, Weight: SemiBold, Italic: true, LetterSpacing: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if advance != 55 {
+		t.Fatalf("advance = %f, want 55 logical pixels", advance)
+	}
+	if err := <-serverDone; err != nil {
+		t.Fatal(err)
+	}
+}

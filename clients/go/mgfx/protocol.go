@@ -34,6 +34,10 @@ const (
 	messageRequestAnimationFrame messageType = 16
 	messageAnimationFrame        messageType = 17
 	messageWindowCursor          messageType = 18
+	messageTextMeasure           messageType = 28
+	messageTextMetrics           messageType = 29
+	messageServerCapabilities    messageType = 34
+	messageServerCapabilityWord  messageType = 37
 )
 
 type message struct {
