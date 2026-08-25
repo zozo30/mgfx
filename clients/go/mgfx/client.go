@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"time"
+	"unicode/utf8"
 )
 
 type Window struct {
@@ -19,6 +21,66 @@ type Window struct {
 }
 
 type DrawFunc func(canvas *Canvas)
+
+type Point struct{ X, Y float32 }
+
+type Key uint16
+
+const (
+	KeyUnknown Key = iota
+	KeyTab
+	KeyEnter
+	KeySpace
+	KeyEscape
+	KeyArrowLeft
+	KeyArrowRight
+	KeyArrowUp
+	KeyArrowDown
+	KeyBackspace
+	KeyCopy
+	KeyCut
+	KeyPaste
+	KeySelectAll
+	KeyPageUp
+	KeyPageDown
+	KeyHome
+	KeyEnd
+	KeyDelete
+)
+
+type KeyModifiers uint16
+
+const (
+	ModifierShift KeyModifiers = 1 << iota
+	ModifierControl
+	ModifierAlt
+	ModifierCommand
+)
+
+type KeyEvent struct {
+	Key       Key
+	Modifiers KeyModifiers
+	Repeat    bool
+}
+
+type ScrollEvent struct {
+	Position       Point
+	DeltaX, DeltaY float32
+}
+
+// Application adds typed input callbacks to a client-owned window. When a
+// callback runs, MGFX automatically redraws with the latest application state.
+type Application struct {
+	Window      Window
+	Draw        DrawFunc
+	PointerDown func(Point)
+	PointerMove func(Point)
+	PointerUp   func(Point)
+	KeyDown     func(KeyEvent)
+	KeyUp       func(KeyEvent)
+	Scroll      func(ScrollEvent)
+	TextInput   func(string)
+}
 
 type Client struct {
 	connection net.Conn
@@ -87,11 +149,72 @@ func (client *Client) OpenWindow(window Window) error {
 }
 
 func (client *Client) Serve(ctx context.Context, draw DrawFunc) error {
-	if draw == nil {
+	return client.ServeApplication(ctx, Application{Draw: draw})
+}
+
+func decodePoint(payload []byte) (Point, error) {
+	if len(payload) != 8 {
+		return Point{}, errors.New("invalid pointer payload")
+	}
+	return Point{X: math.Float32frombits(binary.LittleEndian.Uint32(payload[0:4])),
+		Y: math.Float32frombits(binary.LittleEndian.Uint32(payload[4:8]))}, nil
+}
+
+func decodeKey(payload []byte) (KeyEvent, error) {
+	if len(payload) != 8 {
+		return KeyEvent{}, errors.New("invalid key payload")
+	}
+	key := Key(binary.LittleEndian.Uint16(payload[0:2]))
+	modifiers := KeyModifiers(binary.LittleEndian.Uint16(payload[2:4]))
+	if key > KeyDelete || modifiers > ModifierShift|ModifierControl|ModifierAlt|ModifierCommand {
+		return KeyEvent{}, errors.New("key payload is outside supported bounds")
+	}
+	return KeyEvent{Key: key, Modifiers: modifiers,
+		Repeat: binary.LittleEndian.Uint32(payload[4:8]) != 0}, nil
+}
+
+func decodeScroll(payload []byte) (ScrollEvent, error) {
+	if len(payload) != 16 {
+		return ScrollEvent{}, errors.New("invalid scroll payload")
+	}
+	position, _ := decodePoint(payload[0:8])
+	return ScrollEvent{Position: position,
+		DeltaX: math.Float32frombits(binary.LittleEndian.Uint32(payload[8:12])),
+		DeltaY: math.Float32frombits(binary.LittleEndian.Uint32(payload[12:16]))}, nil
+}
+
+func (client *Client) ServeApplication(ctx context.Context, application Application) error {
+	if application.Draw == nil {
 		return errors.New("draw callback is required")
 	}
 	stopContextClose := context.AfterFunc(ctx, func() { _ = client.connection.Close() })
 	defer stopContextClose()
+	var size Size
+	var inFlight uint32
+	pending := false
+	submit := func() error {
+		if size.Width <= 0 || size.Height <= 0 {
+			return nil
+		}
+		if inFlight != 0 {
+			pending = true
+			return nil
+		}
+		canvas := newCanvas(size)
+		application.Draw(canvas)
+		frame, err := canvas.finish()
+		if err != nil {
+			return err
+		}
+		sequence := client.sequence
+		if err := writeMessage(client.connection, messageFrame, frame, sequence); err != nil {
+			return err
+		}
+		client.sequence++
+		inFlight = sequence
+		pending = false
+		return nil
+	}
 	for {
 		incoming, err := readMessage(client.connection)
 		if err != nil {
@@ -105,22 +228,79 @@ func (client *Client) Serve(ctx context.Context, draw DrawFunc) error {
 			if len(incoming.payload) != 8 {
 				return errors.New("invalid Resize payload")
 			}
-			canvas := newCanvas(Size{
+			size = Size{
 				Width:  float32(binary.LittleEndian.Uint32(incoming.payload[0:4])),
 				Height: float32(binary.LittleEndian.Uint32(incoming.payload[4:8])),
-			})
-			draw(canvas)
-			frame, err := canvas.finish()
+			}
+			if err := submit(); err != nil {
+				return err
+			}
+		case messageFramePresented:
+			if incoming.sequence == inFlight {
+				inFlight = 0
+				if pending {
+					if err := submit(); err != nil {
+						return err
+					}
+				}
+			}
+		case messagePointerDown, messagePointerMove, messagePointerUp:
+			point, err := decodePoint(incoming.payload)
 			if err != nil {
 				return err
 			}
-			if err := writeMessage(client.connection, messageFrame, frame, client.sequence); err != nil {
+			callback := application.PointerDown
+			if incoming.typeID == messagePointerMove {
+				callback = application.PointerMove
+			}
+			if incoming.typeID == messagePointerUp {
+				callback = application.PointerUp
+			}
+			if callback != nil {
+				callback(point)
+				if err := submit(); err != nil {
+					return err
+				}
+			}
+		case messageKeyDown, messageKeyUp:
+			event, err := decodeKey(incoming.payload)
+			if err != nil {
 				return err
 			}
-			client.sequence++
+			callback := application.KeyDown
+			if incoming.typeID == messageKeyUp {
+				callback = application.KeyUp
+			}
+			if callback != nil {
+				callback(event)
+				if err := submit(); err != nil {
+					return err
+				}
+			}
+		case messageScroll:
+			event, err := decodeScroll(incoming.payload)
+			if err != nil {
+				return err
+			}
+			if application.Scroll != nil {
+				application.Scroll(event)
+				if err := submit(); err != nil {
+					return err
+				}
+			}
+		case messageTextInput:
+			if !utf8.Valid(incoming.payload) {
+				return errors.New("text input is not valid UTF-8")
+			}
+			if application.TextInput != nil {
+				application.TextInput(string(incoming.payload))
+				if err := submit(); err != nil {
+					return err
+				}
+			}
 		case messageClose:
 			return nil
-		case messageServerHello, messageFramePresented:
+		case messageServerHello:
 			// Transport acknowledgements remain internal to the package.
 		}
 	}
@@ -131,13 +311,21 @@ func Run(ctx context.Context, window Window, draw DrawFunc) error {
 }
 
 func RunAt(ctx context.Context, socketPath string, window Window, draw DrawFunc) error {
+	return Application{Window: window, Draw: draw}.RunAt(ctx, socketPath)
+}
+
+func (application Application) Run(ctx context.Context) error {
+	return application.RunAt(ctx, DefaultSocketPath())
+}
+
+func (application Application) RunAt(ctx context.Context, socketPath string) error {
 	client, err := Dial(ctx, socketPath)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	if err := client.OpenWindow(window); err != nil {
+	if err := client.OpenWindow(application.Window); err != nil {
 		return err
 	}
-	return client.Serve(ctx, draw)
+	return client.ServeApplication(ctx, application)
 }

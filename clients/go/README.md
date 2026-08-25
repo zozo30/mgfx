@@ -20,6 +20,17 @@ err := mgfx.Run(ctx, window, func(canvas *mgfx.Canvas) {
 `Dial`, `OpenWindow`, and `Serve` are also public for applications that need
 explicit lifecycle control. `RunAt` supports a non-default Unix socket.
 
+For interactive programs, `Application` provides typed pointer, keyboard,
+scroll, and UTF-8 text callbacks. Callback state changes are redrawn
+automatically, and frames are coalesced while Metal is presenting:
+
+```go
+app := mgfx.Application{Window: window, Draw: draw}
+app.PointerDown = func(point mgfx.Point) { selected = point }
+app.TextInput = func(text string) { value += text }
+err := app.Run(ctx)
+```
+
 Shapes use the same logical-pixel coordinate system. Both fill and border are
 lowered to one semantic server command:
 
