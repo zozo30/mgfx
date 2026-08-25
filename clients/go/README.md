@@ -17,6 +17,15 @@ err := mgfx.Run(ctx, window, func(canvas *mgfx.Canvas) {
 })
 ```
 
+Text remains server-shaped. Anchoring, baselines, pixel tracking, and decoration
+are semantic style fields rather than client-generated glyph geometry:
+
+```go
+canvas.Text("CENTERED", mgfx.TextStyle{X: bounds.X + bounds.Width/2,
+    Y: 80, Size: 24, Color: white, Anchor: mgfx.AnchorMiddle,
+    LetterSpacing: 1.2, Decoration: mgfx.Underline})
+```
+
 `Dial`, `OpenWindow`, and `Serve` are also public for applications that need
 explicit lifecycle control. `RunAt` supports a non-default Unix socket.
 

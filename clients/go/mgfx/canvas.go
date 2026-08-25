@@ -106,13 +106,40 @@ const (
 )
 
 type TextStyle struct {
-	X, Y   float32
-	Size   float32
-	Color  Color
-	Family FontFamily
-	Weight FontWeight
-	Italic bool
+	X, Y          float32
+	Size          float32
+	Color         Color
+	Family        FontFamily
+	Weight        FontWeight
+	Italic        bool
+	LetterSpacing float32
+	Decoration    TextDecoration
+	Anchor        TextAnchor
+	Baseline      TextBaseline
 }
+
+type TextDecoration uint8
+
+const (
+	NoDecoration  TextDecoration = 0
+	Underline     TextDecoration = 1
+	StrikeThrough TextDecoration = 2
+)
+
+type TextAnchor uint8
+
+const (
+	AnchorStart TextAnchor = iota
+	AnchorMiddle
+	AnchorEnd
+)
+
+type TextBaseline uint8
+
+const (
+	BaselineTop TextBaseline = iota
+	BaselineAlphabetic
+)
 
 // Canvas records one backend-neutral MGFX display list. Public coordinates are
 // logical pixels; normalization for the graphics protocol remains internal.
@@ -485,9 +512,13 @@ func (canvas *Canvas) DiagonalPattern(bounds Rect, style DiagonalPatternStyle) {
 
 func (canvas *Canvas) Text(value string, style TextStyle) {
 	text := []byte(value)
+	tracking := style.LetterSpacing / style.Size
 	if len(text) == 0 || len(text) > 65536 || style.Size <= 0 ||
 		canvas.Size.Width <= 0 || canvas.Size.Height <= 0 || !validColor(style.Color) ||
-		style.Family > RoundedFont || style.Weight > SemiBold {
+		style.Family > RoundedFont || style.Weight > SemiBold ||
+		style.Decoration > Underline|StrikeThrough || style.Anchor > AnchorEnd ||
+		style.Baseline > BaselineAlphabetic || !finite(style.X, style.Y, style.Size, tracking) ||
+		math.Abs(float64(tracking)) > 10 {
 		canvas.err = errors.New("text contains invalid content, geometry, color, or font style")
 		return
 	}
@@ -497,11 +528,23 @@ func (canvas *Canvas) Text(value string, style TextStyle) {
 			return
 		}
 	}
-	payload := make([]byte, 32+len(text))
+	extension := byte(0)
+	headerSize := 32
+	if style.LetterSpacing != 0 {
+		extension, headerSize = 1, 36
+	}
+	if style.Decoration != NoDecoration {
+		extension, headerSize = 2, 40
+	}
+	if style.Anchor != AnchorStart || style.Baseline != BaselineTop {
+		extension, headerSize = 4, 48
+	}
+	payload := make([]byte, headerSize+len(text))
 	payload[0], payload[1] = byte(style.Family), byte(style.Weight)
 	if style.Italic {
 		payload[2] = 1
 	}
+	payload[3] = extension
 	values := []float32{style.X/canvas.Size.Width*2 - 1,
 		1 - style.Y/canvas.Size.Height*2, style.Size / canvas.Size.Height * 2,
 		style.Color.Red, style.Color.Green, style.Color.Blue, style.Color.Alpha}
@@ -512,7 +555,16 @@ func (canvas *Canvas) Text(value string, style TextStyle) {
 		}
 		putFloat32(payload[4+index*4:], number)
 	}
-	copy(payload[32:], text)
+	if extension >= 1 {
+		putFloat32(payload[32:36], tracking)
+	}
+	if extension >= 2 {
+		payload[36] = byte(style.Decoration)
+	}
+	if extension == 4 {
+		payload[44], payload[45] = byte(style.Anchor), byte(style.Baseline)
+	}
+	copy(payload[headerSize:], text)
 	canvas.command(8, payload)
 }
 

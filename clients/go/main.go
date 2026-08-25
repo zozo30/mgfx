@@ -40,8 +40,10 @@ func main() {
 			Offset: patternOffset,
 		})
 		canvas.Text("Hello from Go over MGFX", mgfx.TextStyle{
-			X: 40 + textOffset, Y: canvas.Size.Height/2 - 20, Size: 34,
+			X: banner.X + (banner.Width-86)/2 + textOffset,
+			Y: canvas.Size.Height/2 - 20, Size: 34,
 			Color: mgfx.RGB(0.72, 0.94, 1), Weight: mgfx.SemiBold,
+			Anchor: mgfx.AnchorMiddle,
 		})
 		canvas.GradientArc(mgfx.Rect{X: banner.X + banner.Width - 86,
 			Y: banner.Y + 18, Width: 68, Height: 68}, mgfx.GradientArcStyle{

@@ -46,6 +46,32 @@ func TestCanvasMatchesTypeScriptProtocolEncoder(t *testing.T) {
 	}
 }
 
+func TestCanvasTextCarriesNativePlacementAndTypography(t *testing.T) {
+	canvas := newCanvas(Size{Width: 400, Height: 200})
+	canvas.Text("CENTERED", TextStyle{X: 200, Y: 100, Size: 24,
+		Color: RGB(1, 1, 1), Family: RoundedFont, Weight: Bold, Italic: true,
+		LetterSpacing: 1.2, Decoration: Underline | StrikeThrough,
+		Anchor: AnchorMiddle, Baseline: BaselineAlphabetic})
+	frame, err := canvas.finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloadSize := binary.LittleEndian.Uint32(frame[20:24])
+	if payloadSize != 48+8 {
+		t.Fatalf("extended text payload = %d bytes", payloadSize)
+	}
+	payload := frame[frameHeaderSize+commandHeaderSize:]
+	if payload[0] != byte(RoundedFont) || payload[1] != byte(Bold) || payload[2] != 1 ||
+		payload[3] != 4 || payload[36] != byte(Underline|StrikeThrough) ||
+		payload[44] != byte(AnchorMiddle) || payload[45] != byte(BaselineAlphabetic) {
+		t.Fatalf("unexpected extended text header: %v", payload[:48])
+	}
+	tracking := math.Float32frombits(binary.LittleEndian.Uint32(payload[32:36]))
+	if math.Abs(float64(tracking-0.05)) > 0.00001 {
+		t.Fatalf("tracking = %f, want 0.05 em", tracking)
+	}
+}
+
 func TestCanvasShapesUseLogicalPixelGeometry(t *testing.T) {
 	canvas := newCanvas(Size{Width: 200, Height: 100})
 	canvas.RoundedRect(Rect{X: 20, Y: 10, Width: 100, Height: 50}, ShapeStyle{
