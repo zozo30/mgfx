@@ -15,10 +15,8 @@ Create messages are idempotent for the same ID and content generation; explicit
 destroy messages permit early release. Servers enforce per-resource and
 per-connection byte limits before allocation.
 
-The React surface performs commit-level reachability for paths, meshes, and
-embedded textures. Resources absent from the new visible tree are destroyed after
-its replacement frame is submitted and removed from the upload set, so a later
-remount safely recreates the same canonical ID.
+Client runtimes may track resource reachability and destroy identities absent
+from a newly committed tree after its replacement frame is submitted.
 
 Resource uploads are separate from MGFX frames. A frame may reference only
 resources acknowledged as ready, keeping display lists small and allowing the
@@ -64,14 +62,14 @@ frame changes therefore need neither a new resource nor a new protocol opcode.
 
 ## SVG and vector paths
 
-SVG remains a frontend document format. The TypeScript or VM runtime parses it
+SVG remains a frontend document format. A client or VM runtime parses it
 and resolves document-level styles and transforms into canonical path commands.
 Those commands become connection-scoped path resources. The graphics server
 flattens curves and tessellates fills/strokes into cached geometry shared by
 Metal, Vulkan, or DirectX backends, avoiding duplicated tessellators in every
 language client without embedding a complete SVG engine in the server.
 
-React `<Svg>` implements the selective document path: a bounded parser reads the
+A frontend SVG implementation can use a bounded parser for the
 root view box, inherited fill/stroke/opacity state, nested groups, primitive
 shapes, and translate/scale/rotate/matrix transforms. Each painted primitive
 becomes a stable path resource with its own compact paint command. Linear gradients
@@ -184,8 +182,8 @@ by the geometry cache, while disconnect and `FontDestroy` release native data.
 `DrawRichText` keeps a styled line in one display-list command. Its run table
 contains compact style records and UTF-8 slices; the graphics server shapes each
 slice, advances one native pen, and batches the resulting colored glyph geometry.
-React exposes the same model through declarative `<RichText spans={...}>` and
-direct SVG `<tspan>` children. Native rich-text placement anchors the full shaped
+Frontends can expose the same model through declarative rich-text spans or SVG
+`<tspan>` children. Native rich-text placement anchors the full shaped
 advance and aligns mixed fonts on a shared alphabetic baseline. Explicit numeric
 `x` positions split an SVG label into compact native run groups; `y/dx/dy` adjust
 each restarted pen without asking the client to measure or construct glyphs.
@@ -219,19 +217,19 @@ positions and thicknesses from the selected native font and emits them with the
 cached glyph geometry, keeping decoration correct for every face and size.
 
 Clients request the exact native advance once per unique family/string through
-correlated `TextMeasure`/`TextMetrics` MGIP messages. React first lays out with a
-nonblocking estimate, caches the em-unit reply, and performs one corrected
-layout; animation frames do not repeat measurement traffic.
+correlated `TextMeasure`/`TextMetrics` MGIP messages. The Go client can request
+the em-unit reply during application preparation and convert it to logical pixels
+before the first layout.
 
-React uses native system text by default. Explicit newline boundaries are
+Clients should prefer native system text. Explicit newline boundaries can be
 measured independently and lower to one `DrawText` command per nonempty line;
 blank lines still contribute configured line-height spacing. The pixel font is
 available only through an explicit diagnostic style.
 
 Metal uses 4× MSAA when supported, so small cached outline glyphs and vector
 icons receive hardware edge coverage before source-over resolve. Typography
-still chooses drawable-pixel sizes in the frontend; the React defaults are
-calibrated for Retina rather than reusing the smaller pixel-font values.
+still chooses drawable-pixel sizes in the frontend rather than reusing smaller
+bootstrap pixel-font values.
 
 Optional automatic wrapping stays frontend-owned: the component layout engine
 greedily fits words using cached native word and space advances, then emits only
@@ -239,10 +237,8 @@ the resulting lines. Start, center, and end alignment use those same widths, so
 the graphics server remains a display-list executor rather than a UI layout
 engine.
 
-Font weight is part of both draw and measurement cache identity. React uses
-bold native faces for titles, section labels, dialog headings, and buttons while
-body text remains regular; measurement therefore always matches the geometry
-that is eventually drawn.
+Font weight is part of both draw and measurement cache identity, so measurement
+always matches the geometry that is eventually drawn.
 
 Editable text reuses the same measurement path: a focused field shapes the runs
 around a visible caret and highlighted selection. Captured pointer movement is
@@ -251,9 +247,8 @@ advances map horizontal positions to Unicode code-point indices. Selection and
 editing stay in the component system while the graphics server remains
 responsible only for shaping and draw execution. Keyboard modifiers survive
 focused dispatch, enabling Shift+arrow range extension and semantic Select All.
-React exposes the correlated native animation clock through context. A focused
-text field subscribes for caret blinking and cancels immediately on blur, so
-reusable components share display cadence without owning timers.
+The correlated native animation clock lets reusable components share display
+cadence without owning timers.
 
 ## Transform stack
 

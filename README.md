@@ -1,589 +1,147 @@
-# MGFX Local Graphics Server
+# MGFX
 
-A local graphics server built around a versioned, backend-neutral binary command
-protocol. A separate client owns the component tree, layout, and window
-lifecycle, while the long-running server supplies the AppKit/Metal host.
-
-## Architecture
+MGFX is an experimental local graphics server with a versioned, backend-neutral
+binary protocol. Applications own their window lifecycle, state, layout, and
+components; the long-running native process owns AppKit, Metal, GPU resources,
+text shaping, and presentation.
 
 ```text
-MGFXDemo / future TypeScript or VM client
-                  |
-                  | MGIP framed messages over a local Unix socket
-                  v
-             MGFXServer
-                  |
-                  +-> Metal backend -> GPU
-                  +-> Vulkan backend (future)
-                  +-> DirectX backend (future)
+Go / C++ / future VM client
+            │
+            │ MGIP over a per-user Unix socket
+            ▼
+      MGFX graphics server
+            │
+            ├── Metal (implemented)
+            ├── Vulkan (future)
+            └── DirectX (future)
 ```
 
-The wire format starts with the bytes `MGFX`, a protocol version, total size, and
-command count. Every command has an opcode and payload byte count, so a decoder
-can validate bounds and skip future opcodes it does not understand. Integer and
-floating-point fields are encoded explicitly in little-endian order; the format
-does not serialize compiler-dependent C++ struct layouts.
-
-Version 1 contains `clear`, `draw`, `pushClip`, `popClip`, and `endFrame` commands. See
-`src/GraphicsProtocol.hpp` for the frontend API and `src/Renderer.cpp` for the
-first backend implementation.
-
-The display list now also contains `drawImage`. Clients upload validated RGBA8
-pixels once as a connection-scoped MGIP texture resource; frames reference its
-ID, UV rectangle, destination, and tint. The Metal backend retains the native
-texture and uses a separate sampled-image pipeline, providing the base for real
-PNG/JPEG decoders, SVG raster fallback, and font glyph atlases.
-
-Rounded pictures use the compatible `DrawImageSurface` extension. It adds a
-pixel-space corner radius and portable linear/nearest sampling choice; Metal masks
-the sampled texture with an antialiased rounded SDF, so cards and avatars need no
-client-generated clipping geometry.
-
-`DrawTiledImageSurface` repeats the same persistent texture independently on X
-and Y. Tile size and phase remain frontend layout values, while Metal samples the
-entire rounded area in one draw, making image and rasterized-SVG patterns cheap to animate.
-
-`DrawNineSliceImage` keeps four textured corners and border thicknesses stable
-while stretching only the center regions. Scalable panels therefore remain one
-fixed display-list command and one Metal draw instead of nine client quads.
-
-`DrawFilteredImageSurface` adds saturation, contrast, brightness, hue rotation, and
-bounded native blur to the same rounded/tiled image shader. Animated treatment changes five floats in
-one fixed display-list command; the persistent source texture is never decoded or
-uploaded again.
-
-Ordinary images can select a pixel-space source rectangle from an uploaded
-atlas. Fill/contain/cover and edge alignment operate on that frame, so sprite
-animation changes only four UV values in the existing image command.
-
-The React client includes bounded PNG, JPEG, and SVG decoders. Raster files are converted to
-premultiplied RGBA8, uploaded once, and displayed with `fill`, `contain`, or
-`cover` geometry computed by the backend-neutral UI runtime.
-SVG currently uses a client-side high-quality raster fallback, including vector
-paths, gradients, masks, transforms, and system-font text; Metal still receives
-only the same portable texture resource and `DrawImage` command.
-
-React also exposes a selective vector `<Svg>` path for complete inline documents.
-It lowers paths, lines, polylines, polygons, rectangles, circles, and ellipses;
-inherits fill/stroke presentation attributes through nested groups; applies affine
-group transforms in source coordinates; resolves two- through eight-stop `<linearGradient>` definitions,
-including local `href`/`xlink:href` inheritance and `pad`, `repeat`, or `reflect`
-spread, in user space or object-bounding-box space; resolves centered two- through
-eight-stop `<radialGradient>` fills with `pad`, `repeat`, or `reflect` spread into
-native elliptical path paint, including local definition inheritance and offset
-`fx`/`fy` focal points;
-nonzero `fr` focal circles use the same native fragment path;
-lowers SVG dash arrays of up to 32 values;
-and uploads every canonical layer once.
-Local SVG `<use>` instances and `<symbol>` definitions are resolved by the
-frontend into independently transformed path instances; external, missing, and
-cyclic references remain rejected. Symbol `viewBox` coordinates map into numeric
-instance `width` and `height` using aligned `meet`, clipped `slice`, or
-`preserveAspectRatio="none"` behavior.
-Local axis-aligned `<clipPath>` definitions containing one numeric, user-space
-`<rect>` also lower to the same balanced clip stack; nested clips are intersected.
-Bounded internal `<style>` sheets support simple tag, class, ID, and compound
-selectors for native paint, opacity, stroke geometry, transforms, visibility,
-gradient stops, and local clip references. Presentation attributes, selector
-specificity/source order, and inline styles follow their normal cascade order;
-at-rules, descendant selectors, `!important`, and unsupported properties are rejected.
-Plain SVG `<text>` elements lower to compact server-shaped `DrawText` commands
-with inherited/CSS font family, size, weight, style, tracking, solid fill,
-`text-anchor`, entities, opacity, affine transforms, and rectangular clipping.
-CoreText applies the alphabetic baseline from its native ascent metric; clients
-never generate glyph triangles. SVG rotation, skew, and nonuniform scale conjugate
-into the normalized display-list transform stack around the text command. Direct
-`<tspan>` children with independent solid color, family, size, weight, style, and tracking
-lower to anchored `DrawRichText` run lists. A span with an explicit numeric `x`
-can restart the native pen and apply `y/dx/dy`, covering multiline SVG labels
-without client glyph metrics. Nested spans inherit styles normally, and underline
-or line-through decorations use native font positions and thicknesses. Plain text
-also supports a solid native outline: CoreText supplies the glyph contours and the
-server tessellates the SVG stroke width once, advertised as `styledNativeText`.
-Individual `<tspan>` runs can independently select solid fill, outline color, and
-outline width through `styledRichTextRuns`; even stroke-only runs remain compact
-UTF-8 plus semantic font data. Numeric, percentage, `super`, and `sub` baseline shifts
-remain semantic run metrics. Plain SVG text also lowers 2–8 stop
-`userSpaceOnUse` linear gradients to `DrawGradientText`; gradient coordinates,
-stops, spread mode, and UTF-8 cross the socket while CoreText still owns all glyph
-geometry. Default SVG object-bounding-box gradients are resolved against the actual
-server-shaped contour bounds rather than guessed client text metrics.
-Metal evaluates stop selection and repeat/reflect mapping per fragment, so a glyph
-triangle crossing a stop boundary cannot smear colors across that boundary.
-Plain text also supports native radial SVG paint with affine axes, focal point and
-focal radius, multi-stop spread, and either user-space or server-shaped bounds.
-Embedded SVG `<image>` elements accept bounded base64 PNG, JPEG, and nested SVG
-data URLs. Nested SVG artwork is safely rasterized without external resources. Pixels
-decode and upload once as canonical persistent textures; frames retain only
-`DrawImage` references with SVG placement, transform, opacity, clipping,
-all nine `preserveAspectRatio` alignments for meet/slice (plus `none`), and
-`image-rendering` sampling.
-Frames then contain only resource references at the component's current layout
-size. Documents using more complex gradients or non-rectangular masks
-continue through the bounded raster fallback instead of partially misrendering.
-
-React can also submit indexed normalized `Mesh` geometry directly. Positions,
-per-vertex colors, and indices upload once as a connection-scoped mesh resource;
-frames carry only `DrawMesh`, its destination, and source view box. The server
-caches expanded triangle geometry and applies layout, transforms, and opacity.
-`Mesh` remains the explicit low-level escape hatch for application-owned geometry.
-
-The React `Path` component now directly accepts SVG path data. Relative and
-absolute commands are normalized, arcs and quadratic segments become cubics,
-TypeScript sends those backend-neutral `move`, `line`, `cubic`, and `close`
-commands once as a persistent MGIP path resource. Frame display lists reference
-the resource with `DrawPath`, destination, paint, fill rule, tolerance, and
-stroke parameters; they contain no generated path vertices.
-
-The graphics server owns adaptive curve flattening and tessellation. Its cache
-is keyed independently from destination and paint, so animated colors and
-layout changes reuse geometry. Compound paths support SVG `evenodd` and
-`nonzero` fill rules, while strokes support configurable width, butt, round, or
-square caps, and bevel, round, or miter joins. Miters default to a safety limit
-of four stroke half-widths, accept an explicit SVG `stroke-miterlimit`, and fall
-back to bevels beyond the limit. `DrawPath` also supports source-space linear
-gradient fills: the server derives colors from cached source geometry and clips
-triangles at intermediate stop boundaries for exact piecewise interpolation.
-Centered radial fills likewise remain paint-only: the command carries a center,
-two source-space radius vectors, and up to eight ordered colors, while Metal
-evaluates the elliptical falloff per fragment over the server-owned path mesh.
-The same radial paint can target cached stroke geometry; independently painted
-radial fill and stroke lower to two small draws sharing one path resource.
-Dash arrays, phase, joins, caps, and custom miter limits remain server-owned when
-that stroke uses radial paint.
-Arbitrary cached paths also accept two- through eight-stop conic fill or stroke
-paint. Their source-space center and rotation are fragment parameters, so a
-rotating angular gradient never re-uploads or retessellates its path.
-Persistent RGBA textures can likewise paint cached path fills or strokes. Metal
-maps source-space tile coordinates to a UV crop with optional X/Y repetition,
-tint, and nearest or linear sampling, giving images and rasterized SVG assets
-true vector clipping without client-generated mask geometry.
-The same gradient paint is available for strokes, so changing gradient colors
-does not invalidate tessellation. Two-value dashed strokes use the compact
-`DrawDashedPath` extension, while longer rhythms use `DrawDashArrayPath`: dash
-splitting, curve flattening, joins, and caps all remain server-owned and cached.
-The demo loads several icons from the
-ISC-licensed `lucide-static` package through this path pipeline.
-
-All colored geometry uses source-over alpha compositing. Straight-alpha MGFX
-vertex colors are premultiplied in the vertex shader before interpolation, then
-blended with `one` / `one-minus-source-alpha`; translucent paths, gradients,
-meshes, text, circles, and patterns therefore compose consistently with
-premultiplied uploaded images.
-The client loader converts SVG paths, lines, polylines, polygons, rectangles, circles,
-and ellipses into a common path stream, so the gallery is not restricted to
-path-only icons.
-
-The local process protocol uses `MGIP` framing and a per-user Unix-domain socket
-at `/tmp/mgfx-<uid>.sock`. It carries MGFX frames from client to server and sends
-resize, pointer-down, and close events back to the client. Payloads are capped at
-64 MiB, the socket is mode `0600`, and the server accepts only peers with the same
-effective user ID. No TCP listener exists.
-
-Window metadata remains native but is client-controlled. A connected client can
-send a bounded UTF-8 `WindowTitle` message; the server applies it to its AppKit
-window on the main thread.
-
-The server starts headless and keeps listening without a client. `WindowConfig`
-is the create/show request: the first one creates the native surface and later
-clients reconfigure and reuse it. When a client disconnects, its window is
-hidden but the server, Metal device, renderer, shaders, and Unix listener stay
-alive for the next build.
-
-Each connection begins with `ServerHello`, which identifies the MGIP version,
-active graphics backend, and feature bits. Frontends can therefore target
-capabilities rather than Metal, Vulkan, or DirectX by name. The first positive
-`Resize` is also the acknowledgement that the requested drawable is ready.
-
-React tracks the persistent path, mesh, and embedded-texture identities reachable
-from each committed tree. When the last component disappears it sends the existing
-resource-destroy message; remounting the canonical identity uploads it again. Empty
-trees also submit a clear frame, preventing stale pixels and route-driven GPU leaks.
-
-The original 32-bit `ServerHello` remains byte-for-byte stable and is followed
-by an optional `ServerCapabilities` message carrying the complete 64-bit mask.
-Legacy clients safely ignore that companion; current clients gain bits 32–63
-without spending protocol version 2 merely to add feature space.
-
-Frames use the MGIP sequence field for presentation pacing. The server sends
-`FramePresented` after Metal completes the submitted command buffer. TypeScript
-and React keep one frame in flight and collapse a burst of pending commits to its
-newest frame, preventing animation or input bursts from building an unbounded
-render queue.
-
-MGIP also provides a one-shot `RequestAnimationFrame`/`AnimationFrame` clock.
-The timestamp comes from the native display loop, so React hooks and future VM
-programs can animate without platform APIs or free-running JavaScript timers.
-
-Cursor shape is client-owned as well. React buttons and text fields lower their
-hover state to portable pointing-hand and I-beam requests, which the macOS host
-maps to real AppKit cursors while keeping `NSCursor` out of the frontend API.
-
-Text clipboard access follows the same boundary. React's Copy and Paste buttons
-call an asynchronous MGIP service; only the native host touches `NSPasteboard`.
-The same service backs semantic Copy, Cut, and Paste key events, mapped from
-Command-C/X/V by macOS without exposing platform modifier conventions to widgets.
-
-Clients may also request initial content dimensions and minimum resize limits in
-logical host units. The server validates the request before applying it, while
-drawable-pixel resize events continue to drive client layout.
-
-The language-neutral framing and event payloads are specified in
-[`docs/LOCAL_PROTOCOL.md`](docs/LOCAL_PROTOCOL.md), so future TypeScript and VM
-clients do not need to reproduce C++ object layouts.
-
-The staged portable design for textures, images, SVG meshes, shaped glyph runs,
-and font atlases is documented in
-[`docs/GRAPHICS_RESOURCES.md`](docs/GRAPHICS_RESOURCES.md).
-
-The TypeScript client also has its own retained component and layout runtime in
-`clients/ts/src/ui.ts`. This demonstrates that component state, measurement,
-layout, and interaction can live entirely in another language while the native
-process remains only a window, event, and graphics server.
-
-The layout tree supports stable numeric `zIndex` ordering and absolute `inset`
-positioning without changing flow measurement. Painting follows ascending
-depth, hit testing follows the exact reverse, and a `modal` layer isolates
-pointer, scroll, and keyboard focus from every lower route.
-
-MGIP carries pointer move, down, and up as separate events. The TypeScript host
-retains hover and pressed state and activates a component only when release lands
-inside the component that originally received the press. A pressed component
-captures subsequent movement and receives element-local coordinates, enabling
-drag selection and other gestures without exposing window-space layout details.
-
-Keyboard events use backend-neutral logical keys. Clickable TypeScript elements
-participate in Tab/Shift-Tab focus traversal and activate with Enter or Space;
-focus and keyboard-pressed state use the same retained component identity as
-pointer interaction. Modifier bits remain attached during focused dispatch, so
-components can implement Shift selection and platform semantic shortcuts.
-
-Printable input travels as a separate validated UTF-8 event and is routed only
-to the focused TypeScript node. The demo includes an editable field with a
-placeholder, focus styling, Unicode-safe Backspace, and a bounded value length.
-
-## Components and layout
-
-Component styles support nested affine translation, scale, rotation, and
-fractional transform origins. The retained tree emits balanced transform-stack
-records; the graphics server applies them uniformly to triangles, textures,
-cached paths, native text, and clip bounds. Hit testing applies the matching
-inverse transform, so animated controls remain interactive at their drawn
-position.
-
-An inherited `opacity` style lowers to a separate balanced stack. Nested values
-multiply on the server and tint every drawable category while leaving cached
-geometry and uploaded resources unchanged.
-
-Soft rounded shadows are also server primitives. A component sends its rectangle,
-corner radius, blur, spread, offset, and color once per frame; Metal evaluates a
-signed-distance field in the fragment shader instead of receiving many translucent
-client triangles. Shadows compose with transform and opacity stacks.
-
-Radial backgrounds follow the same model: one command carries focal position,
-pixel radius, rounded-corner mask, and inner/outer colors. Metal evaluates the
-falloff per fragment, so React and future VM clients never generate gradient fans.
-
-Two-stop linear backgrounds are server primitives as well. One fixed record carries
-the destination, horizontal/vertical/diagonal direction, rounded-corner radius, and
-colors. Metal interpolates and masks the fill per fragment, replacing client-colored
-rectangle and rounded-rectangle meshes.
-
-Three-stop conic backgrounds use `DrawConicGradient`. Center, rotation, rounded
-mask, and start/middle/end colors are evaluated per fragment. The demo's rotating
-title-bar badge therefore animates one angle value without textures or gradient fans.
-
-Solid boxes and borders now use one `DrawRoundedRect` record backed by an
-antialiased rounded-box SDF. This replaces the old 32-segment client fan/ring,
-shrinks animated frames, and eliminates polygon seam and one-pixel border overlap.
-
-Solid `Circle` components use the equivalent `DrawCircle` SDF command, combining
-fill and ring in one antialiased quad. Dot grids therefore send six vertices per
-dot internally on Metal instead of separate 32-segment client meshes.
-
-Animated diagonal fills now use one constant-size `DrawDiagonalPattern` record.
-Stripe width, gap, phase, direction, and color are evaluated per fragment, so
-large patterned areas no longer expand the Unix-socket frame with stripe quads.
-
-Filled/ring dot grids similarly use one `DrawDotGrid` record containing dimensions,
-a 32-bit fill mask, optional active cell, geometry, and colors. Metal evaluates every
-antialiased dot from the destination rectangle; the animated 4×4 title icon therefore
-replaces sixteen React circle nodes and sixteen per-frame draw commands.
-
-Technical background grids use one `DrawGridPattern` record. Minor spacing and
-width, stronger periodic major lines, two colors, rounded masking, and animated
-pixel offsets are evaluated per fragment. The dashboard now moves an effectively
-unbounded drafting grid while sending only one fixed-size command per frame.
-
-The animated wave row is one `DrawWaveDots` command rather than 24 reconciled circle
-components. Count, phase, frequency, radius range, border, and trough/crest gradients
-remain backend-neutral inputs; Metal derives every dot's size and paint per fragment.
-
-`src/UI.hpp` provides keyed component elements plus `Box`, `Row`, `Column`, and
-`Stack` primitives. `ComponentHost` reconciles a component description into a
-retained layout tree, measures it with min/max constraints, assigns final bounds,
-and paints visible boxes into the MGFX stream. Layout is backend-independent;
-Metal only receives positioned triangles.
-
-Containers may enable hierarchical clipping. The MGFX display list carries a
-normalized nested clip stack; Metal maps it to intersected scissor rectangles,
-leaving equivalent Vulkan and DirectX implementations straightforward.
-
-Boxes support `borderWidth` and `borderColor`. `Circle` elements support a fill,
-a border ring, or both, lowered to the backend-neutral `DrawCircle` server primitive.
-The TypeScript demo header uses these primitives for a framed 4×4 dot-grid icon.
-
-Boxes also accept `cornerRadius`. Solid fills and borders lower to one
-`DrawRoundedRect` command, with radii and border widths clamped to legal geometry.
-Cards, list rows, panels, and fields demonstrate it.
-
-TypeScript styles also accept horizontal, vertical, or diagonal linear gradients.
-Rectangle and rounded-rectangle backgrounds lower to a constant-size
-`DrawLinearGradient` command. Circle gradients use the corresponding
-`DrawLinearGradientCircle` server primitive and an antialiased radial mask, so
-they no longer generate a 32-segment client triangle fan. The React demo combines
-these fills with native-clock-driven badges and wave patterns.
-
-Rectangular areas can additionally use an animated diagonal stripe pattern with
-configurable color, stripe width, gap, direction, and phase offset. One
-`DrawDiagonalPattern` command drives the Metal fragment shader regardless of area.
-
-The TypeScript runtime builds on clipping with nested vertical scroll views.
-Wheel and trackpad events carry the pointer position plus normalized deltas, so
-the deepest scroll container under the pointer handles the event.
-
-Rows and columns support per-child `flexGrow`, configurable gaps,
-`MainAxisAlignment` (`start`, `center`, `end`, `spaceBetween`), and
-`CrossAxisAlignment` (`start`, `center`, `end`, `stretch`).
-
-Boxes can carry keyed click handlers. `ComponentHost::pointerDown()` performs
-reverse-order hit testing, invokes the topmost handler, and lets component state
-drive a keyed rebuild. The demo cards brighten when selected.
-
-Stateful components call the protected `Component::invalidate()` method after a
-state change. The host records the invalidation and reconciles once at the start
-of the next layout pass, so an event handler never mutates the retained tree while
-hit testing is in progress.
-
-React `Text` now defaults to native `system` rendering; `fontFamily: "pixel"`
-keeps the built-in 5x7 font available only as a diagnostic/bootstrap mode.
-`monospace`, `serif`, and `rounded` select portable native designs. Native modes emit one compact
-UTF-8 `DrawText` command per visible line. Explicit newlines and configurable
-line height participate in intrinsic measurement. `wrap: true` performs greedy
-word wrapping against layout constraints with exact cached word/space advances,
-and `textAlign` supports start, center, or end placement. The
-macOS server shapes Unicode with CoreText and caches vector glyph outlines;
-future Vulkan and DirectX hosts can execute the same display-list command using
-their platform text service. The component runtime asynchronously requests and
-caches exact native advances, then performs one corrected layout without
-blocking frames on the Unix socket. Uploaded font resources and multiline rich
-text runs use the same native shaping and cache pipeline.
-
-The text opcode also carries optional start/middle/end anchoring and top/alphabetic
-baseline placement. The backend applies shaped advance and ascent, allowing SVG
-text to retain native baseline semantics without client-side font approximations.
-
-The native Metal host selects 4× multisample antialiasing when the device
-supports it, smoothing glyph outlines, vector paths, circles, and mesh edges in
-one backend-level quality setting. React typography uses Retina-appropriate
-drawable sizes (22 px body text and 32 px titles in the demo) rather than the
-too-small bootstrap values.
-
-`fontWeight` supports regular, medium, semibold, and bold native faces end to
-end, while `fontStyle` selects regular or italic shaping. Both attributes are
-encoded in `DrawText`, included in asynchronous measurement requests, and used
-as part of server/client cache keys, so styled UI hierarchy does not compromise
-layout accuracy. Servers advertise this extension with the
-`typographyStyles` capability bit.
-
-`letterSpacing` is expressed in logical pixels at the component layer and
-normalized to em units on the wire. CoreText applies the tracking while shaping;
-the same value participates in exact measurement and both client/server cache
-keys. Zero spacing retains the original compact text payload for compatibility.
-
-`textDecoration` supports underline, line-through, or both. The wire command
-contains only decoration flags; the graphics server derives placement and
-thickness from native font metrics and adds the lines to cached text geometry.
-This is advertised independently through the `textDecorations` capability bit.
-
-Portable `fontFamily` choices now include `system`, `monospace`, `serif`, and
-`rounded`. These are semantic families rather than font-file names: CoreText
-maps them to the current macOS system designs, while future backends can choose
-their native equivalents. Servers advertise the expanded family set with
-`portableFontFamilies`.
-
-Custom fonts are persistent connection-scoped resources. `FontCreate` uploads
-at most 16 MiB once, and subsequent draw and metric requests carry only its
-nonzero ID. CoreText validates and shapes the font server-side; the client never
-converts glyphs to geometry. Resource versions prevent stale cached outlines
-after replacement, and fonts are released on destroy or disconnect.
-
-Textures, paths, meshes, and fonts now produce a common `ResourceStatus` event.
-Ready is emitted only after the resource reaches Metal, the renderer cache, or
-CoreText; rejection reports native allocation or validation failure. Pending
-uploads carry their connection generation so hot-reload completions cannot cross
-into the replacement program.
-
-React `<RichText>` accepts declarative spans with independent color, family,
-weight, italic, tracking, decoration, and custom font ID. The client lowers the
-whole visible line to one `DrawRichText` command; Metal-side CoreText shaping
-advances the pen between runs and batches their colored glyph geometry. Explicit
-newlines plus optional word wrapping, line height, and start/center/end alignment
-share the native metric cache with plain text. Each resulting line remains one
-compact command, and exact per-run measurements feed retained layout asynchronously.
-Server-shaped fill and outline geometry lives in a bounded LRU: at most 512 text
-identities and roughly two million tessellated points are retained. Hit, miss,
-point, and eviction counters belong to the cache policy; trimming occurs at frame
-boundaries so rich-text references remain stable during encoding.
-Below that string cache, a second native glyph-geometry atlas reuses CoreText glyph
-outlines across unrelated labels. It is keyed by resolved font face, uploaded-font
-generation, glyph ID, and outline width, and is bounded to 4096 entries or roughly
-one million points. This keeps vector/MSAA text, gradients, and outlines intact while
-avoiding repeated curve extraction and tessellation for common characters.
-Persistent connection resources are transactionally budgeted as well: 256 textures
-and 256 MiB of RGBA pixels, 4096 paths and one million canonical segments, 1024
-meshes and four million expanded vertices, plus 32 fonts and 64 MiB of font bytes.
-Rejected uploads emit the normal resource-status event and preserve any previous
-resource with the same ID; destroy, replacement, and disconnect release accounting.
-Servers also emit compact resource-trace events for creates, rejects, and explicit
-destroys. TypeScript clients can inspect live count/cost against each quota without
-polling or coupling application code to Metal.
-
-The Metal renderer keeps immutable CPU backing for persistent resources. A failed
-command buffer schedules a main-thread renderer rebuild: pipelines and native
-textures are recreated, derived path/text caches are discarded, canonical paths
-and meshes are retained, and the latest display list is submitted again. The client
-connection and native window remain alive and no upload replay is required. For a
-local recovery drill, send `SIGUSR1` to the server process; its log reports the
-number of textures, paths, and meshes restored.
-
-## Requirements
-
-- macOS
-- Xcode or the Xcode command-line tools
-- CMake 3.24 or newer
-
-## Build and run
+There is no TCP transport. The server listens on `/tmp/mgfx-<uid>.sock`, checks
+the peer user ID, and keeps running while clients are rebuilt or replaced. It
+starts headless; connecting clients create and configure their own window.
+
+## Why
+
+MGFX explores a small graphics boundary that can support native applications,
+custom VMs, and other languages without embedding a browser runtime. Clients
+send semantic display-list commands rather than Metal-specific objects or
+client-generated glyph and curve triangles.
+
+The protocol is explicitly little-endian, length-delimited, and independent of
+C++ structure layout. Unknown commands can be skipped, payloads are bounded,
+and capabilities are negotiated at connection time.
+
+## Current features
+
+- Client-owned window title, size, resize limits, cursor, chrome, and state
+- Pointer, keyboard, scroll, UTF-8 text input, clipboard, and close events
+- Presentation-paced frames and a native display-link animation clock
+- Clip, opacity, and affine-transform stacks
+- Rounded rectangles, circles, arcs, shadows, gradients, grids, waves, and
+  animated diagonal patterns
+- Persistent textures, vector paths, meshes, and font resources
+- Server-side path flattening, tessellation, dashes, joins, and gradient paints
+- Native CoreText shaping, exact text measurement, rich text, and decorations
+- Connection-scoped resource budgets, status events, and recovery caches
+
+Metal is the first backend. The command and process protocols intentionally do
+not expose Metal so another host can implement the same semantics later.
+
+## Repository layout
+
+```text
+src/                 C++ protocol, UI runtime, server, and Metal renderer
+shaders/             Metal shaders
+clients/go/          Dependency-free Go API and animated component demo
+tests/               C++ protocol, layout, IPC, path, and text tests
+docs/LOCAL_PROTOCOL.md
+docs/GRAPHICS_RESOURCES.md
+```
+
+## Build the server
+
+Requirements: macOS 13+, Xcode command-line tools, CMake 3.24+, and Go for the
+Go client.
 
 ```sh
 cmake --preset clangd
 cmake --build --preset clangd
+ctest --preset clangd
 ```
 
-Start the native graphics server:
+Start the persistent native server:
 
 ```sh
 open build-clangd/MGFXServer.app
 ```
 
-It intentionally opens no window by itself. Leave it running while rebuilding
-or restarting clients.
+It opens no window until a client sends `WindowConfig`.
 
-Then start the separate UI client from another terminal:
+## Run a client
+
+The C++ demo:
 
 ```sh
 ./build-clangd/MGFXDemo
 ```
 
-Or exercise the same server from the standalone Node.js/TypeScript client:
-
-```sh
-cd clients/ts
-npm install
-npm test
-npm start
-```
-
-The custom React client uses hooks and JSX without React DOM:
-
-```sh
-cd clients/react
-npm install
-npm test
-npm start
-```
-
-A dependency-free Go client exercises the raw binary protocol with a basic
-client-owned window and one server-rendered text command:
+The dependency-free Go demo:
 
 ```sh
 cd clients/go
-go test ./...
+go test -race ./...
 go run .
 ```
 
-Its host elements (`mgfx-row`, `mgfx-column`, `mgfx-box`, `mgfx-circle`,
-`mgfx-text`, and others) lower into the same layout tree and MGFX binary frames.
-The experimental reconciler dependency is version-pinned and isolated inside
-`clients/react/src/renderer.ts`.
+The Go package hides MGIP framing, socket parsing, normalized coordinates,
+window events, frame coalescing, and animation correlation:
 
-The React package also provides higher-level typed layout, shape, `Button`, and
-controlled `TextField` components, so normal application code rarely needs to
-use the renderer's intrinsic `mgfx-*` elements directly.
+```go
+app := mgfx.Application{
+    Window: mgfx.Window{
+        Title: "Hello MGFX", Width: 720, Height: 320,
+        MinimumWidth: 480, MinimumHeight: 220, Resizable: true,
+    },
+    Draw: func(canvas *mgfx.Canvas) {
+        canvas.Clear(mgfx.RGB(0.02, 0.03, 0.06))
+        canvas.Text("Hello from Go", mgfx.TextStyle{
+            X: 40, Y: 80, Size: 32,
+            Color: mgfx.RGB(0.7, 0.95, 1), Weight: mgfx.SemiBold,
+        })
+    },
+}
+err := app.Run(ctx)
+```
 
-Focused text fields render a measured caret between independently shaped text
-runs. Clicking positions the insertion point; dragging creates a highlighted
-Unicode code-point range. Left/right arrows collapse or move the selection, and
-text input, Backspace, Cut, Copy, and Paste operate on that range.
-Shift+Left/Right extends the range and Command+A selects the complete value.
-The caret blinks from the server's native display-link clock and restarts its
-visible phase after pointer, keyboard, or text-editing activity; unfocused
-fields do not request animation frames.
+It also provides exact native text measurement, fixed/flexible stack layout,
+measured labels and panels, alignment, animation offsets, recursive hit-testing,
+and stateful buttons. See [`clients/go/README.md`](clients/go/README.md) for the
+API tour.
 
-Native title, initial size, and minimum size are declarative through the React
-`Window` component; its layout effect emits MGIP metadata independently from the
-graphics frame.
+## Protocol documentation
 
-`Window` can request `chrome="overlay"` with a draggable title height. The
-surface then extends beneath a transparent native title bar, allowing React to
-draw Brave-style chrome while AppKit keeps ownership of traffic-light controls
-and native window dragging.
-The server reports the measured trailing edge of the real window controls, so
-React derives its title padding from AppKit instead of assuming a macOS button
-size or display scale.
-
-`Window` also controls resizability and `normal`, `maximized`, or `fullscreen`
-mode. The server maps those semantic states onto the native host window rather
-than exposing AppKit-specific actions to clients.
-
-Closing a client-owned window sends a close event to that client. The window is
-hidden when the client exits, while the server and Unix socket remain available.
-Clicking cards sends pointer coordinates to the client, which rebuilds the
-component tree and submits a new MGFX frame.
+- [`docs/LOCAL_PROTOCOL.md`](docs/LOCAL_PROTOCOL.md) specifies MGIP framing,
+  messages, validation, lifecycle, and capability negotiation.
+- [`docs/GRAPHICS_RESOURCES.md`](docs/GRAPHICS_RESOURCES.md) describes textures,
+  paths, meshes, native text, and resource ownership.
+- [`src/GraphicsProtocol.hpp`](src/GraphicsProtocol.hpp) defines the portable
+  display-list command API.
 
 ## Nova / clangd
 
-Generate the compilation database used by `.clangd` before opening the folder in
-Nova:
+The `clangd` preset generates `build-clangd/compile_commands.json` and the root
+link used by Nova and other clangd editors:
 
 ```sh
 cmake --preset clangd
 cmake --build --preset clangd
 ```
 
-Nova's clangd-based C++ extension will then read the root-level
-`compile_commands.json` link to `build-clangd/compile_commands.json`. Nova probes
-the project root by default, while `.clangd` points command-line clangd directly
-at the build directory. This gives both clients the correct C++17,
-Objective-C++, macOS SDK, framework, source, and fetched metal-cpp header paths,
-so completion and type navigation work across both the C++ renderer and the
-AppKit bridge. Re-run the configure command after adding source files or changing
-CMake settings.
+Reconfigure after adding source files or changing build options.
 
-Run all protocol, UI, and local IPC tests with:
+## Status
 
-```sh
-ctest --preset clangd
-```
-
-CMake downloads Apple's official header-only `metal-cpp` repository at a pinned
-revision. To build offline, provide an existing checkout:
-
-```sh
-cmake -S . -B build -DMETAL_CPP_DIR=/path/to/metal-cpp
-```
-
-When Xcode's optional Metal Toolchain is installed, the shader in
-`shaders/Triangle.metal` is compiled into `default.metallib` at build time and
-bundled with the server. CMake falls back to bundling the source and compiling it
-at runtime when that component is unavailable.
+MGFX is experimental. Protocol version 1 is actively evolving and Metal is the
+only renderer today. The project is useful for exploring a compact native UI and
+graphics boundary, but it is not yet a production compatibility promise.

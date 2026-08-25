@@ -24,7 +24,7 @@ func TestMGIPMessageRoundTrip(t *testing.T) {
 	}
 }
 
-func TestCanvasMatchesTypeScriptProtocolEncoder(t *testing.T) {
+func TestCanvasMatchesCanonicalProtocolFrame(t *testing.T) {
 	canvas := newCanvas(Size{Width: 720, Height: 320})
 	canvas.Clear(RGB(0.025, 0.035, 0.065))
 	canvas.Text("Hello from Go over MGFX", TextStyle{
@@ -39,7 +39,7 @@ func TestCanvasMatchesTypeScriptProtocolEncoder(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(frame, want) {
-		t.Fatalf("Go frame differs from TypeScript encoder:\n got %x\nwant %x", frame, want)
+		t.Fatalf("Go frame differs from canonical encoding:\n got %x\nwant %x", frame, want)
 	}
 	if commands := binary.LittleEndian.Uint32(frame[12:16]); commands != 3 {
 		t.Fatalf("expected Clear, DrawText, EndFrame; got %d commands", commands)
