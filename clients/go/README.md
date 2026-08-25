@@ -91,6 +91,23 @@ columns, err := (mgfx.StackLayout{Axis: mgfx.Horizontal, Gap: 12,
 labelBounds := columns[1].Centered(mgfx.Size{Width: width + 24, Height: 40})
 ```
 
+Reusable components add measurement and painting without taking ownership of
+application state. Labels, panels, alignment, offsets, and component stacks
+compose as ordinary Go values:
+
+```go
+label := mgfx.Panel{Padding: mgfx.SymmetricInsets(14, 6),
+    Style: panelStyle,
+    Child: mgfx.Label{Value: "Measured", Advance: width, Style: textStyle}}
+root := mgfx.ComponentStack{Axis: mgfx.Horizontal,
+    Children: []mgfx.StackChild{
+        {Track: mgfx.Flex(1), Child: mgfx.Align{
+            Horizontal: mgfx.AlignCenter, Vertical: mgfx.AlignCenter,
+            Child: label}},
+    }}
+mgfx.PaintComponentTree(canvas, bounds, root)
+```
+
 Affine transforms also stay in logical pixels and are scoped. Scale defaults to
 one when omitted, and rotation is expressed as clockwise degrees:
 
