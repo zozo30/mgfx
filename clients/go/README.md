@@ -108,6 +108,19 @@ root := mgfx.ComponentStack{Axis: mgfx.Horizontal,
 mgfx.PaintComponentTree(canvas, bounds, root)
 ```
 
+`ComponentHost` uses that same measured geometry for hit-testing. A persistent
+`Button` provides hover, pressed, and click behavior and plugs directly into the
+application callbacks:
+
+```go
+host := &mgfx.ComponentHost{}
+button := &mgfx.Button{Style: buttonStyle, Child: label,
+    OnClick: func() { enabled = !enabled }}
+app.Draw = func(canvas *mgfx.Canvas) { host.Paint(canvas, bounds, button) }
+app.PointerMove, app.PointerDown, app.PointerUp =
+    host.PointerMove, host.PointerDown, host.PointerUp
+```
+
 Affine transforms also stay in logical pixels and are scoped. Scale defaults to
 one when omitted, and rotation is expressed as clockwise degrees:
 

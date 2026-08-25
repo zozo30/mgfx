@@ -126,19 +126,7 @@ func (alignment Align) Paint(canvas *Canvas, bounds Rect) {
 	if alignment.Child == nil {
 		return
 	}
-	size := alignment.Child.Measure(Loose(Size{Width: bounds.Width, Height: bounds.Height}))
-	if alignment.Horizontal == AlignStretch {
-		size.Width = bounds.Width
-	}
-	if alignment.Vertical == AlignStretch {
-		size.Height = bounds.Height
-	}
-	childBounds := Rect{
-		X:     alignedOrigin(bounds.X, bounds.Width, size.Width, alignment.Horizontal),
-		Y:     alignedOrigin(bounds.Y, bounds.Height, size.Height, alignment.Vertical),
-		Width: size.Width, Height: size.Height,
-	}
-	alignment.Child.Paint(canvas, childBounds)
+	alignment.Child.Paint(canvas, alignment.childBounds(bounds))
 }
 
 // Offset translates a component without changing its reported size.
@@ -214,9 +202,7 @@ func (stack ComponentStack) Measure(constraints Constraints) Size {
 }
 
 func (stack ComponentStack) Paint(canvas *Canvas, bounds Rect) {
-	tracks := stack.childTracks(Tight(Size{Width: bounds.Width, Height: bounds.Height}))
-	frames, err := (StackLayout{Axis: stack.Axis, Gap: stack.Gap, Padding: stack.Padding}).Arrange(
-		bounds, tracks...)
+	frames, err := stack.frames(bounds)
 	if err != nil {
 		canvas.err = errors.New("component stack: " + err.Error())
 		return

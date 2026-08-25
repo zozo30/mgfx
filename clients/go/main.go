@@ -23,6 +23,20 @@ func main() {
 	patternOffset := float32(0)
 	arcAngle := float32(0)
 	labelWidth := float32(360)
+	playing := true
+	host := &mgfx.ComponentHost{}
+	toggle := &mgfx.Button{
+		Style: mgfx.ButtonStyle{
+			Normal: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.02, 0.06, 0.16, 0.72),
+				Border: mgfx.RGBA(0.55, 0.9, 1, 0.45), BorderWidth: 1, CornerRadius: 12},
+			Hovered: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.08, 0.28, 0.48, 0.86),
+				Border: mgfx.RGBA(0.65, 1, 0.9, 0.9), BorderWidth: 2, CornerRadius: 12},
+			Pressed: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.35, 0.16, 0.72, 0.92),
+				Border: mgfx.RGBA(0.85, 0.7, 1, 1), BorderWidth: 2, CornerRadius: 12},
+			Padding: mgfx.UniformInsets(6),
+		},
+		OnClick: func() { playing = !playing },
+	}
 	app := mgfx.Application{Window: window}
 	app.Prepare = func(ctx context.Context, client *mgfx.Client) error {
 		measured, err := client.MeasureText(ctx, "Hello from Go over MGFX", mgfx.TextMeasureStyle{
@@ -58,9 +72,29 @@ func main() {
 				Style: mgfx.TextStyle{Size: 34, Color: mgfx.RGB(0.72, 0.94, 1),
 					Weight: mgfx.SemiBold}},
 		}
+		toggle.Child = mgfx.PaintComponent{Preferred: mgfx.Size{Width: 40, Height: 40},
+			Draw: func(canvas *mgfx.Canvas, bounds mgfx.Rect) {
+				indicator := bounds.Centered(mgfx.Size{Width: 28, Height: 28})
+				color := mgfx.RGB(0.45, 1, 0.72)
+				if !playing {
+					color = mgfx.RGB(1, 0.65, 0.25)
+				}
+				canvas.Circle(indicator, mgfx.ShapeStyle{Fill: mgfx.RGBA(0.01, 0.03, 0.08, 0.8),
+					Border: color, BorderWidth: 3})
+				if playing {
+					for _, x := range []float32{indicator.X + 8, indicator.X + 16} {
+						canvas.RoundedRect(mgfx.Rect{X: x, Y: indicator.Y + 7, Width: 4, Height: 14},
+							mgfx.ShapeStyle{Fill: color, CornerRadius: 2})
+					}
+				} else {
+					canvas.Arc(indicator.Inset(mgfx.UniformInsets(6)), mgfx.ArcStyle{
+						StartAngle: -55, SweepAngle: 290, Thickness: 4, RoundCaps: true, Color: color})
+				}
+			}}
 		components := mgfx.ComponentStack{Axis: mgfx.Horizontal, Gap: 18,
 			Padding: mgfx.SymmetricInsets(18, 14), Children: []mgfx.StackChild{
-				{Track: mgfx.Fixed(68)},
+				{Track: mgfx.Fixed(68), Child: mgfx.Align{Horizontal: mgfx.AlignCenter,
+					Vertical: mgfx.AlignCenter, Child: toggle}},
 				{Track: mgfx.Flex(1), Child: mgfx.Offset{X: textOffset,
 					Child: mgfx.Align{Horizontal: mgfx.AlignCenter, Vertical: mgfx.AlignCenter,
 						Child: label}}},
@@ -75,9 +109,15 @@ func main() {
 						},
 					}}},
 			}}
-		mgfx.PaintComponentTree(canvas, banner, components)
+		host.Paint(canvas, banner, components)
 	}
+	app.PointerMove = host.PointerMove
+	app.PointerDown = host.PointerDown
+	app.PointerUp = host.PointerUp
 	app.Animation = func(now time.Duration) {
+		if !playing {
+			return
+		}
 		textOffset = float32(math.Sin(now.Seconds()*1.8) * 16)
 		patternOffset = -float32(math.Mod(now.Seconds()*28, 13))
 		arcAngle = float32(math.Mod(now.Seconds()*90, 360))
