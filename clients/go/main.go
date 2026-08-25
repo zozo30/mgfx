@@ -31,6 +31,8 @@ func main() {
 				Border: mgfx.RGBA(0.55, 0.9, 1, 0.45), BorderWidth: 1, CornerRadius: 12},
 			Hovered: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.08, 0.28, 0.48, 0.86),
 				Border: mgfx.RGBA(0.65, 1, 0.9, 0.9), BorderWidth: 2, CornerRadius: 12},
+			Focused: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.05, 0.16, 0.36, 0.86),
+				Border: mgfx.RGBA(0.82, 0.72, 1, 1), BorderWidth: 3, CornerRadius: 12},
 			Pressed: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.35, 0.16, 0.72, 0.92),
 				Border: mgfx.RGBA(0.85, 0.7, 1, 1), BorderWidth: 2, CornerRadius: 12},
 			Padding: mgfx.UniformInsets(6),
@@ -114,6 +116,8 @@ func main() {
 	app.PointerMove = host.PointerMove
 	app.PointerDown = host.PointerDown
 	app.PointerUp = host.PointerUp
+	app.KeyDown = host.KeyDown
+	app.KeyUp = host.KeyUp
 	app.Animation = func(now time.Duration) {
 		if !playing {
 			return

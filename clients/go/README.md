@@ -121,6 +121,10 @@ app.PointerMove, app.PointerDown, app.PointerUp =
     host.PointerMove, host.PointerDown, host.PointerUp
 ```
 
+The same host supports keyboard access. Assign `host.KeyDown` and `host.KeyUp`
+to the application to get Tab/Shift-Tab focus traversal and Enter/Space button
+activation without a separate focus framework.
+
 Affine transforms also stay in logical pixels and are scoped. Scale defaults to
 one when omitted, and rotation is expressed as clockwise degrees:
 
