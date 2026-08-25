@@ -503,6 +503,15 @@ npm test
 npm start
 ```
 
+A dependency-free Go client exercises the raw binary protocol with a basic
+client-owned window and one server-rendered text command:
+
+```sh
+cd clients/go
+go test ./...
+go run .
+```
+
 Its host elements (`mgfx-row`, `mgfx-column`, `mgfx-box`, `mgfx-circle`,
 `mgfx-text`, and others) lower into the same layout tree and MGFX binary frames.
 The experimental reconciler dependency is version-pinned and isolated inside
