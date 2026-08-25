@@ -67,3 +67,17 @@ func TestComponentHostTraversesAndActivatesButtonsFromKeyboard(t *testing.T) {
 		t.Fatal("Shift-Tab did not traverse backward")
 	}
 }
+
+func TestOverlayHitTestingPrefersFrontmostButton(t *testing.T) {
+	clicks := [2]int{}
+	back := &Button{OnClick: func() { clicks[0]++ }}
+	front := &Button{OnClick: func() { clicks[1]++ }}
+	host := &ComponentHost{}
+	host.Paint(newCanvas(Size{Width: 100, Height: 60}), Rect{Width: 100, Height: 60},
+		Overlay{Children: []Component{back, front}})
+	host.PointerDown(Point{X: 50, Y: 30})
+	host.PointerUp(Point{X: 50, Y: 30})
+	if clicks != [2]int{0, 1} {
+		t.Fatalf("overlay click order = %v", clicks)
+	}
+}

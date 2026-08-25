@@ -42,3 +42,17 @@ func TestComponentStackPaintsTrackFrames(t *testing.T) {
 		t.Fatalf("right frame = %#v", right.painted)
 	}
 }
+
+func TestOverlayMeasuresLargestChildAndPaintsEveryLayer(t *testing.T) {
+	back := &recordingComponent{desired: Size{Width: 80, Height: 30}}
+	front := &recordingComponent{desired: Size{Width: 24, Height: 60}}
+	overlay := Overlay{Children: []Component{back, front}}
+	if got := overlay.Measure(Loose(Size{Width: 200, Height: 100})); got != (Size{80, 60}) {
+		t.Fatalf("overlay size = %#v", got)
+	}
+	overlay.Paint(newCanvas(Size{Width: 120, Height: 90}), Rect{X: 4, Y: 6, Width: 120, Height: 90})
+	want := Rect{X: 4, Y: 6, Width: 120, Height: 90}
+	if back.painted != want || front.painted != want {
+		t.Fatalf("overlay frames: back=%#v front=%#v", back.painted, front.painted)
+	}
+}

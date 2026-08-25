@@ -96,6 +96,14 @@ func (offset Offset) hitTest(bounds Rect, point Point) *Button {
 	bounds.Y += offset.Y
 	return hitComponent(offset.Child, bounds, point)
 }
+func (overlay Overlay) hitTest(bounds Rect, point Point) *Button {
+	for index := len(overlay.Children) - 1; index >= 0; index-- {
+		if target := hitComponent(overlay.Children[index], bounds, point); target != nil {
+			return target
+		}
+	}
+	return nil
+}
 
 func (stack ComponentStack) frames(bounds Rect) ([]Rect, error) {
 	tracks := stack.childTracks(Tight(Size{Width: bounds.Width, Height: bounds.Height}))
@@ -141,6 +149,11 @@ func (offset Offset) collectButtons(bounds Rect, entries *[]buttonEntry) {
 	bounds.X += offset.X
 	bounds.Y += offset.Y
 	collectComponentButtons(offset.Child, bounds, entries)
+}
+func (overlay Overlay) collectButtons(bounds Rect, entries *[]buttonEntry) {
+	for _, child := range overlay.Children {
+		collectComponentButtons(child, bounds, entries)
+	}
 }
 func (stack ComponentStack) collectButtons(bounds Rect, entries *[]buttonEntry) {
 	frames, err := stack.frames(bounds)

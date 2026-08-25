@@ -74,7 +74,7 @@ func main() {
 				Style: mgfx.TextStyle{Size: 34, Color: mgfx.RGB(0.72, 0.94, 1),
 					Weight: mgfx.SemiBold}},
 		}
-		toggle.Child = mgfx.PaintComponent{Preferred: mgfx.Size{Width: 40, Height: 40},
+		toggleIcon := mgfx.PaintComponent{Preferred: mgfx.Size{Width: 40, Height: 40},
 			Draw: func(canvas *mgfx.Canvas, bounds mgfx.Rect) {
 				indicator := bounds.Centered(mgfx.Size{Width: 28, Height: 28})
 				color := mgfx.RGB(0.45, 1, 0.72)
@@ -93,6 +93,15 @@ func main() {
 						StartAngle: -55, SweepAngle: 290, Thickness: 4, RoundCaps: true, Color: color})
 				}
 			}}
+		toggle.Child = mgfx.Overlay{Children: []mgfx.Component{
+			toggleIcon,
+			mgfx.Align{Horizontal: mgfx.AlignEnd, Vertical: mgfx.AlignStart,
+				Child: mgfx.PaintComponent{Preferred: mgfx.Size{Width: 10, Height: 10},
+					Draw: func(canvas *mgfx.Canvas, bounds mgfx.Rect) {
+						canvas.Circle(bounds, mgfx.ShapeStyle{Fill: mgfx.RGB(0.95, 0.42, 1),
+							Border: mgfx.RGB(0.75, 1, 0.92), BorderWidth: 1})
+					}}},
+		}}
 		components := mgfx.ComponentStack{Axis: mgfx.Horizontal, Gap: 18,
 			Padding: mgfx.SymmetricInsets(18, 14), Children: []mgfx.StackChild{
 				{Track: mgfx.Fixed(68), Child: mgfx.Align{Horizontal: mgfx.AlignCenter,

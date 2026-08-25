@@ -154,6 +154,34 @@ type StackChild struct {
 	Child Component
 }
 
+// Overlay paints children in slice order into the same bounds. Later children
+// appear above earlier children; wrap a child in Align to give it a smaller,
+// positioned frame.
+type Overlay struct {
+	Children []Component
+}
+
+func (overlay Overlay) Measure(constraints Constraints) Size {
+	desired := Size{}
+	for _, child := range overlay.Children {
+		if child == nil {
+			continue
+		}
+		size := child.Measure(constraints)
+		desired.Width = max(desired.Width, size.Width)
+		desired.Height = max(desired.Height, size.Height)
+	}
+	return constraints.Constrain(desired)
+}
+
+func (overlay Overlay) Paint(canvas *Canvas, bounds Rect) {
+	for _, child := range overlay.Children {
+		if child != nil {
+			child.Paint(canvas, bounds)
+		}
+	}
+}
+
 // ComponentStack combines track layout with measured children.
 type ComponentStack struct {
 	Axis     Axis

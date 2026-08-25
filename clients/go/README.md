@@ -108,6 +108,10 @@ root := mgfx.ComponentStack{Axis: mgfx.Horizontal,
 mgfx.PaintComponentTree(canvas, bounds, root)
 ```
 
+`Overlay` gives components explicit depth without changing flow measurement.
+Children paint back-to-front and hit-test front-to-back; `Align` can position a
+badge, menu, or dialog layer within the shared bounds.
+
 `ComponentHost` uses that same measured geometry for hit-testing. A persistent
 `Button` provides hover, pressed, and click behavior and plugs directly into the
 application callbacks:
