@@ -69,6 +69,17 @@ canvas.Transform(mgfx.Transform{Rotation: 12,
     Origin: mgfx.Point{X: 120, Y: 80}}, drawCard)
 ```
 
+Gradients and diagonal patterns remain one native command regardless of their
+pixel area:
+
+```go
+canvas.LinearGradient(bounds, mgfx.LinearGradientStyle{
+    Start: purple, End: blue, Direction: mgfx.GradientHorizontal,
+    CornerRadius: 16})
+canvas.DiagonalPattern(accent, mgfx.DiagonalPatternStyle{
+    Color: lime, StripeWidth: 7, Gap: 6, Offset: phase})
+```
+
 Start `MGFXServer`, then run:
 
 ```sh

@@ -29,6 +29,27 @@ type ShapeStyle struct {
 	CornerRadius float32
 }
 
+type GradientDirection uint8
+
+const (
+	GradientHorizontal GradientDirection = iota
+	GradientVertical
+	GradientDiagonal
+)
+
+type LinearGradientStyle struct {
+	Start, End   Color
+	Direction    GradientDirection
+	CornerRadius float32
+}
+
+type DiagonalPatternStyle struct {
+	Color            Color
+	StripeWidth, Gap float32
+	Offset           float32
+	Backward         bool
+}
+
 type Transform struct {
 	TranslateX, TranslateY float32
 	ScaleX, ScaleY         float32
@@ -259,6 +280,54 @@ func (canvas *Canvas) Circle(bounds Rect, style ShapeStyle) {
 		putFloat32(payload[index*4:], value)
 	}
 	canvas.command(16, payload)
+}
+
+// LinearGradient draws a server-native two-color gradient inside bounds.
+func (canvas *Canvas) LinearGradient(bounds Rect, style LinearGradientStyle) {
+	destination, ok := canvas.normalizedRect(bounds)
+	if !ok {
+		return
+	}
+	if !validColor(style.Start) || !validColor(style.End) ||
+		style.Direction > GradientDiagonal || style.CornerRadius < 0 || style.CornerRadius > 8192 {
+		canvas.err = errors.New("linear gradient paint is outside supported bounds")
+		return
+	}
+	values := []float32{destination[0], destination[1], destination[2], destination[3],
+		style.CornerRadius, float32(style.Direction),
+		style.Start.Red, style.Start.Green, style.Start.Blue, style.Start.Alpha,
+		style.End.Red, style.End.Green, style.End.Blue, style.End.Alpha}
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(18, payload)
+}
+
+// DiagonalPattern draws an arbitrarily large stripe field as one server command.
+func (canvas *Canvas) DiagonalPattern(bounds Rect, style DiagonalPatternStyle) {
+	destination, ok := canvas.normalizedRect(bounds)
+	if !ok {
+		return
+	}
+	if !validColor(style.Color) || style.StripeWidth <= 0 || style.StripeWidth > 1024 ||
+		style.Gap < 0 || style.Gap > 1024 || math.IsNaN(float64(style.Offset)) ||
+		math.IsInf(float64(style.Offset), 0) {
+		canvas.err = errors.New("diagonal pattern paint is outside supported bounds")
+		return
+	}
+	backward := float32(0)
+	if style.Backward {
+		backward = 1
+	}
+	values := []float32{destination[0], destination[1], destination[2], destination[3],
+		style.StripeWidth, style.Gap, style.Offset, backward,
+		style.Color.Red, style.Color.Green, style.Color.Blue, style.Color.Alpha}
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(17, payload)
 }
 
 func (canvas *Canvas) Text(value string, style TextStyle) {

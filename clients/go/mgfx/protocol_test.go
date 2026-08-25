@@ -134,3 +134,26 @@ func TestCanvasTransformConvertsPixelTranslation(t *testing.T) {
 		}
 	}
 }
+
+func TestCanvasGradientAndPatternRemainSemanticCommands(t *testing.T) {
+	canvas := newCanvas(Size{Width: 400, Height: 200})
+	canvas.LinearGradient(Rect{X: 20, Y: 20, Width: 360, Height: 80}, LinearGradientStyle{
+		Start: RGB(0.3, 0.1, 0.8), End: RGB(0.05, 0.6, 1),
+		Direction: GradientHorizontal, CornerRadius: 16,
+	})
+	canvas.DiagonalPattern(Rect{X: 280, Y: 20, Width: 100, Height: 80}, DiagonalPatternStyle{
+		Color: RGB(0.9, 1, 0.4), StripeWidth: 7, Gap: 6, Offset: 3,
+	})
+	frame, err := canvas.finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opcodes := make([]uint16, 0, 3)
+	for offset := frameHeaderSize; offset < len(frame); {
+		opcodes = append(opcodes, binary.LittleEndian.Uint16(frame[offset:offset+2]))
+		offset += commandHeaderSize + int(binary.LittleEndian.Uint32(frame[offset+4:offset+8]))
+	}
+	if want := []uint16{18, 17, 3}; !slices.Equal(opcodes, want) {
+		t.Fatalf("paint opcodes = %v, want %v", opcodes, want)
+	}
+}
