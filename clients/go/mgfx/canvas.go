@@ -59,6 +59,20 @@ type ShadowStyle struct {
 	CornerRadius float32
 }
 
+type ArcStyle struct {
+	StartAngle, SweepAngle float32
+	Thickness              float32
+	RoundCaps              bool
+	Color                  Color
+}
+
+type GradientArcStyle struct {
+	StartAngle, SweepAngle float32
+	Thickness              float32
+	RoundCaps              bool
+	Start, End             Color
+}
+
 type DiagonalPatternStyle struct {
 	Color            Color
 	StripeWidth, Gap float32
@@ -329,6 +343,68 @@ func (canvas *Canvas) Circle(bounds Rect, style ShapeStyle) {
 		putFloat32(payload[index*4:], value)
 	}
 	canvas.command(16, payload)
+}
+
+func arcGeometry(canvas *Canvas, bounds Rect, startDegrees, sweepDegrees, thickness float32) ([8]float32, bool) {
+	destination, ok := canvas.normalizedRect(bounds)
+	if !ok {
+		return [8]float32{}, false
+	}
+	if !finite(startDegrees, sweepDegrees, thickness) || sweepDegrees <= 0 ||
+		sweepDegrees > 360 || thickness <= 0 || thickness > 8192 {
+		canvas.err = errors.New("arc geometry is outside supported bounds")
+		return [8]float32{}, false
+	}
+	start := float32(math.Mod(float64(startDegrees+180), 360))
+	if start < 0 {
+		start += 360
+	}
+	start = (start - 180) * math.Pi / 180
+	return [8]float32{destination[0], destination[1], destination[2], destination[3],
+		start, sweepDegrees * math.Pi / 180, thickness, 0}, true
+}
+
+// Arc draws a server-native partial ring. Angles are clockwise degrees.
+func (canvas *Canvas) Arc(bounds Rect, style ArcStyle) {
+	geometry, ok := arcGeometry(canvas, bounds, style.StartAngle, style.SweepAngle, style.Thickness)
+	if !ok {
+		return
+	}
+	if !validColor(style.Color) {
+		canvas.err = errors.New("arc color is outside supported bounds")
+		return
+	}
+	if style.RoundCaps {
+		geometry[7] = 1
+	}
+	values := append(geometry[:], style.Color.Red, style.Color.Green, style.Color.Blue, style.Color.Alpha)
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(46, payload)
+}
+
+// GradientArc interpolates paint from the start to the end of a partial ring.
+func (canvas *Canvas) GradientArc(bounds Rect, style GradientArcStyle) {
+	geometry, ok := arcGeometry(canvas, bounds, style.StartAngle, style.SweepAngle, style.Thickness)
+	if !ok {
+		return
+	}
+	if !validColor(style.Start) || !validColor(style.End) {
+		canvas.err = errors.New("gradient arc colors are outside supported bounds")
+		return
+	}
+	if style.RoundCaps {
+		geometry[7] = 1
+	}
+	values := append(geometry[:], style.Start.Red, style.Start.Green, style.Start.Blue,
+		style.Start.Alpha, style.End.Red, style.End.Green, style.End.Blue, style.End.Alpha)
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(47, payload)
 }
 
 // LinearGradient draws a server-native two-color gradient inside bounds.

@@ -90,6 +90,15 @@ canvas.RadialGradient(card, mgfx.RadialGradientStyle{
     Center: mgfx.UnitPoint{X: 0.3, Y: 0.25}, CornerRadius: 18})
 ```
 
+Progress rings use clockwise degrees at the API boundary and remain semantic
+native arcs on the wire:
+
+```go
+canvas.GradientArc(gauge, mgfx.GradientArcStyle{
+    StartAngle: -90, SweepAngle: 280, Thickness: 10, RoundCaps: true,
+    Start: cyan, End: purple})
+```
+
 Start `MGFXServer`, then run:
 
 ```sh

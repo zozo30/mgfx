@@ -180,3 +180,31 @@ func TestCanvasShadowAndRadialGradientRemainSemanticCommands(t *testing.T) {
 		t.Fatalf("paint opcodes = %v, want %v", opcodes, want)
 	}
 }
+
+func TestCanvasArcsUseDegreesAndSemanticCommands(t *testing.T) {
+	canvas := newCanvas(Size{Width: 200, Height: 100})
+	bounds := Rect{X: 50, Y: 10, Width: 80, Height: 80}
+	canvas.Arc(bounds, ArcStyle{StartAngle: -90, SweepAngle: 270, Thickness: 8,
+		RoundCaps: true, Color: RGB(0.3, 0.9, 1)})
+	canvas.GradientArc(bounds, GradientArcStyle{StartAngle: 450, SweepAngle: 180,
+		Thickness: 10, Start: RGB(0.2, 1, 0.6), End: RGB(0.7, 0.2, 1)})
+	frame, err := canvas.finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opcodes := make([]uint16, 0, 3)
+	for offset := frameHeaderSize; offset < len(frame); {
+		opcodes = append(opcodes, binary.LittleEndian.Uint16(frame[offset:offset+2]))
+		offset += commandHeaderSize + int(binary.LittleEndian.Uint32(frame[offset+4:offset+8]))
+	}
+	if want := []uint16{46, 47, 3}; !slices.Equal(opcodes, want) {
+		t.Fatalf("arc opcodes = %v, want %v", opcodes, want)
+	}
+	arcPayload := frame[frameHeaderSize+commandHeaderSize:]
+	start := math.Float32frombits(binary.LittleEndian.Uint32(arcPayload[16:20]))
+	sweep := math.Float32frombits(binary.LittleEndian.Uint32(arcPayload[20:24]))
+	if math.Abs(float64(start+math.Pi/2)) > 0.00001 ||
+		math.Abs(float64(sweep-3*math.Pi/2)) > 0.00001 {
+		t.Fatalf("arc radians = %f, %f", start, sweep)
+	}
+}

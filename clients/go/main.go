@@ -21,6 +21,7 @@ func main() {
 	}
 	textOffset := float32(0)
 	patternOffset := float32(0)
+	arcAngle := float32(0)
 	app := mgfx.Application{Window: window}
 	app.Draw = func(canvas *mgfx.Canvas) {
 		canvas.Clear(mgfx.RGB(0.025, 0.035, 0.065))
@@ -42,10 +43,16 @@ func main() {
 			X: 40 + textOffset, Y: canvas.Size.Height/2 - 20, Size: 34,
 			Color: mgfx.RGB(0.72, 0.94, 1), Weight: mgfx.SemiBold,
 		})
+		canvas.GradientArc(mgfx.Rect{X: banner.X + banner.Width - 86,
+			Y: banner.Y + 18, Width: 68, Height: 68}, mgfx.GradientArcStyle{
+			StartAngle: arcAngle, SweepAngle: 285, Thickness: 8, RoundCaps: true,
+			Start: mgfx.RGB(0.55, 1, 0.76), End: mgfx.RGB(0.82, 0.42, 1),
+		})
 	}
 	app.Animation = func(now time.Duration) {
 		textOffset = float32(math.Sin(now.Seconds()*1.8) * 16)
 		patternOffset = -float32(math.Mod(now.Seconds()*28, 13))
+		arcAngle = float32(math.Mod(now.Seconds()*90, 360))
 	}
 	err := app.Run(ctx)
 	if err != nil {
