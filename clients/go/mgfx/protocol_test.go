@@ -157,3 +157,26 @@ func TestCanvasGradientAndPatternRemainSemanticCommands(t *testing.T) {
 		t.Fatalf("paint opcodes = %v, want %v", opcodes, want)
 	}
 }
+
+func TestCanvasShadowAndRadialGradientRemainSemanticCommands(t *testing.T) {
+	canvas := newCanvas(Size{Width: 300, Height: 180})
+	bounds := Rect{X: 30, Y: 25, Width: 240, Height: 120}
+	canvas.Shadow(bounds, ShadowStyle{Color: RGBA(0.1, 0.4, 1, 0.45),
+		Blur: 24, Spread: 3, CornerRadius: 18})
+	canvas.RadialGradient(bounds, RadialGradientStyle{
+		Inner: RGB(0.4, 0.9, 1), Outer: RGB(0.08, 0.12, 0.3),
+		Center: UnitPoint{X: 0.3, Y: 0.25}, CornerRadius: 18,
+	})
+	frame, err := canvas.finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opcodes := make([]uint16, 0, 3)
+	for offset := frameHeaderSize; offset < len(frame); {
+		opcodes = append(opcodes, binary.LittleEndian.Uint16(frame[offset:offset+2]))
+		offset += commandHeaderSize + int(binary.LittleEndian.Uint32(frame[offset+4:offset+8]))
+	}
+	if want := []uint16{13, 14, 3}; !slices.Equal(opcodes, want) {
+		t.Fatalf("paint opcodes = %v, want %v", opcodes, want)
+	}
+}

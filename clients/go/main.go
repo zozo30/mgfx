@@ -26,6 +26,9 @@ func main() {
 		canvas.Clear(mgfx.RGB(0.025, 0.035, 0.065))
 		banner := mgfx.Rect{X: 24, Y: canvas.Size.Height/2 - 60,
 			Width: canvas.Size.Width - 48, Height: 120}
+		canvas.Shadow(banner, mgfx.ShadowStyle{
+			Color: mgfx.RGBA(0.12, 0.46, 1, 0.42), Blur: 24, Spread: 2, CornerRadius: 18,
+		})
 		canvas.LinearGradient(banner, mgfx.LinearGradientStyle{
 			Start: mgfx.RGB(0.30, 0.10, 0.82), End: mgfx.RGB(0.04, 0.55, 1),
 			Direction: mgfx.GradientHorizontal, CornerRadius: 18,

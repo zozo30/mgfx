@@ -43,6 +43,22 @@ type LinearGradientStyle struct {
 	CornerRadius float32
 }
 
+// UnitPoint identifies a relative position inside bounds from zero through one.
+type UnitPoint struct{ X, Y float32 }
+
+type RadialGradientStyle struct {
+	Inner, Outer Color
+	Center       UnitPoint
+	Radius       float32
+	CornerRadius float32
+}
+
+type ShadowStyle struct {
+	Color        Color
+	Blur, Spread float32
+	CornerRadius float32
+}
+
 type DiagonalPatternStyle struct {
 	Color            Color
 	StripeWidth, Gap float32
@@ -118,6 +134,15 @@ func validColor(color Color) bool {
 	return true
 }
 
+func finite(values ...float32) bool {
+	for _, value := range values {
+		if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
+			return false
+		}
+	}
+	return true
+}
+
 func (canvas *Canvas) normalizedRect(bounds Rect) ([4]float32, bool) {
 	for _, value := range []float32{bounds.X, bounds.Y, bounds.Width, bounds.Height} {
 		if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
@@ -138,7 +163,8 @@ func (canvas *Canvas) normalizedRect(bounds Rect) ([4]float32, bool) {
 }
 
 func (canvas *Canvas) shapeValues(bounds Rect, style ShapeStyle) ([4]float32, bool) {
-	if !validColor(style.Fill) || !validColor(style.Border) || style.BorderWidth < 0 ||
+	if !validColor(style.Fill) || !validColor(style.Border) ||
+		!finite(style.BorderWidth, style.CornerRadius) || style.BorderWidth < 0 ||
 		style.BorderWidth > 8192 || style.CornerRadius < 0 || style.CornerRadius > 8192 {
 		canvas.err = errors.New("shape paint values are outside supported bounds")
 		return [4]float32{}, false
@@ -156,6 +182,29 @@ func (canvas *Canvas) Clear(color Color) {
 		putFloat32(payload[index*4:], value)
 	}
 	canvas.command(1, payload)
+}
+
+// Shadow draws a server-native soft shadow behind bounds.
+func (canvas *Canvas) Shadow(bounds Rect, style ShadowStyle) {
+	destination, ok := canvas.normalizedRect(bounds)
+	if !ok {
+		return
+	}
+	if !validColor(style.Color) || !finite(style.Blur, style.Spread, style.CornerRadius) ||
+		style.Blur < 0 || style.Blur > 256 ||
+		style.Spread < -256 || style.Spread > 256 || style.CornerRadius < 0 ||
+		style.CornerRadius > 8192 {
+		canvas.err = errors.New("shadow paint is outside supported bounds")
+		return
+	}
+	values := []float32{destination[0], destination[1], destination[2], destination[3],
+		style.CornerRadius, style.Blur, style.Spread,
+		style.Color.Red, style.Color.Green, style.Color.Blue, style.Color.Alpha}
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(13, payload)
 }
 
 // Clip applies a nested rectangular clip only while draw records its commands.
@@ -288,7 +337,7 @@ func (canvas *Canvas) LinearGradient(bounds Rect, style LinearGradientStyle) {
 	if !ok {
 		return
 	}
-	if !validColor(style.Start) || !validColor(style.End) ||
+	if !validColor(style.Start) || !validColor(style.End) || !finite(style.CornerRadius) ||
 		style.Direction > GradientDiagonal || style.CornerRadius < 0 || style.CornerRadius > 8192 {
 		canvas.err = errors.New("linear gradient paint is outside supported bounds")
 		return
@@ -304,15 +353,43 @@ func (canvas *Canvas) LinearGradient(bounds Rect, style LinearGradientStyle) {
 	canvas.command(18, payload)
 }
 
+// RadialGradient draws a server-native radial paint. Center is relative to
+// bounds; a zero Radius defaults to half the bounds diagonal in logical pixels.
+func (canvas *Canvas) RadialGradient(bounds Rect, style RadialGradientStyle) {
+	destination, ok := canvas.normalizedRect(bounds)
+	if !ok {
+		return
+	}
+	radius := style.Radius
+	if radius == 0 {
+		radius = float32(math.Hypot(float64(bounds.Width), float64(bounds.Height)) / 2)
+	}
+	if !validColor(style.Inner) || !validColor(style.Outer) ||
+		!finite(style.Center.X, style.Center.Y, radius, style.CornerRadius) || style.Center.X < 0 ||
+		style.Center.X > 1 || style.Center.Y < 0 || style.Center.Y > 1 || radius <= 0 ||
+		radius > 8192 || style.CornerRadius < 0 || style.CornerRadius > 8192 {
+		canvas.err = errors.New("radial gradient paint is outside supported bounds")
+		return
+	}
+	values := []float32{destination[0], destination[1], destination[2], destination[3],
+		style.Center.X, style.Center.Y, radius, style.CornerRadius,
+		style.Inner.Red, style.Inner.Green, style.Inner.Blue, style.Inner.Alpha,
+		style.Outer.Red, style.Outer.Green, style.Outer.Blue, style.Outer.Alpha}
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(14, payload)
+}
+
 // DiagonalPattern draws an arbitrarily large stripe field as one server command.
 func (canvas *Canvas) DiagonalPattern(bounds Rect, style DiagonalPatternStyle) {
 	destination, ok := canvas.normalizedRect(bounds)
 	if !ok {
 		return
 	}
-	if !validColor(style.Color) || style.StripeWidth <= 0 || style.StripeWidth > 1024 ||
-		style.Gap < 0 || style.Gap > 1024 || math.IsNaN(float64(style.Offset)) ||
-		math.IsInf(float64(style.Offset), 0) {
+	if !validColor(style.Color) || !finite(style.StripeWidth, style.Gap, style.Offset) ||
+		style.StripeWidth <= 0 || style.StripeWidth > 1024 || style.Gap < 0 || style.Gap > 1024 {
 		canvas.err = errors.New("diagonal pattern paint is outside supported bounds")
 		return
 	}

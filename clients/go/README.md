@@ -80,6 +80,16 @@ canvas.DiagonalPattern(accent, mgfx.DiagonalPatternStyle{
     Color: lime, StripeWidth: 7, Gap: 6, Offset: phase})
 ```
 
+Soft shadows and radial gradients are also native paints:
+
+```go
+canvas.Shadow(card, mgfx.ShadowStyle{Color: shadow,
+    Blur: 24, Spread: 3, CornerRadius: 18})
+canvas.RadialGradient(card, mgfx.RadialGradientStyle{
+    Inner: cyan, Outer: navy,
+    Center: mgfx.UnitPoint{X: 0.3, Y: 0.25}, CornerRadius: 18})
+```
+
 Start `MGFXServer`, then run:
 
 ```sh
