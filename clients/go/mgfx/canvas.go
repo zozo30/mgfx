@@ -29,6 +29,13 @@ type ShapeStyle struct {
 	CornerRadius float32
 }
 
+type Transform struct {
+	TranslateX, TranslateY float32
+	ScaleX, ScaleY         float32
+	Rotation               float32
+	Origin                 Point
+}
+
 type FontFamily uint8
 
 const (
@@ -59,10 +66,10 @@ type TextStyle struct {
 // Canvas records one backend-neutral MGFX display list. Public coordinates are
 // logical pixels; normalization for the graphics protocol remains internal.
 type Canvas struct {
-	Size                    Size
-	commands                [][]byte
-	err                     error
-	clipDepth, opacityDepth uint32
+	Size                                    Size
+	commands                                [][]byte
+	err                                     error
+	clipDepth, opacityDepth, transformDepth uint32
 }
 
 func newCanvas(size Size) *Canvas { return &Canvas{Size: size} }
@@ -171,6 +178,54 @@ func (canvas *Canvas) Opacity(alpha float32, draw DrawFunc) {
 	}
 }
 
+// Transform applies logical-pixel translation plus scale and clockwise degree
+// rotation around Origin for the duration of draw.
+func (canvas *Canvas) Transform(transform Transform, draw DrawFunc) {
+	if draw == nil {
+		canvas.err = errors.New("transform draw callback is required")
+		return
+	}
+	values := []float32{transform.TranslateX, transform.TranslateY, transform.ScaleX,
+		transform.ScaleY, transform.Rotation, transform.Origin.X, transform.Origin.Y}
+	for _, value := range values {
+		if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
+			canvas.err = errors.New("transform values must be finite")
+			return
+		}
+	}
+	scaleX, scaleY := transform.ScaleX, transform.ScaleY
+	if scaleX == 0 {
+		scaleX = 1
+	}
+	if scaleY == 0 {
+		scaleY = 1
+	}
+	if canvas.Size.Width <= 0 || canvas.Size.Height <= 0 {
+		canvas.err = errors.New("canvas dimensions must be positive")
+		return
+	}
+	radians := transform.Rotation * math.Pi / 180
+	cosine, sine := float32(math.Cos(float64(radians))), float32(math.Sin(float64(radians)))
+	originX := transform.Origin.X/canvas.Size.Width*2 - 1
+	originY := 1 - transform.Origin.Y/canvas.Size.Height*2
+	m11, m12 := cosine*scaleX, -sine*scaleX
+	m21, m22 := sine*scaleY, cosine*scaleY
+	matrix := []float32{m11, m12, m21, m22,
+		originX - m11*originX - m21*originY + transform.TranslateX/canvas.Size.Width*2,
+		originY - m12*originX - m22*originY - transform.TranslateY/canvas.Size.Height*2}
+	payload := make([]byte, 24)
+	for index, value := range matrix {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(9, payload)
+	canvas.transformDepth++
+	draw(canvas)
+	canvas.transformDepth--
+	if canvas.err == nil {
+		canvas.command(10, nil)
+	}
+}
+
 // RoundedRect draws a filled and/or bordered rectangle. A zero CornerRadius is
 // a regular rectangle; radius and border width are expressed in logical pixels.
 func (canvas *Canvas) RoundedRect(bounds Rect, style ShapeStyle) {
@@ -243,7 +298,7 @@ func (canvas *Canvas) finish() ([]byte, error) {
 	if canvas.err != nil {
 		return nil, canvas.err
 	}
-	if canvas.clipDepth != 0 || canvas.opacityDepth != 0 {
+	if canvas.clipDepth != 0 || canvas.opacityDepth != 0 || canvas.transformDepth != 0 {
 		return nil, errors.New("unbalanced canvas state")
 	}
 	canvas.command(3, nil)

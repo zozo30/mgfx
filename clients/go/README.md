@@ -61,6 +61,14 @@ canvas.Clip(contentBounds, func(canvas *mgfx.Canvas) {
 })
 ```
 
+Affine transforms also stay in logical pixels and are scoped. Scale defaults to
+one when omitted, and rotation is expressed as clockwise degrees:
+
+```go
+canvas.Transform(mgfx.Transform{Rotation: 12,
+    Origin: mgfx.Point{X: 120, Y: 80}}, drawCard)
+```
+
 Start `MGFXServer`, then run:
 
 ```sh

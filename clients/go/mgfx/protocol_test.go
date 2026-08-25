@@ -105,3 +105,32 @@ func TestCanvasScopesClipAndOpacity(t *testing.T) {
 		}
 	}
 }
+
+func TestCanvasTransformConvertsPixelTranslation(t *testing.T) {
+	canvas := newCanvas(Size{Width: 200, Height: 100})
+	canvas.Transform(Transform{TranslateX: 20, TranslateY: 10, Rotation: 90,
+		Origin: Point{X: 100, Y: 50}}, func(canvas *Canvas) {
+		canvas.RoundedRect(Rect{X: 70, Y: 30, Width: 60, Height: 40}, ShapeStyle{
+			Fill: RGB(0.3, 0.7, 1), CornerRadius: 8,
+		})
+	})
+	frame, err := canvas.finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opcodes := make([]uint16, 0, 4)
+	for offset := frameHeaderSize; offset < len(frame); {
+		opcodes = append(opcodes, binary.LittleEndian.Uint16(frame[offset:offset+2]))
+		offset += commandHeaderSize + int(binary.LittleEndian.Uint32(frame[offset+4:offset+8]))
+	}
+	if want := []uint16{9, 15, 10, 3}; !slices.Equal(opcodes, want) {
+		t.Fatalf("transform opcodes = %v, want %v", opcodes, want)
+	}
+	payload := frame[frameHeaderSize+commandHeaderSize:]
+	for index, want := range []float32{0, -1, 1, 0, 0.2, -0.2} {
+		got := math.Float32frombits(binary.LittleEndian.Uint32(payload[index*4:]))
+		if math.Abs(float64(got-want)) > 0.00001 {
+			t.Fatalf("transform value %d = %f, want %f", index, got, want)
+		}
+	}
+}
