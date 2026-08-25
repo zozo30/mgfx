@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"math"
 	"testing"
 )
 
@@ -41,5 +42,34 @@ func TestCanvasMatchesTypeScriptProtocolEncoder(t *testing.T) {
 	}
 	if commands := binary.LittleEndian.Uint32(frame[12:16]); commands != 3 {
 		t.Fatalf("expected Clear, DrawText, EndFrame; got %d commands", commands)
+	}
+}
+
+func TestCanvasShapesUseLogicalPixelGeometry(t *testing.T) {
+	canvas := newCanvas(Size{Width: 200, Height: 100})
+	canvas.RoundedRect(Rect{X: 20, Y: 10, Width: 100, Height: 50}, ShapeStyle{
+		Fill: RGB(0.1, 0.2, 0.3), Border: RGB(0.5, 0.6, 0.7),
+		BorderWidth: 2, CornerRadius: 12,
+	})
+	canvas.Circle(Rect{X: 150, Y: 25, Width: 30, Height: 30}, ShapeStyle{
+		Fill: RGB(0.2, 0.8, 0.5),
+	})
+	frame, err := canvas.finish()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opcode := binary.LittleEndian.Uint16(frame[16:18]); opcode != 15 {
+		t.Fatalf("first opcode = %d, want DrawRoundedRect", opcode)
+	}
+	rectPayload := frame[frameHeaderSize+commandHeaderSize:]
+	for index, want := range []float32{-0.8, 0.8, 0.2, -0.2, 12, 2} {
+		got := math.Float32frombits(binary.LittleEndian.Uint32(rectPayload[index*4:]))
+		if math.Abs(float64(got-want)) > 0.00001 {
+			t.Fatalf("rounded rectangle value %d = %f, want %f", index, got, want)
+		}
+	}
+	circleOffset := frameHeaderSize + commandHeaderSize + 56
+	if opcode := binary.LittleEndian.Uint16(frame[circleOffset : circleOffset+2]); opcode != 16 {
+		t.Fatalf("second opcode = %d, want DrawCircle", opcode)
 	}
 }

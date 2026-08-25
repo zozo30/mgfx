@@ -20,6 +20,17 @@ err := mgfx.Run(ctx, window, func(canvas *mgfx.Canvas) {
 `Dial`, `OpenWindow`, and `Serve` are also public for applications that need
 explicit lifecycle control. `RunAt` supports a non-default Unix socket.
 
+Shapes use the same logical-pixel coordinate system. Both fill and border are
+lowered to one semantic server command:
+
+```go
+canvas.RoundedRect(mgfx.Rect{X: 24, Y: 24, Width: 220, Height: 96},
+    mgfx.ShapeStyle{Fill: mgfx.RGB(0.08, 0.16, 0.28),
+        Border: mgfx.RGB(0.3, 0.7, 1), BorderWidth: 2, CornerRadius: 16})
+canvas.Circle(mgfx.Rect{X: 270, Y: 32, Width: 72, Height: 72},
+    mgfx.ShapeStyle{Fill: mgfx.RGB(0.2, 0.85, 0.55)})
+```
+
 Start `MGFXServer`, then run:
 
 ```sh

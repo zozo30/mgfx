@@ -20,6 +20,15 @@ type Color struct{ Red, Green, Blue, Alpha float32 }
 func RGB(red, green, blue float32) Color         { return Color{red, green, blue, 1} }
 func RGBA(red, green, blue, alpha float32) Color { return Color{red, green, blue, alpha} }
 
+type Rect struct{ X, Y, Width, Height float32 }
+
+type ShapeStyle struct {
+	Fill         Color
+	Border       Color
+	BorderWidth  float32
+	CornerRadius float32
+}
+
 type FontFamily uint8
 
 const (
@@ -80,6 +89,34 @@ func validColor(color Color) bool {
 	return true
 }
 
+func (canvas *Canvas) normalizedRect(bounds Rect) ([4]float32, bool) {
+	for _, value := range []float32{bounds.X, bounds.Y, bounds.Width, bounds.Height} {
+		if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
+			canvas.err = errors.New("shape geometry must be finite")
+			return [4]float32{}, false
+		}
+	}
+	if bounds.Width <= 0 || bounds.Height <= 0 || canvas.Size.Width <= 0 || canvas.Size.Height <= 0 {
+		canvas.err = errors.New("shape and canvas dimensions must be positive")
+		return [4]float32{}, false
+	}
+	return [4]float32{
+		bounds.X/canvas.Size.Width*2 - 1,
+		1 - bounds.Y/canvas.Size.Height*2,
+		(bounds.X+bounds.Width)/canvas.Size.Width*2 - 1,
+		1 - (bounds.Y+bounds.Height)/canvas.Size.Height*2,
+	}, true
+}
+
+func (canvas *Canvas) shapeValues(bounds Rect, style ShapeStyle) ([4]float32, bool) {
+	if !validColor(style.Fill) || !validColor(style.Border) || style.BorderWidth < 0 ||
+		style.BorderWidth > 8192 || style.CornerRadius < 0 || style.CornerRadius > 8192 {
+		canvas.err = errors.New("shape paint values are outside supported bounds")
+		return [4]float32{}, false
+	}
+	return canvas.normalizedRect(bounds)
+}
+
 func (canvas *Canvas) Clear(color Color) {
 	if !validColor(color) {
 		canvas.err = errors.New("clear color components must be finite values from zero through one")
@@ -90,6 +127,41 @@ func (canvas *Canvas) Clear(color Color) {
 		putFloat32(payload[index*4:], value)
 	}
 	canvas.command(1, payload)
+}
+
+// RoundedRect draws a filled and/or bordered rectangle. A zero CornerRadius is
+// a regular rectangle; radius and border width are expressed in logical pixels.
+func (canvas *Canvas) RoundedRect(bounds Rect, style ShapeStyle) {
+	destination, ok := canvas.shapeValues(bounds, style)
+	if !ok {
+		return
+	}
+	values := []float32{destination[0], destination[1], destination[2], destination[3],
+		style.CornerRadius, style.BorderWidth,
+		style.Fill.Red, style.Fill.Green, style.Fill.Blue, style.Fill.Alpha,
+		style.Border.Red, style.Border.Green, style.Border.Blue, style.Border.Alpha}
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(15, payload)
+}
+
+// Circle draws an ellipse fitted inside bounds with an optional border ring.
+func (canvas *Canvas) Circle(bounds Rect, style ShapeStyle) {
+	destination, ok := canvas.shapeValues(bounds, style)
+	if !ok {
+		return
+	}
+	values := []float32{destination[0], destination[1], destination[2], destination[3],
+		style.BorderWidth,
+		style.Fill.Red, style.Fill.Green, style.Fill.Blue, style.Fill.Alpha,
+		style.Border.Red, style.Border.Green, style.Border.Blue, style.Border.Alpha}
+	payload := make([]byte, len(values)*4)
+	for index, value := range values {
+		putFloat32(payload[index*4:], value)
+	}
+	canvas.command(16, payload)
 }
 
 func (canvas *Canvas) Text(value string, style TextStyle) {
