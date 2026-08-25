@@ -81,3 +81,28 @@ func TestOverlayHitTestingPrefersFrontmostButton(t *testing.T) {
 		t.Fatalf("overlay click order = %v", clicks)
 	}
 }
+
+func TestModalBlocksBackdropAndDismissesFromResolvedContent(t *testing.T) {
+	lowerClicks, dismissals := 0, 0
+	lower := &Button{OnClick: func() { lowerClicks++ }}
+	modal := &Modal{OnDismiss: func() { dismissals++ },
+		Child: Align{Horizontal: AlignCenter, Vertical: AlignCenter,
+			Child: PaintComponent{Preferred: Size{Width: 40, Height: 20}}}}
+	host := &ComponentHost{}
+	host.Paint(newCanvas(Size{Width: 120, Height: 80}), Rect{Width: 120, Height: 80},
+		Overlay{Children: []Component{lower, modal}})
+
+	if cursor := host.CursorAt(Point{X: 10, Y: 10}); cursor != CursorArrow {
+		t.Fatalf("modal backdrop cursor = %d, want arrow", cursor)
+	}
+	host.PointerDown(Point{X: 10, Y: 10})
+	host.PointerUp(Point{X: 10, Y: 10})
+	if lowerClicks != 0 || dismissals != 0 {
+		t.Fatalf("backdrop routing: lower=%d dismissals=%d", lowerClicks, dismissals)
+	}
+	host.PointerDown(Point{X: 60, Y: 40})
+	host.PointerUp(Point{X: 60, Y: 40})
+	if lowerClicks != 0 || dismissals != 1 {
+		t.Fatalf("modal routing: lower=%d dismissals=%d", lowerClicks, dismissals)
+	}
+}

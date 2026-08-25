@@ -182,6 +182,30 @@ func (overlay Overlay) Paint(canvas *Canvas, bounds Rect) {
 	}
 }
 
+// Modal paints a backdrop and child above lower overlay layers. Use a stable
+// pointer so its internal barrier can retain pointer state across frames.
+type Modal struct {
+	Backdrop  ShapeStyle
+	Child     Component
+	OnDismiss func()
+	barrier   Button
+	dismiss   Button
+}
+
+func (modal *Modal) Measure(constraints Constraints) Size {
+	if modal.Child == nil {
+		return constraints.Constrain(constraints.Maximum)
+	}
+	return modal.Child.Measure(constraints)
+}
+
+func (modal *Modal) Paint(canvas *Canvas, bounds Rect) {
+	canvas.RoundedRect(bounds, modal.Backdrop)
+	if modal.Child != nil {
+		modal.Child.Paint(canvas, bounds)
+	}
+}
+
 // ComponentStack combines track layout with measured children.
 type ComponentStack struct {
 	Axis     Axis

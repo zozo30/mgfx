@@ -139,6 +139,101 @@ func TestApplicationAnimationUsesServerClock(t *testing.T) {
 	}
 }
 
+func TestApplicationSuspendsAndResumesAnimationRequests(t *testing.T) {
+	clientConnection, serverConnection := net.Pipe()
+	client := &Client{connection: clientConnection, sequence: 1}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer serverConnection.Close()
+	var active atomic.Bool
+	var animationNanos atomic.Int64
+	active.Store(true)
+	done := make(chan error, 1)
+	go func() {
+		done <- client.ServeApplication(ctx, Application{
+			Draw:            func(canvas *Canvas) { canvas.Clear(RGB(0, 0, 0)) },
+			Animation:       func(now time.Duration) { animationNanos.Store(int64(now)) },
+			AnimationActive: active.Load,
+			PointerDown:     func(Point) {},
+		})
+	}()
+
+	resize := make([]byte, 8)
+	binary.LittleEndian.PutUint32(resize[0:4], 320)
+	binary.LittleEndian.PutUint32(resize[4:8], 200)
+	if err := writeMessage(serverConnection, messageResize, resize, 0); err != nil {
+		t.Fatal(err)
+	}
+	if frame, err := readMessage(serverConnection); err != nil || frame.typeID != messageFrame {
+		t.Fatalf("initial frame = %#v, %v", frame, err)
+	}
+	request, err := readMessage(serverConnection)
+	if err != nil || request.typeID != messageRequestAnimationFrame {
+		t.Fatalf("initial animation request = %#v, %v", request, err)
+	}
+
+	clock := make([]byte, 8)
+	binary.LittleEndian.PutUint64(clock, uint64(time.Second))
+	if err := writeMessage(serverConnection, messageAnimationFrame, clock, request.sequence); err != nil {
+		t.Fatal(err)
+	}
+	nextRequest, err := readMessage(serverConnection)
+	if err != nil || nextRequest.typeID != messageRequestAnimationFrame {
+		t.Fatalf("next animation request = %#v, %v", nextRequest, err)
+	}
+	if got := animationNanos.Load(); got != int64(time.Second) {
+		t.Fatalf("initial animation time = %v", time.Duration(got))
+	}
+
+	active.Store(false)
+	if err := writeMessage(serverConnection, messagePointerDown, testFloats(10, 10), 0); err != nil {
+		t.Fatal(err)
+	}
+	binary.LittleEndian.PutUint64(clock, uint64(11*time.Second))
+	if err := writeMessage(serverConnection, messageAnimationFrame, clock, nextRequest.sequence); err != nil {
+		t.Fatal(err)
+	}
+	if err := serverConnection.SetReadDeadline(time.Now().Add(40 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	if unexpected, err := readMessage(serverConnection); err == nil {
+		t.Fatalf("paused animation emitted %#v", unexpected)
+	}
+	if err := serverConnection.SetReadDeadline(time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+
+	active.Store(true)
+	if err := writeMessage(serverConnection, messagePointerDown, testFloats(10, 10), 0); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := readMessage(serverConnection)
+	if err != nil || resumed.typeID != messageRequestAnimationFrame || resumed.sequence == request.sequence {
+		t.Fatalf("resumed animation request = %#v, %v", resumed, err)
+	}
+	binary.LittleEndian.PutUint64(clock, uint64(21*time.Second))
+	if err := writeMessage(serverConnection, messageAnimationFrame, clock, resumed.sequence); err != nil {
+		t.Fatal(err)
+	}
+	continued, err := readMessage(serverConnection)
+	if err != nil || continued.typeID != messageRequestAnimationFrame {
+		t.Fatalf("continued animation request = %#v, %v", continued, err)
+	}
+	if got := time.Duration(animationNanos.Load()); got != time.Second {
+		t.Fatalf("resumed timeline jumped to %v, want paused phase %v", got, time.Second)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("suspended animation application did not stop")
+	}
+}
+
 func TestMeasureTextReturnsLogicalPixelAdvance(t *testing.T) {
 	clientConnection, serverConnection := net.Pipe()
 	client := &Client{connection: clientConnection, sequence: 7}

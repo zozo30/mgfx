@@ -50,6 +50,11 @@ app.Animation = func(now time.Duration) {
 }
 ```
 
+`AnimationActive` can suspend frame requests while retaining the callback. The
+server clock keeps advancing, while the callback timeline subtracts inactive
+duration. Resuming continues at the paused phase without submitting duplicate
+frames or jumping to a new absolute-time phase.
+
 Shapes use the same logical-pixel coordinate system. Both fill and border are
 lowered to one semantic server command:
 
@@ -111,6 +116,12 @@ mgfx.PaintComponentTree(canvas, bounds, root)
 `Overlay` gives components explicit depth without changing flow measurement.
 Children paint back-to-front and hit-test front-to-back; `Align` can position a
 badge, menu, or dialog layer within the shared bounds.
+
+A pointer-stable `Modal` adds a painted backdrop and an input barrier. Lower
+overlay layers cannot receive pointer events while it is mounted, and an
+optional `OnDismiss` callback handles activation of the resolved dialog frame.
+The surrounding backdrop blocks input without using a shifted full-layer click
+target.
 
 `ComponentHost` uses that same measured geometry for hit-testing. A persistent
 `Button` provides hover, pressed, and click behavior and plugs directly into the

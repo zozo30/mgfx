@@ -7,12 +7,14 @@ type ButtonStyle struct {
 
 // Button is a measured component with persistent hover, press, and click state.
 type Button struct {
-	Style   ButtonStyle
-	Child   Component
-	OnClick func()
-	hovered bool
-	focused bool
-	pressed bool
+	Style     ButtonStyle
+	Child     Component
+	OnClick   func()
+	hovered   bool
+	focused   bool
+	pressed   bool
+	cursor    Cursor
+	cursorSet bool
 }
 
 func (button *Button) Measure(constraints Constraints) Size {
@@ -104,6 +106,38 @@ func (overlay Overlay) hitTest(bounds Rect, point Point) *Button {
 	}
 	return nil
 }
+func (modal *Modal) hitTest(bounds Rect, point Point) *Button {
+	if target := hitComponent(modal.Child, bounds, point); target != nil {
+		return target
+	}
+	if !contains(bounds, point) {
+		return nil
+	}
+	contentBounds := componentVisualBounds(modal.Child, bounds)
+	if contains(contentBounds, point) {
+		modal.dismiss.OnClick = modal.OnDismiss
+		modal.dismiss.cursor = CursorArrow
+		modal.dismiss.cursorSet = true
+		return &modal.dismiss
+	}
+	modal.barrier.OnClick = nil
+	modal.barrier.cursor = CursorArrow
+	modal.barrier.cursorSet = true
+	return &modal.barrier
+}
+
+func componentVisualBounds(component Component, bounds Rect) Rect {
+	switch value := component.(type) {
+	case Align:
+		return value.childBounds(bounds)
+	case Offset:
+		bounds.X += value.X
+		bounds.Y += value.Y
+		return componentVisualBounds(value.Child, bounds)
+	default:
+		return bounds
+	}
+}
 
 func (stack ComponentStack) frames(bounds Rect) ([]Rect, error) {
 	tracks := stack.childTracks(Tight(Size{Width: bounds.Width, Height: bounds.Height}))
@@ -155,6 +189,9 @@ func (overlay Overlay) collectButtons(bounds Rect, entries *[]buttonEntry) {
 		collectComponentButtons(child, bounds, entries)
 	}
 }
+func (modal *Modal) collectButtons(bounds Rect, entries *[]buttonEntry) {
+	collectComponentButtons(modal.Child, bounds, entries)
+}
 func (stack ComponentStack) collectButtons(bounds Rect, entries *[]buttonEntry) {
 	frames, err := stack.frames(bounds)
 	if err != nil {
@@ -186,7 +223,10 @@ func (host *ComponentHost) target(point Point) *Button {
 
 // CursorAt maps interactive component geometry to a portable native cursor.
 func (host *ComponentHost) CursorAt(point Point) Cursor {
-	if host.target(point) != nil {
+	if target := host.target(point); target != nil {
+		if target.cursorSet {
+			return target.cursor
+		}
 		return CursorPointingHand
 	}
 	return CursorArrow

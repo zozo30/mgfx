@@ -24,7 +24,9 @@ func main() {
 	arcAngle := float32(0)
 	labelWidth := float32(360)
 	playing := true
+	dialogOpen := false
 	host := &mgfx.ComponentHost{}
+	modal := &mgfx.Modal{}
 	toggle := &mgfx.Button{
 		Style: mgfx.ButtonStyle{
 			Normal: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.02, 0.06, 0.16, 0.72),
@@ -37,8 +39,12 @@ func main() {
 				Border: mgfx.RGBA(0.85, 0.7, 1, 1), BorderWidth: 2, CornerRadius: 12},
 			Padding: mgfx.UniformInsets(6),
 		},
-		OnClick: func() { playing = !playing },
+		OnClick: func() {
+			playing = !playing
+			dialogOpen = !playing
+		},
 	}
+	modal.OnDismiss = func() { dialogOpen, playing = false, true }
 	app := mgfx.Application{Window: window}
 	app.Prepare = func(ctx context.Context, client *mgfx.Client) error {
 		measured, err := client.MeasureText(ctx, "Hello from Go over MGFX", mgfx.TextMeasureStyle{
@@ -120,7 +126,27 @@ func main() {
 						},
 					}}},
 			}}
-		host.Paint(canvas, banner, components)
+		var root mgfx.Component = components
+		if dialogOpen {
+			modal.Backdrop = mgfx.ShapeStyle{Fill: mgfx.RGBA(0.005, 0.01, 0.035, 0.78),
+				CornerRadius: 18}
+			modal.Child = mgfx.Align{Horizontal: mgfx.AlignCenter, Vertical: mgfx.AlignCenter,
+				Child: mgfx.Panel{Padding: mgfx.UniformInsets(12),
+					Style: mgfx.ShapeStyle{Fill: mgfx.RGBA(0.035, 0.06, 0.15, 0.98),
+						Border: mgfx.RGB(0.72, 0.62, 1), BorderWidth: 2, CornerRadius: 16},
+					Child: mgfx.PaintComponent{Preferred: mgfx.Size{Width: 260, Height: 62},
+						Draw: func(canvas *mgfx.Canvas, bounds mgfx.Rect) {
+							canvas.Text("Animation paused - click to resume", mgfx.TextStyle{
+								X: bounds.X + bounds.Width/2, Y: bounds.Y + 6, Size: 18,
+								Color: mgfx.RGB(0.78, 0.95, 1), Weight: mgfx.Medium,
+								Anchor: mgfx.AnchorMiddle})
+							canvas.DiagonalPattern(mgfx.Rect{X: bounds.X + 20, Y: bounds.Y + 42,
+								Width: bounds.Width - 40, Height: 8}, mgfx.DiagonalPatternStyle{
+								Color: mgfx.RGBA(0.75, 0.55, 1, 0.85), StripeWidth: 5, Gap: 5})
+						}}}}
+			root = mgfx.Overlay{Children: []mgfx.Component{components, modal}}
+		}
+		host.Paint(canvas, banner, root)
 	}
 	app.PointerMove = host.PointerMove
 	app.PointerDown = host.PointerDown
@@ -128,10 +154,8 @@ func main() {
 	app.Cursor = host.CursorAt
 	app.KeyDown = host.KeyDown
 	app.KeyUp = host.KeyUp
+	app.AnimationActive = func() bool { return playing }
 	app.Animation = func(now time.Duration) {
-		if !playing {
-			return
-		}
 		textOffset = float32(math.Sin(now.Seconds()*1.8) * 16)
 		patternOffset = -float32(math.Mod(now.Seconds()*28, 13))
 		arcAngle = float32(math.Mod(now.Seconds()*90, 360))

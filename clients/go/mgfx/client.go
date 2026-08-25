@@ -96,6 +96,9 @@ type Application struct {
 	Scroll      func(ScrollEvent)
 	TextInput   func(string)
 	Animation   func(time.Duration)
+	// AnimationActive can suspend display-link requests without removing the
+	// animation callback. A nil predicate means animation is always active.
+	AnimationActive func() bool
 }
 
 type Client struct {
@@ -285,6 +288,10 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 	pending := false
 	var animationSequence uint32 = 1
 	var pendingAnimation uint32
+	var lastServerAnimation time.Duration
+	var animationOffset time.Duration
+	hasAnimationTime := false
+	animationSuspended := false
 	currentCursor := CursorArrow
 	submit := func() error {
 		if size.Width <= 0 || size.Height <= 0 {
@@ -309,8 +316,16 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 		pending = false
 		return nil
 	}
+	animationIsActive := func() bool {
+		active := application.Animation != nil &&
+			(application.AnimationActive == nil || application.AnimationActive())
+		if !active && application.Animation != nil {
+			animationSuspended = true
+		}
+		return active
+	}
 	requestAnimation := func() error {
-		if application.Animation == nil || pendingAnimation != 0 {
+		if !animationIsActive() || pendingAnimation != 0 {
 			return nil
 		}
 		sequence := animationSequence
@@ -383,6 +398,9 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 				if err := submit(); err != nil {
 					return err
 				}
+				if err := requestAnimation(); err != nil {
+					return err
+				}
 			}
 		case messageKeyDown, messageKeyUp:
 			event, err := decodeKey(incoming.payload)
@@ -398,6 +416,9 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 				if err := submit(); err != nil {
 					return err
 				}
+				if err := requestAnimation(); err != nil {
+					return err
+				}
 			}
 		case messageScroll:
 			event, err := decodeScroll(incoming.payload)
@@ -407,6 +428,9 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 			if application.Scroll != nil {
 				application.Scroll(event)
 				if err := submit(); err != nil {
+					return err
+				}
+				if err := requestAnimation(); err != nil {
 					return err
 				}
 			}
@@ -419,6 +443,9 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 				if err := submit(); err != nil {
 					return err
 				}
+				if err := requestAnimation(); err != nil {
+					return err
+				}
 			}
 		case messageAnimationFrame:
 			if len(incoming.payload) != 8 {
@@ -426,9 +453,18 @@ func (client *Client) ServeApplication(ctx context.Context, application Applicat
 			}
 			if application.Animation != nil && incoming.sequence == pendingAnimation {
 				pendingAnimation = 0
-				application.Animation(time.Duration(binary.LittleEndian.Uint64(incoming.payload)))
-				if err := submit(); err != nil {
-					return err
+				if animationIsActive() {
+					serverTime := time.Duration(binary.LittleEndian.Uint64(incoming.payload))
+					if animationSuspended && hasAnimationTime && serverTime > lastServerAnimation {
+						animationOffset += serverTime - lastServerAnimation
+					}
+					animationSuspended = false
+					lastServerAnimation = serverTime
+					hasAnimationTime = true
+					application.Animation(serverTime - animationOffset)
+					if err := submit(); err != nil {
+						return err
+					}
 				}
 				if err := requestAnimation(); err != nil {
 					return err
